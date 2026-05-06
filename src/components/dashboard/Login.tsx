@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { LockPasswordIcon, Login03Icon } from '@hugeicons/core-free-icons';
+import { LockIcon, Login03Icon } from '@hugeicons/core-free-icons';
 
 export const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -41,7 +41,7 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md bg-paper-dark sketchy-border p-10 md:p-12 relative z-10 text-center shadow-[8px_8px_0px_0px_rgba(232,224,208,0.1)]">
         <div className="flex justify-center mb-8">
           <div className="p-4 sketchy-border bg-white/5 border-white/20 text-sepia">
-            <HugeiconsIcon icon={LockPasswordIcon} size={28} strokeWidth={1.5} />
+            <HugeiconsIcon icon={LockIcon} size={28} strokeWidth={1.5} />
           </div>
         </div>
         
