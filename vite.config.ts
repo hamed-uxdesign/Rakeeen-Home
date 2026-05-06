@@ -12,7 +12,7 @@ export default defineConfig({
   base: '/Rakeeen-Home/',
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(process.cwd(), "./src"),
     },
   },
 })
