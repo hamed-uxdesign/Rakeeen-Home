@@ -1,0 +1,166 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&display=swap');
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sketch: "Playfair Display", Georgia, serif;
+  --font-arabic: "SF Pro Arabic Rounded", "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
+
+  /* Rakeeen Palette - Derived from original but structured like Hamid's system */
+  --paper: #0a0908;
+  --paper-dark: #0e0d0c;
+  --ink: #e9e2d2;
+  --ink-faded: #a59e92;
+  --ink-light: #7c7265;
+  --sepia: #d1b16c;
+  --rust: #d97858;
+  --forest: #7ca87c;
+  --cream: #12100e;
+  
+  --color-background: var(--paper);
+  --color-surface: var(--paper-dark);
+  --color-primary: var(--ink);
+  --color-gold: var(--sepia);
+
+  --radius-organic: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  --radius-btn: 180px 8px 160px 8px / 8px 160px 8px 180px;
+}
+
+@layer base {
+  :root {
+    /* Legacy variables for compatibility with existing components */
+    --bg: var(--paper);
+    --surface: var(--paper-dark);
+    --surface2: var(--cream);
+    --border: rgba(195,163,112,0.18);
+    --border-mid: rgba(195,163,112,0.35);
+    --gold: var(--sepia);
+    --text: var(--ink);
+    --text-mid: var(--ink-faded);
+    --text-dim: var(--ink-light);
+    --serif: var(--font-sketch);
+    --sans: var(--font-sans);
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    @apply antialiased;
+    background-image: radial-gradient(rgba(233, 226, 210, 0.03) 1.5px, transparent 1.5px);
+    background-size: 24px 24px;
+    min-height: 100vh;
+  }
+
+  /* Custom Cursor - Desktop Only */
+  @media (min-width: 769px) and (hover: hover) {
+    *, a, button, input, textarea, select {
+      cursor: none !important;
+    }
+  }
+
+  i, em, .italic {
+    font-family: var(--font-sketch);
+    font-style: italic;
+  }
+
+  ::selection {
+    background: var(--sepia);
+    color: var(--paper);
+  }
+}
+
+@layer utilities {
+  .sketch-font { font-family: var(--font-sketch); }
+  .font-arabic { font-family: var(--font-arabic); }
+
+  .hand-card {
+    background: var(--paper-dark);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-organic);
+    position: relative;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .sketchy-border {
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-btn);
+    background: var(--paper-dark);
+    box-shadow: 2px 2px 0px 0px rgba(232, 224, 208, 0.1);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .sketchy-border:hover {
+    box-shadow: 6px 6px 0px 0px var(--ink);
+    transform: translate(-3px, -3px);
+  }
+
+  .animate-scale-in {
+    animation: scaleInWithShadow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes scaleInWithShadow {
+    from {
+      opacity: 0;
+      transform: scale(0.9) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      box-shadow: 8px 8px 0px 0px var(--ink);
+    }
+  }
+
+  /* Premium Buttons (Rakeeen specific style but with Hamid's tech) */
+  .btn-premium {
+    @apply inline-flex items-center justify-center gap-3 px-8 py-4;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-btn);
+    background: var(--paper-dark);
+    box-shadow: 2px 2px 0px 0px rgba(232, 224, 208, 0.1);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    color: var(--ink);
+    font-size: 17px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    outline: none;
+  }
+
+  .btn-premium:hover {
+    box-shadow: 6px 6px 0px 0px var(--ink);
+    transform: translate(-3px, -3px);
+  }
+
+  .btn-premium:active {
+    transform: translate(0, 0);
+    box-shadow: 2px 2px 0px 0px var(--ink);
+    transition: all 0.1s ease;
+  }
+
+  .sketchy-btn {
+    @apply inline-flex items-center justify-center px-6 py-2 transition-all duration-200;
+    font-weight: 700;
+    background: transparent;
+    border: 2px solid var(--ink);
+    border-radius: var(--radius-btn);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .sketchy-btn:hover {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  .sketchy-btn.filled {
+    background: var(--forest);
+    color: var(--paper);
+    border-color: var(--forest);
+  }
+
+  .sketchy-btn.filled:hover {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+}
