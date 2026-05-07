@@ -149,7 +149,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate }) => {
 
       {tab === 'progress' && (
         <div className="animate-scale-in">
-          <Card variant="sketchy" title="Weekly Calories" subtitle={`Goal: ${CALORIE_GOAL} kcal`} className="bg-paper/30">
+          <Card variant="sketchy" title="Weekly Calories" subtitle={`Goal: ${CALORIE_GOAL} kcal`} className="bg-[var(--paper)]">
             <div className="h-[250px] w-full mt-8">
               <ResponsiveContainer>
                 <AreaChart data={weekCalories}>

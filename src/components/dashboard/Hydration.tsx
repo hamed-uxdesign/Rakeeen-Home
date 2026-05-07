@@ -119,7 +119,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
       </header>
 
       {/* Main Card (Non-interactive hover, removed 'variant="sketchy"') */}
-      <div className="text-center mb-10 overflow-hidden border-2 border-ink rounded-[var(--radius-btn)] bg-paper-dark shadow-[4px_4px_0px_0px_rgba(232,224,208,0.05)] p-8">
+      <div className="text-center mb-10 sys-card p-8">
         <div className="relative py-6">
           <div className="text-8xl font-black text-sepia leading-none">{glasses}</div>
           <div className="text-[10px] text-ink/30 uppercase tracking-[0.2em] font-black mt-2">of {goal} glasses today</div>
@@ -161,7 +161,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
       </div>
 
       {/* Today's Log */}
-      <div className="bg-[var(--paper)]/30 mb-10 overflow-hidden border-2 border-[var(--ink)] rounded-[var(--radius-btn)] shadow-[4px_4px_0px_0px_rgba(232,224,208,0.05)] p-8">
+      <div className="sys-card mb-10 p-8">
         <h2 className="text-3xl font-bold tracking-tight mb-8">Today's log</h2>
         {log.length > 0 ? (
           <div className="flex flex-wrap gap-3">
@@ -178,7 +178,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
       </div>
 
       {/* Water Reports Section */}
-      <div className="bg-[var(--paper)]/30 pb-4 overflow-hidden border-2 border-[var(--ink)] rounded-[var(--radius-btn)] shadow-[4px_4px_0px_0px_rgba(232,224,208,0.05)] p-8">
+      <div className="sys-card pb-4 p-8">
         <h2 className="text-3xl font-bold tracking-tight mb-8">Water reports</h2>
         <div className="flex justify-end gap-3 mb-8 -mt-16 relative z-10">
           {(['week', 'month', 'year'] as const).map(v => (

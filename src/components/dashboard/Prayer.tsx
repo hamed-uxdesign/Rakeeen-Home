@@ -64,7 +64,7 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
           return (
             <div key={name} 
               className={`flex justify-between items-center px-8 py-6 transition-all duration-300
-                ${isCurrent ? 'bg-sepia/10 sketchy-border scale-[1.02] -translate-y-1' : 'bg-paper/30 border-2 border-ink/5 rounded-2xl hover:border-ink/10'}
+                ${isCurrent ? 'bg-sepia/10 sketchy-border scale-[1.02] -translate-y-1' : 'bg-[var(--paper)] border-2 border-ink/5 rounded-2xl hover:border-ink/10'}
               `}
             >
               <div className="flex items-center gap-4">

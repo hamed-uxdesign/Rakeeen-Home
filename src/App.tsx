@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Home } from './components/dashboard/Home';
 import { Water } from './components/dashboard/Hydration';
 import { Calendar } from './components/dashboard/Calendar';
@@ -7,17 +8,23 @@ import { Prayer } from './components/dashboard/Prayer';
 import { Fitness } from './components/dashboard/Fitness';
 import { Login } from './components/dashboard/Login';
 import { CustomCursor } from './components/ui/CustomCursor';
+import { FloatingTimer } from './components/ui/FloatingTimer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { PomodoroProvider } from './hooks/usePomodoro';
 import './styles/global.css';
 
-const Main: React.FC = () => {
-  const [page, setPage] = useState('home');
+const AppRoutes: React.FC = () => {
+  const navigate = useNavigate();
   const { user, loading } = useAuth();
 
-  const navigate = (to: string) => {
-    setPage(to);
+  const nav = (to: string) => {
+    const path = to === 'home' ? '/' : `/${to}`;
+    navigate(path);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Derive current page from location
+  const currentPage = window.location.pathname.replace('/Rakeeen-Home', '').replace('/', '') || 'home';
 
   if (loading) {
     return (
@@ -27,30 +34,47 @@ const Main: React.FC = () => {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen">
+        <CustomCursor />
+        <Login />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       <CustomCursor />
-      {!user ? (
-        <Login />
-      ) : (
-        <>
-          {page === 'home' && <Home navigate={navigate} />}
-          {page === 'hydration' && <Water navigate={navigate} />}
-          {page === 'calendar' && <Calendar navigate={navigate} />}
-          {page === 'pomodoro' && <Pomodoro navigate={navigate} />}
-          {page === 'prayer' && <Prayer navigate={navigate} />}
-          {page === 'fitness' && <Fitness navigate={navigate} />}
-        </>
-      )}
+      <Routes>
+        <Route path="/" element={<Home navigate={nav} />} />
+        <Route path="/hydration" element={<Water navigate={nav} />} />
+        <Route path="/calendar" element={<Calendar navigate={nav} />} />
+        <Route path="/pomodoro" element={<Pomodoro navigate={nav} />} />
+        <Route path="/prayer" element={<Prayer navigate={nav} />} />
+        <Route path="/fitness" element={<Fitness navigate={nav} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <FloatingTimer currentPage={currentPage} onNavigate={() => nav('pomodoro')} />
     </div>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <Main />
-    </AuthProvider>
+    <BrowserRouter 
+      basename="/Rakeeen-Home"
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}
+    >
+      <AuthProvider>
+        <PomodoroProvider>
+          <AppRoutes />
+        </PomodoroProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
