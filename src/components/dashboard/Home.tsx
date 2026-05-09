@@ -41,7 +41,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     { id:'calendar', icon:<CalIcon size={18} />, label:'Calendar' },
     { id:'pomodoro', icon:<Timer size={18} />, label:'Pomodoro analytics' },
     { id:'prayer', icon:<Moon size={18} />, label:'Prayer times' },
-    // { id:'fitness', icon:<Activity size={18} />, label:'Fitness & nutrition' },
+    { id:'fitness', icon:<Activity size={18} />, label:'Fitness & nutrition' },
   ];
 
   const handleAvatarClick = () => {
