@@ -4,7 +4,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { POMODORO_MONTHLY_MOCK, POMODORO_WEEKLY_MOCK } from '../../constants/mockData';
 import { formatTime } from '../../utils/timeHelpers';
 import { BackBtn } from '../layout/Common';
-import { Button } from '../ui/UIComponents';
+import { Button, PageHeader, ChartTooltip } from '../ui/UIComponents';
+import { Tabs } from '../ui/Tabs';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { PlayIcon, PauseIcon, RefreshIcon, ArrowExpand01Icon, Cancel01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
 import { usePomodoro } from '../../hooks/usePomodoro';
@@ -83,31 +84,14 @@ const DurationEditor: React.FC<{
   );
 };
 
-// ─── Custom Tooltip (Matches Hydration Style) ───────────────────────────────────
+// Custom tooltip logic moved to ChartTooltip
 const getTip = (value: number, type: string) => {
-  let target = 8; // Default goal: 8 sessions
-  if (type === 'month') target = 8 * 5; // roughly 5 days/week
+  let target = 8;
+  if (type === 'month') target = 8 * 5;
   if (type === 'year') target = 8 * 250;
-
   if (value >= target) return "Elite Focus!";
   if (value >= target * 0.7) return "Almost there!";
   return "Keep pushing";
-};
-
-const CustomTooltip = ({ active, payload, label, view }: any) => {
-  if (active && payload && payload.length) {
-    const val = payload[0].value;
-    return (
-      <div className="bg-[var(--paper-dark)] border-2 border-[var(--ink)] shadow-[4px_4px_0px_0px_var(--ink)] p-4 rounded-[var(--radius-btn)]">
-        <p className="text-[var(--ink)] font-black text-xl">{label}</p>
-        <p className="text-[var(--forest)] font-bold text-sm mt-1">{val} Sessions</p>
-        <p className="text-[10px] text-[var(--ink)] opacity-50 uppercase tracking-widest mt-2 font-black">
-          {getTip(val, view)}
-        </p>
-      </div>
-    );
-  }
-  return null;
 };
 
 // ─── Wavy Timer Ring ──────────────────────────────────────────────────────────
@@ -203,12 +187,22 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
     return () => cancelAnimationFrame(animId);
   }, [running, isOvertime]);
 
-  // ESC to exit fullscreen
+  // ESC to exit fullscreen + Disable body scroll
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsFullscreen(false); };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+    
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isFullscreen]);
 
   const FOCUS_S = focusDuration * 60;
   const BREAK_S = breakDuration * 60;
@@ -341,10 +335,11 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
       <div className="max-w-2xl mx-auto py-10 px-5">
         <BackBtn onClick={() => navigate('home')} />
 
-        <header className="mb-10">
-          <h2 className="text-4xl font-black text-ink mb-1">Pomodoro</h2>
-          <p className="text-[10px] text-ink/30 tracking-[0.2em] font-black">Focus sessions & productivity analytics</p>
-        </header>
+        <PageHeader 
+          title="Pomodoro" 
+          subtitle="Focus sessions & productivity analytics" 
+          size="md"
+        />
 
         {/* Focus Session Card */}
         <div className="text-center mb-10 sys-card p-8 relative">
@@ -429,15 +424,12 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
         {/* Sessions Reports */}
         <div className="sys-card pb-4 p-8">
           <h2 className="text-3xl font-bold tracking-tight mb-8">Sessions reports</h2>
-          <div className="flex justify-end gap-3 mb-8 -mt-16 relative z-10">
-            {(['week', 'month', 'year'] as const).map(v => (
-              <button key={v} onClick={() => setView(v)}
-                className={`text-[10px] uppercase tracking-widest font-black px-5 py-2 rounded-full border-2 transition-all duration-300 ${view === v ? 'border-[var(--forest)] text-[var(--paper)] bg-[var(--forest)]' : 'border-[var(--ink)] text-[var(--ink)] opacity-40 hover:opacity-100 hover:border-[var(--forest)]'}`}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+          <Tabs 
+            tabs={['week', 'month', 'year']} 
+            activeTab={view} 
+            onChange={(v) => setView(v as any)} 
+            className="justify-end mb-10 -mt-16"
+          />
 
           <div className="h-[250px] w-full mt-4">
             <ResponsiveContainer>
@@ -447,7 +439,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                 <YAxis tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
                 <Tooltip
                   cursor={{ fill: 'rgba(124,169,130,0.05)' }}
-                  content={<CustomTooltip view={view} />}
+                  content={<ChartTooltip unit="Sessions" getTipMessage={(val) => getTip(val, view)} />}
                 />
                 
                 {/* Goal Reference Line (Matches Hydration) */}
@@ -458,7 +450,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                   strokeOpacity={0.4} 
                 />
 
-                <Bar dataKey="sessions" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                <Bar dataKey="sessions" radius={[0, 0, 0, 0]} maxBarSize={40}>
                   {(view === 'week' ? weekStats : POMODORO_MONTHLY_MOCK).map((_: any, i: number) => (
                     <Cell key={i} fill="var(--forest)" />
                   ))}

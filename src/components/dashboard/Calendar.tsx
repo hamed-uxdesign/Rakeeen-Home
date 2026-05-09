@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BackBtn } from '../layout/Common';
+import { PageHeader } from '../ui/UIComponents';
 
 interface CalendarProps {
   navigate: (to: string) => void;
@@ -14,7 +15,6 @@ interface CalEvent {
   durationMins: number;
 }
 
-// Temporary URL (Returns 404 because it's public. User needs to replace with Secret iCal link)
 const ICAL_URL = 'https://calendar.google.com/calendar/ical/hamed.rakeeen%40gmail.com/private-aa7a61a1272c8a39e1d8c9e1d8ecba50/basic.ics';
 
 export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
@@ -27,96 +27,127 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
     document.title = 'Rakeeen - Calendar';
   }, []);
 
+  const parseICalDate = (str: string) => {
+    if (!str) return null;
+    try {
+      const cleanStr = str.replace(/[:;].*$/, '').trim();
+      if (cleanStr.length < 8) return null;
+      const y = parseInt(cleanStr.slice(0, 4));
+      const m = parseInt(cleanStr.slice(4, 6)) - 1;
+      const d = parseInt(cleanStr.slice(6, 8));
+      if (cleanStr.includes('T')) {
+        const h = parseInt(cleanStr.slice(9, 11));
+        const min = parseInt(cleanStr.slice(11, 13));
+        const s = parseInt(cleanStr.slice(13, 15));
+        const isUTC = cleanStr.endsWith('Z');
+        if (isUTC) return new Date(Date.UTC(y, m, d, h, min, s));
+        return new Date(y, m, d, h, min, s);
+      }
+      return new Date(y, m, d);
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const formatDuration = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h > 0) return `${h}h ${m > 0 ? m + 'm' : ''}`;
+    return `${m}m`;
+  };
+
   useEffect(() => {
     const fetchICS = async () => {
       try {
         const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(ICAL_URL)}`);
-        if (!res.ok) throw new Error('Failed to fetch');
         const text = await res.text();
-
-        const lines = text.split(/\r?\n/);
-        const parsedEvents: CalEvent[] = [];
+        const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
+        const lines = unfoldedText.split(/\r?\n/);
+        const tempEvents: CalEvent[] = [];
         let curr: any = { rrule: '' };
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        const todayTime = todayStart.getTime();
+        const tomorrowTime = todayEnd.getTime();
 
         for (let line of lines) {
           if (line.startsWith('BEGIN:VEVENT')) {
-            curr = { id: Math.random().toString(), rrule: '' };
+            curr = { rrule: '' };
           } else if (line.startsWith('END:VEVENT')) {
-            if (curr.title && curr.start && curr.end) {
-              const baseStart = parseICalDate(curr.start);
-              const baseEnd = parseICalDate(curr.end);
-              const durationMs = baseEnd.getTime() - baseStart.getTime();
+            if (curr.summary && curr.dtstart && curr.dtend) {
+              const baseStart = parseICalDate(curr.dtstart);
+              const baseEnd = parseICalDate(curr.dtend);
+              
+              if (baseStart && baseEnd) {
+                const durationMs = baseEnd.getTime() - baseStart.getTime();
+                const untilDate = curr.rrule && curr.rrule.includes('UNTIL=') ? parseICalDate(curr.rrule.match(/UNTIL=([^;]+)/)?.[1] || '') : null;
 
-              const generateInstance = (offsetDays: number) => {
-                const instStart = new Date(baseStart);
-                const targetDate = new Date(today);
-                targetDate.setDate(targetDate.getDate() + offsetDays);
-                instStart.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
-                const instEnd = new Date(instStart.getTime() + durationMs);
-                return { start: instStart, end: instEnd };
-              };
+                const checkAndAdd = (instStart: Date) => {
+                  if (untilDate && instStart.getTime() > untilDate.getTime()) return;
+                  
+                  const instEnd = new Date(instStart.getTime() + durationMs);
+                  
+                  // ABSOLUTE SINGLE DAY CHECK
+                  const todayStr = new Date().toDateString();
+                  const startsToday = instStart.toDateString() === todayStr;
+                  const endsToday = instEnd.toDateString() === todayStr;
+                  const spansToday = instStart.getTime() < todayTime && instEnd.getTime() > tomorrowTime;
 
-              let untilDate: Date | null = null;
-              if (curr.rrule.includes('UNTIL=')) {
-                const match = curr.rrule.match(/UNTIL=([0-9T]+Z?)/);
-                if (match) untilDate = parseICalDate(match[1]);
-              }
+                  if (startsToday || endsToday || spansToday) {
+                     const durationMins = Math.floor(durationMs / 60000);
+                     const timeStr = instStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                     tempEvents.push({ 
+                       id: curr.summary + instStart.getTime(), 
+                       title: curr.summary, 
+                       startDate: instStart, 
+                       endDate: instEnd, 
+                       durationMins, 
+                       timeStr 
+                     });
+                  }
+                };
 
-              const addIfMatches = (offsetDays: number) => {
-                if (untilDate && untilDate.getTime() < today.getTime()) return; // Skip expired events
-                const inst = generateInstance(offsetDays);
-                const durationMins = Math.floor(durationMs / 60000);
-                const timeStr = inst.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                parsedEvents.push({ id: curr.id + offsetDays, title: curr.title, startDate: inst.start, endDate: inst.end, durationMins, timeStr });
-              };
-
-              if (curr.rrule.includes('FREQ=DAILY')) {
-                addIfMatches(-1); // Yesterday
-                addIfMatches(0);  // Today
-              } else if (curr.rrule.includes('FREQ=WEEKLY')) {
-                const days = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-                const yestDate = new Date(today); yestDate.setDate(yestDate.getDate() - 1);
-                
-                let byDays = '';
-                const byDayMatch = curr.rrule.match(/BYDAY=([^;]+)/);
-                if (byDayMatch) {
-                  byDays = byDayMatch[1];
+                if (curr.rrule && curr.rrule.includes('FREQ=DAILY')) {
+                  // Only if the recurring series started before or on today
+                  if (baseStart.getTime() <= tomorrowTime) {
+                    const inst = new Date(todayStart);
+                    inst.setHours(baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds());
+                    checkAndAdd(inst);
+                  }
+                } else if (curr.rrule && curr.rrule.includes('FREQ=WEEKLY')) {
+                  if (baseStart.getTime() <= tomorrowTime) {
+                    const days = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+                    const targetDay = todayStart.getDay();
+                    let byDay = curr.rrule.match(/BYDAY=([^;]+)/)?.[1] || days[baseStart.getDay()];
+                    if (byDay.includes(days[targetDay])) {
+                      const inst = new Date(todayStart);
+                      inst.setHours(baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds());
+                      checkAndAdd(inst);
+                    }
+                  }
                 } else {
-                  byDays = days[baseStart.getDay()];
+                  // Non-recurring: must be today
+                  checkAndAdd(baseStart);
                 }
-                
-                if (byDays.includes(days[yestDate.getDay()])) addIfMatches(-1);
-                if (byDays.includes(days[today.getDay()])) addIfMatches(0);
-              } else {
-                const durationMins = Math.floor(durationMs / 60000);
-                const timeStr = baseStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                parsedEvents.push({ id: curr.id, title: curr.title, startDate: baseStart, endDate: baseEnd, durationMins, timeStr });
               }
             }
             curr = { rrule: '' };
-          } else if (line.startsWith('SUMMARY:')) curr.title = line.substring(8);
-          else if (line.startsWith('DTSTART')) curr.start = line.split(':')[1];
-          else if (line.startsWith('DTEND')) curr.end = line.split(':')[1];
+          }
+ else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
+          else if (line.startsWith('DTSTART')) curr.dtstart = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
+          else if (line.startsWith('DTEND')) curr.dtend = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
           else if (line.startsWith('RRULE:')) curr.rrule = line;
         }
 
-        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-
-        const filteredEvents = parsedEvents.filter(e => e.startDate.getTime() <= todayEnd.getTime() && e.endDate.getTime() >= todayStart.getTime());
-        filteredEvents.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
-        
-        setEvents(filteredEvents);
+        const unique = tempEvents.filter((v, i, a) => a.findIndex(t => t.title === v.title && t.startDate.getTime() === v.startDate.getTime()) === i);
+        unique.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+        setEvents(unique);
       } catch (err) {
-        console.error("ICS Fetch Error:", err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
-
     fetchICS();
   }, []);
 
@@ -136,82 +167,73 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
     return () => clearInterval(interval);
   }, [events]);
 
-  const parseICalDate = (str: string) => {
-    if (!str) return new Date();
-    // basic parsing for YYYYMMDDTHHMMSSZ
-    const y = parseInt(str.slice(0, 4));
-    const m = parseInt(str.slice(4, 6)) - 1;
-    const d = parseInt(str.slice(6, 8));
-    if (str.includes('T')) {
-      const h = parseInt(str.slice(9, 11));
-      const min = parseInt(str.slice(11, 13));
-      const s = parseInt(str.slice(13, 15));
-      const isUTC = str.endsWith('Z');
-      if (isUTC) return new Date(Date.UTC(y, m, d, h, min, s));
-      return new Date(y, m, d, h, min, s);
-    }
-    return new Date(y, m, d);
-  };
-
-  const formatDuration = (mins: number) => {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    if (h > 0 && m > 0) return `${h}h ${m}m`;
-    if (h > 0) return `${h}h`;
-    return `${m}m`;
-  };
-
   return (
-    <div className="max-w-2xl mx-auto py-10 px-5 sm:px-20 ml-10 sm:ml-auto">
+    <div className="max-w-2xl mx-auto py-12 px-6 min-h-screen">
       <BackBtn onClick={() => navigate('home')} />
+      <PageHeader 
+        title="Calendar" 
+        subtitle="Schedule & Agenda" 
+      />
 
-      <header className="mb-10">
-        <h2 className="text-4xl font-black text-ink mb-1">Calendar</h2>
-        <p className="text-[10px] text-ink/30 tracking-[0.2em] font-black">Calendar view</p>
-      </header>
-
-      {/* Active Event Banner */}
       {activeEvent ? (
-        <div className="mb-10 bg-forest/20 border-2 border-forest rounded-2xl p-6 text-center shadow-[4px_4px_0px_0px_var(--forest)] animate-scale-in">
-          <p className="text-[10px] text-forest/70 tracking-[0.3em] font-black mb-2"><span className="text-orange-500">●</span> Happening now</p>
-          <h3 className="text-3xl font-black text-forest mb-4">{activeEvent.title}</h3>
-          <div className="inline-block bg-forest text-paper px-6 py-2 rounded-full font-black tracking-widest text-sm">
-            {formatDuration(timeLeft)} left
-          </div>
+        <div 
+          className="p-12 text-center mb-12 animate-scale-in"
+          style={{ 
+            backgroundColor: 'var(--paper)',
+            border: '2px solid var(--forest)',
+            borderLeftWidth: '8px',
+            borderRadius: 'var(--radius-organic)',
+          }}
+        >
+           <div className="text-xs font-black text-forest uppercase tracking-[0.4em] mb-6">● Active Session</div>
+           <h3 className="text-4xl font-black text-ink mb-6">{activeEvent.title}</h3>
+           {timeLeft < 60 && (
+             <div className="text-2xl font-black text-forest tracking-tighter">
+               {timeLeft} 
+               <span className="text-xs uppercase ml-4 opacity-50 font-black tracking-[0.2em] whitespace-nowrap inline-block">
+                 minutes remaining
+               </span>
+             </div>
+           )}
         </div>
       ) : (
-        <div className="mb-10 bg-ink/5 border-2 border-ink/10 rounded-2xl p-6 text-center">
-          <p className="text-xs text-ink/40 font-bold tracking-widest">No active event at the moment.</p>
+        <div 
+          className="p-10 text-center mb-12 bg-paper/30"
+          style={{ borderRadius: 'var(--radius-organic)' }}
+        >
+           <p className="text-xs text-ink/20 font-black uppercase tracking-widest">Quiet period — No active events</p>
         </div>
       )}
 
-      <div className="relative mt-8">
-        <div className="absolute -left-[24px] top-4 bottom-4 w-1 bg-ink/5" />
-
+      <div className="space-y-6">
         {loading ? (
-          <div className="text-center py-10 text-ink/40 font-bold tracking-widest">Syncing Google calendar...</div>
+          <div className="py-24 text-center text-ink/20 font-black uppercase tracking-widest text-sm animate-pulse">Syncing Cloud Calendar...</div>
         ) : events.length === 0 ? (
-          <div className="text-center py-10 text-ink/40 font-bold tracking-widest">No events scheduled for today.</div>
+          <div className="py-24 text-center text-ink/20 font-black uppercase tracking-widest text-sm border-2 border-dashed border-ink/5" style={{ borderRadius: 'var(--radius-organic)' }}>Empty Horizon</div>
         ) : events.map((task) => {
           const isActive = activeEvent?.id === task.id;
           return (
-            <div key={task.id} className="flex relative mb-6">
-              <div className={`absolute -left-[85px] w-[60px] text-right text-xs font-bold tracking-wider pt-5 ${isActive ? 'text-forest' : 'text-ink/40'}`}>
-                {task.timeStr}
-              </div>
-
-              <div
-                className={`w-full p-4 border-2 rounded-[var(--radius-btn)] relative overflow-hidden ${isActive ? 'bg-forest/10 border-forest' : 'bg-paper/20 border-ink/20'}`}
-              >
-                <div className="flex items-start justify-between relative z-10">
-                  <div>
-                    <div className="text-base text-ink font-bold font-serif mb-1">{task.title}</div>
-                    <div className="text-[10px] text-ink/40 font-bold tracking-wider">
-                      {task.timeStr} — {task.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })} <span className="opacity-50 mx-1">|</span> {formatDuration(task.durationMins)}
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div 
+              key={task.id} 
+              className={`p-10 flex justify-between items-center transition-all duration-500 ${isActive ? 'scale-[1.02]' : 'opacity-80 hover:opacity-100 hover:translate-x-1'}`}
+              style={{
+                backgroundColor: isActive ? 'var(--paper)' : 'var(--paper-dark)',
+                border: isActive ? '2px solid var(--forest)' : 'none',
+                borderLeftWidth: isActive ? '8px' : '0px',
+                borderRadius: 'var(--radius-organic)'
+              }}
+            >
+               <div className="flex items-center gap-8">
+                 <div className={`w-1.5 h-12 ${isActive ? 'bg-forest' : 'bg-ink/5'}`} />
+                 <div>
+                    <div className={`text-xs font-black uppercase tracking-widest mb-2 ${isActive ? 'text-forest' : 'text-ink/30'}`}>{task.timeStr}</div>
+                    <div className="text-3xl font-black text-ink tracking-tighter">{task.title}</div>
+                 </div>
+               </div>
+               <div className="text-right">
+                  <div className="text-[10px] font-black text-ink/20 uppercase tracking-widest mb-2">Duration</div>
+                  <div className="text-xl font-black text-ink/60 tabular-nums">{formatDuration(task.durationMins)}</div>
+               </div>
             </div>
           );
         })}

@@ -11,6 +11,7 @@ import { CustomCursor } from './components/ui/CustomCursor';
 import { FloatingTimer } from './components/ui/FloatingTimer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { PomodoroProvider } from './hooks/usePomodoro';
+import { FastingManager } from './components/logic/FastingManager';
 import './styles/global.css';
 
 const AppRoutes: React.FC = () => {
@@ -46,6 +47,7 @@ const AppRoutes: React.FC = () => {
   return (
     <div className="min-h-screen">
       <CustomCursor />
+      <FastingManager />
       <Routes>
         <Route path="/" element={<Home navigate={nav} />} />
         <Route path="/water" element={<Water navigate={nav} />} />

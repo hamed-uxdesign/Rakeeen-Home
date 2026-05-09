@@ -90,28 +90,44 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  const sendDiscordNotification = useCallback(async (type: 'focus_complete' | 'break_complete', overtimeSecs = 0) => {
+  const sendDiscordNotification = useCallback(async (type: 'focus_started' | 'focus_complete' | 'break_complete' | 'test', data?: { duration?: number, overtime?: number }) => {
     const webhookUrl = import.meta.env.VITE_DISCORD_POMODORO_WEBHOOK;
     if (!webhookUrl) return;
-    const overtimeStr = overtimeSecs > 0 ? ` (+${Math.floor(overtimeSecs/60)}m ${overtimeSecs%60}s overtime)` : '';
-    const embed = type === 'focus_complete' ? {
-      title: '🧠 Focus Session Complete',
-      description: `Great work! You've finished a **${focusDuration}-minute** focus session${overtimeStr}.\nTime to take a break.`,
-      color: 0x7ca982,
-      footer: { text: 'Rakeeen Pomodoro System' }
-    } : {
-      title: '☕ Break Time Over',
-      description: `Your **${breakDuration}-minute** break is done. Ready for another round?`,
-      color: 0xc8a96e,
-      footer: { text: 'Rakeeen Pomodoro System' }
-    };
+
+    const embeds: any[] = [];
+    
+    if (type === 'focus_complete') {
+      const totalMins = (data?.duration || focusDuration) + Math.floor((data?.overtime || 0) / 60);
+      embeds.push({
+        title: '🧠 Focus Session Finished',
+        description: `Excellent! You've completed **${totalMins} minutes** of deep work.`,
+        fields: [
+          { name: 'Base Goal', value: `${data?.duration || focusDuration}m`, inline: true },
+          { name: 'Overtime', value: `${Math.floor((data?.overtime || 0) / 60)}m ${ (data?.overtime || 0) % 60}s`, inline: true }
+        ],
+        color: 0x7ca982,
+        footer: { text: 'Rakeeen Productivity System' },
+        timestamp: new Date().toISOString()
+      });
+    } else if (type === 'break_complete') {
+      embeds.push({
+        title: '☕ Break Time Over',
+        description: `Your **${breakDuration}-minute** break is done. Time to return to flow state.`,
+        color: 0xc8a96e,
+        footer: { text: 'Rakeeen Productivity System' },
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (embeds.length === 0) return;
+
     try {
       await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] })
+        body: JSON.stringify({ embeds })
       });
-    } catch (e) { /* silent */ }
+    } catch (e) { console.error('Discord Webhook Error:', e); }
   }, [focusDuration, breakDuration]);
 
   // Core timer logic - Robust against background throttling
@@ -137,12 +153,12 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (newTime <= 0) {
             if (mode === 'focus') {
               setIsOvertime(true);
-              setRunning(true); // Keep running for overtime
-              baseOvertimeRef.current = 0;
-              startTimeRef.current = Date.now();
               sendNotification("Focus session complete", `You've finished ${focusDuration} minutes. Take a break or keep going.`);
-              sendDiscordNotification('focus_complete', 0);
+              // We only send a "Time's up" browser notification at 0, 
+              // but we'll send the final Discord report when they actually click "Start Break"
+              // to capture the full time spent.
             } else {
+              // Break finished
               setRunning(false);
               setMode('focus');
               setTimeLeft(FOCUS);
@@ -151,7 +167,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           }
         }
-      }, 100); // Check more frequently (every 100ms) for smoother UI, but logic is timestamp-based
+      }, 200);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [running, mode, isOvertime, sendNotification, sendDiscordNotification, FOCUS, focusDuration]);
@@ -172,6 +188,9 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const focusGained = focusDuration + Math.floor(overtime / 60);
     setSessions(s => s + 1);
     
+    // Send Discord Report with full time (Base + Overtime)
+    sendDiscordNotification('focus_complete', { duration: focusDuration, overtime });
+
     const updated = weekStats.map((d: any, i: number) => 
       i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + focusGained } : d
     );
@@ -182,7 +201,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setOvertime(0);
     setTimeLeft(BREAK);
     setRunning(true);
-  }, [overtime, weekStats, todayIdx, setWeekStats, BREAK, focusDuration]);
+  }, [overtime, weekStats, todayIdx, setWeekStats, BREAK, focusDuration, sendDiscordNotification]);
 
   const startNewSession = useCallback(() => {
     setMode('focus');

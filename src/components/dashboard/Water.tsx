@@ -1,15 +1,20 @@
 import React, { useState } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { BackBtn } from '../layout/Common';
-import { Card, Button, Label } from '../ui/UIComponents';
-import { Droplets, RefreshCw } from 'lucide-react';
+import { Button, PageHeader, ChartTooltip } from '../ui/UIComponents';
+import { Tabs } from '../ui/Tabs';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { 
+  DropletIcon, 
+  RefreshIcon, 
+  ArrowTurnBackwardIcon 
+} from '@hugeicons/core-free-icons';
 
 interface WaterProps {
   navigate: (to: string) => void;
 }
 
-// Base structure for reports, we will dynamically inject today's data into it
 const BASE_REPORTS = {
   week: [
     { name: 'Mon', glasses: 0 }, { name: 'Tue', glasses: 0 }, { name: 'Wed', glasses: 0 },
@@ -36,30 +41,22 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     document.title = 'Rakeeen - Water';
   }, []);
 
-  // 12:00 AM Midnight Reset Logic
   React.useEffect(() => {
     const checkMidnight = () => {
       const todayStr = new Date().toDateString();
       if (todayStr !== lastDate) {
-        // A new day has started (passed 12:00 AM)
-        if (glasses > 0) {
-          // Archive yesterday's data
-          setHistory({ ...history, [lastDate]: glasses });
-        }
-        // Reset for the new day
+        if (glasses > 0) setHistory({ ...history, [lastDate]: glasses });
         setGlasses(0);
         setLog([]);
         setLastDate(todayStr);
       }
     };
-
-    checkMidnight(); // Check on mount
-    const interval = setInterval(checkMidnight, 60000); // Check every minute
+    checkMidnight();
+    const interval = setInterval(checkMidnight, 60000);
     return () => clearInterval(interval);
   }, [lastDate, glasses, history, setHistory, setGlasses, setLog, setLastDate]);
 
   const addGlass = () => {
-    // 12-hour format
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     setLog([...log, now]);
     setGlasses(glasses + 1);
@@ -70,11 +67,15 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     setLog([]);
   };
 
-  const pct = Math.min((glasses / goal) * 100, 100);
+  const undo = () => {
+    if (glasses <= 0) return;
+    setGlasses(glasses - 1);
+    setLog(log.slice(0, -1));
+  };
 
-  // Dynamically generate report data based on current state
+  const pct = Math.min((glasses / goal) * 100, 100);
   const now = new Date();
-  const dayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1; // 0=Mon, 6=Sun
+  const dayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1;
   const weekIndex = Math.floor(now.getDate() / 7);
   const monthIndex = now.getMonth();
 
@@ -84,131 +85,104 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     year: BASE_REPORTS.year.map((d, i) => i === monthIndex ? { ...d, glasses: glasses } : d),
   };
 
-  // Helper for generating tips based on goal achievement
-  const getTip = (value: number, type: string) => {
-    let target = goal;
-    if (type === 'month') target = goal * 7;
-    if (type === 'year') target = goal * 30;
-
-    if (value === target) return "Perfect!";
-    if (value > target) return "Refreshed!";
-    return "Keep drinking";
-  };
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      const val = payload[0].value;
-      return (
-        <div className="bg-[var(--paper-dark)] border-2 border-[var(--ink)] shadow-[4px_4px_0px_0px_var(--ink)] p-4 rounded-[var(--radius-btn)]">
-          <p className="text-[var(--ink)] font-black text-xl">{label}</p>
-          <p className="text-[var(--forest)] font-bold text-sm mt-1">{val} Glasses</p>
-          <p className="text-[10px] text-[var(--ink)] opacity-50 uppercase tracking-widest mt-2 font-black">{getTip(val, reportView)}</p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-5">
+    <div className="max-w-2xl mx-auto py-12 px-6 min-h-screen">
       <BackBtn onClick={() => navigate('home')} />
 
-      <header className="mb-10">
-        <h2 className="text-4xl font-black text-ink mb-1">Water</h2>
-        <p className="text-[10px] text-ink/40 tracking-[0.2em] font-black">Daily water intake tracker</p>
-      </header>
+      <PageHeader 
+        title="Water" 
+        subtitle="Daily intake tracker" 
+      />
 
-      {/* Main Card (Non-interactive hover, removed 'variant="sketchy"') */}
-      <div className="text-center mb-10 sys-card p-8">
-        <div className="relative py-6">
-          <div className="text-8xl font-black text-sepia leading-none">{glasses}</div>
-          <div className="text-[10px] text-ink/30 uppercase tracking-[0.2em] font-black mt-2">of {goal} glasses today</div>
+      <div className="text-center mb-12 sys-card p-10">
+        <div className="relative py-8">
+          <div className="text-[120px] font-black text-sepia leading-none tracking-tighter">{glasses}</div>
+          <div className="text-xs text-ink/30 uppercase tracking-[0.3em] font-black mt-4">of {goal} glasses today</div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="h-3 w-full bg-[var(--paper)] rounded-full mb-10 relative overflow-hidden border border-[var(--ink)] opacity-80">
-          <div
-            className="h-full bg-[var(--forest)] transition-all duration-700 ease-out"
-            style={{ width: `${pct}%` }}
+        <div 
+          className="h-4 w-full bg-paper rounded-none mb-12 relative overflow-hidden border-2 transition-all duration-500"
+          style={{ borderColor: glasses > 0 ? 'var(--forest)' : 'var(--ink)' }}
+        >
+          <div 
+            className="h-full transition-all duration-1000 ease-out" 
+            style={{ width: `${pct}%`, backgroundColor: 'var(--forest)' }} 
           />
         </div>
 
-        {/* Visual Glasses Grid with Fill Animation */}
-        <div className="flex gap-3 justify-center mb-10 flex-wrap">
+        <div className="flex gap-4 justify-center mb-12 flex-wrap">
           {Array.from({ length: goal }).map((_, i) => (
-            <div key={i} className={`relative w-6 h-9 border-2 overflow-hidden transition-all duration-500 ${i < glasses ? 'border-[var(--forest)]' : 'border-[var(--ink)] opacity-20'}`} style={{ borderRadius: '4px 4px 10px 10px' }}>
-              {/* Fill element sliding up from bottom */}
-              <div
-                className="absolute bottom-0 left-0 w-full bg-[var(--forest)] transition-all duration-700 ease-out"
-                style={{ height: i < glasses ? '100%' : '0%' }}
+            <div 
+              key={i} 
+              className="relative w-8 h-12 border-2 overflow-hidden transition-all duration-700" 
+              style={{ 
+                borderRadius: '4px 4px 12px 12px', 
+                borderColor: i < glasses ? 'var(--forest)' : 'var(--ink)',
+                opacity: i < glasses ? 1 : 0.1
+              }}
+            >
+              <div 
+                className="absolute bottom-0 left-0 w-full transition-all duration-1000 ease-out" 
+                style={{ height: i < glasses ? '100%' : '0%', backgroundColor: 'var(--forest)' }} 
               />
             </div>
           ))}
         </div>
 
-        {/* Log Buttons */}
-        <div className="flex gap-4 justify-center">
-          <Button variant="premium" onClick={addGlass} className="flex items-center justify-center min-w-[220px]">
-            <Droplets size={20} className="text-[var(--forest)] mr-3" />
-            <span className="tracking-wider font-black pt-1">+ Log glass</span>
+        <div className="flex gap-3 justify-center">
+          <Button variant="premium" onClick={addGlass} className="flex items-center justify-center min-w-[200px] h-14 group">
+            <HugeiconsIcon icon={DropletIcon} size={22} className="text-forest mr-3 group-hover:text-paper transition-colors" />
+            <span className="tracking-[0.2em] font-black uppercase text-sm">+ Log Glass</span>
           </Button>
           {glasses > 0 && (
-            <Button variant="sketchy" onClick={reset} className="px-5 border-ink/20 opacity-50 hover:opacity-100 hover:border-rust hover:text-rust">
-              <RefreshCw size={18} />
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="sketchy" onClick={undo} className="px-5 h-14 border-ink/20 opacity-60 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
+                <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={20} />
+              </Button>
+              <Button variant="sketchy" onClick={reset} className="px-5 h-14 border-ink/20 opacity-30 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
+                <HugeiconsIcon icon={RefreshIcon} size={20} />
+              </Button>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Today's Log */}
-      <div className="sys-card mb-10 p-8">
-        <h2 className="text-3xl font-bold tracking-tight mb-8">Today's log</h2>
+      <div className="sys-card mb-12 p-10">
+        <h2 className="text-4xl font-black tracking-tighter mb-10 text-ink">Timeline</h2>
         {log.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {log.map((t, i) => (
-              <div key={i} className="flex items-center gap-2 bg-[var(--forest)]/10 border-2 border-[var(--forest)] px-4 py-2 rounded-xl animate-scale-in">
-                <Droplets size={14} className="text-[var(--forest)]" />
-                <span className="text-xs font-black tracking-widest text-[var(--forest)]">{t}</span>
+              <div key={i} className="flex items-center gap-2.5 px-3 py-2 border-2 transition-all animate-scale-in" 
+                style={{ borderColor: 'var(--forest)', backgroundColor: 'transparent' }}>
+                <HugeiconsIcon icon={DropletIcon} size={13} style={{ color: 'var(--forest)' }} />
+                <span className="text-xs font-black tracking-widest tabular-nums" style={{ color: 'var(--forest)' }}>{t}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-[var(--ink)] opacity-40 text-sm font-bold">No glasses logged yet today. Drink up!</p>
+          <p className="text-ink/20 text-sm font-black uppercase tracking-[0.3em]">No hydration logged yet.</p>
         )}
       </div>
 
-      {/* Water Reports Section */}
-      <div className="sys-card pb-4 p-8">
-        <h2 className="text-3xl font-bold tracking-tight mb-8">Water reports</h2>
-        <div className="flex justify-end gap-3 mb-8 -mt-16 relative z-10">
-          {(['week', 'month', 'year'] as const).map(v => (
-            <button
-              key={v}
-              onClick={() => setReportView(v)}
-              className={`text-[10px] uppercase tracking-widest font-black px-5 py-2 rounded-full border-2 transition-all duration-300 ${reportView === v ? 'border-[var(--forest)] text-[var(--paper)] bg-[var(--forest)]' : 'border-[var(--ink)] text-[var(--ink)] opacity-40 hover:opacity-100 hover:border-[var(--forest)]'}`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
+      <div className="sys-card pb-6 p-10">
+        <h2 className="text-4xl font-black tracking-tighter mb-12 text-ink">Analytics</h2>
+        <Tabs 
+          tabs={['week', 'month', 'year']} 
+          activeTab={reportView} 
+          onChange={(v) => setReportView(v as any)} 
+          className="justify-end mb-10 -mt-20"
+        />
 
-        <div className="h-[250px] w-full mt-4">
+        <div className="h-[300px] w-full mt-6">
           <ResponsiveContainer>
             <BarChart data={dynamicReports[reportView]} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.05)" />
-              <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
-              <YAxis tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
-              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.05)' }} content={<CustomTooltip />} />
-
-              {/* Reference line showing the goal depending on view */}
-              <ReferenceLine
-                y={reportView === 'week' ? goal : reportView === 'month' ? goal * 7 : goal * 30}
-                stroke="var(--forest)"
-                strokeDasharray="5 5"
-                strokeOpacity={0.4}
-              />
-
-              <Bar dataKey="glasses" fill="var(--forest)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.3, fontSize: 11, fontWeight: 900 }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis tick={{ fill: 'var(--ink)', opacity: 0.3, fontSize: 11, fontWeight: 900 }} axisLine={false} tickLine={false} />
+              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.05)' }} content={<ChartTooltip unit="Glasses" getTipMessage={(val) => val >= goal ? 'Goal Achieved' : 'Hydration Pending'} />} />
+              <ReferenceLine y={reportView === 'week' ? goal : reportView === 'month' ? goal * 7 : goal * 30} stroke="var(--forest)" strokeDasharray="6 6" strokeOpacity={0.4} />
+              <Bar dataKey="glasses" fill="var(--forest)" radius={[0, 0, 0, 0]} maxBarSize={45} />
             </BarChart>
           </ResponsiveContainer>
         </div>
