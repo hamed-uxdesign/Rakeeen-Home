@@ -58,7 +58,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Request Notification permission
   useEffect(() => {
-    if (Notification.permission === 'default') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       Notification.requestPermission();
     }
   }, []);
@@ -85,7 +85,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [running, isOvertime]);
 
   const sendNotification = useCallback((title: string, body: string) => {
-    if (Notification.permission === 'granted') {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       new Notification(title, { body, icon: '/favicon.png' });
     }
   }, []);
