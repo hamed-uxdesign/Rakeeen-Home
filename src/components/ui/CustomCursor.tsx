@@ -8,7 +8,7 @@ export const CustomCursor = () => {
   return (
     <div
       ref={cursorRef}
-      className="custom-cursor-wrapper"
+      className="custom-cursor-wrapper hidden md:flex"
       style={{
         position: 'fixed',
         top: 0,
