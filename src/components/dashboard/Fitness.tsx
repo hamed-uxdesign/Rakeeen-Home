@@ -140,7 +140,7 @@ export const Fitness: React.FC = () => {
           { id: 'challenge', label: 'No Sugar' },
           { id: 'database', label: 'Foods' },
           { id: 'workout', label: 'Workouts' },
-          { id: 'progress', label: 'Reports' },
+          { id: 'progress', label: 'Analytics' },
         ]}
         activeTab={tab}
         onChange={(v) => setTab(v as any)}
@@ -338,8 +338,8 @@ export const Fitness: React.FC = () => {
       {tab === 'progress' && (
         <div className="animate-scale-in space-y-8">
            <div className="sys-card p-12">
-              <div className="flex justify-between items-center mb-12">
-                <h3 className="text-4xl font-black tracking-tighter">Reports</h3>
+              <div className="flex justify-between items-center mb-12 whitespace-nowrap">
+                <h3 className="text-4xl font-black tracking-tighter">Diet Reports</h3>
                 <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-forest"><div className="w-2.5 h-2.5 bg-forest rounded-full" />Goal: {CALORIE_GOAL}</div>
               </div>
               <div className="h-[350px] w-full">
@@ -357,7 +357,7 @@ export const Fitness: React.FC = () => {
            </div>
 
            <div className="sys-card p-12">
-              <div className="flex justify-between items-center mb-12">
+              <div className="flex justify-between items-center mb-12 whitespace-nowrap">
                 <h3 className="text-4xl font-black tracking-tighter">Training Flow</h3>
                 <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-forest"><div className="w-2.5 h-2.5 bg-forest rounded-full" />Daily Minutes</div>
               </div>
