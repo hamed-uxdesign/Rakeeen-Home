@@ -114,32 +114,44 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) { /* silent */ }
   }, [focusDuration, breakDuration]);
 
-  // Core timer logic
+  // Core timer logic - Robust against background throttling
+  const startTimeRef = useRef<number | null>(null);
+  const baseTimeLeftRef = useRef<number>(timeLeft);
+  const baseOvertimeRef = useRef<number>(overtime);
+
   useEffect(() => {
     if (running) {
+      startTimeRef.current = Date.now();
+      baseTimeLeftRef.current = timeLeft;
+      baseOvertimeRef.current = overtime;
+
       timerRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - (startTimeRef.current || Date.now())) / 1000);
+        
         if (isOvertime) {
-          setOvertime(o => o + 1);
+          setOvertime(baseOvertimeRef.current + elapsed);
         } else {
-          setTimeLeft(t => {
-            if (t <= 1) {
-              if (mode === 'focus') {
-                setIsOvertime(true);
-                sendNotification("Focus session complete", `You've finished ${focusDuration} minutes. Take a break or keep going.`);
-                sendDiscordNotification('focus_complete', 0);
-                return 0;
-              } else {
-                setRunning(false);
-                setMode('focus');
-                sendNotification("Break finished", "Time to start a new focus session.");
-                sendDiscordNotification('break_complete');
-                return FOCUS;
-              }
+          const newTime = Math.max(0, baseTimeLeftRef.current - elapsed);
+          setTimeLeft(newTime);
+
+          if (newTime <= 0) {
+            if (mode === 'focus') {
+              setIsOvertime(true);
+              setRunning(true); // Keep running for overtime
+              baseOvertimeRef.current = 0;
+              startTimeRef.current = Date.now();
+              sendNotification("Focus session complete", `You've finished ${focusDuration} minutes. Take a break or keep going.`);
+              sendDiscordNotification('focus_complete', 0);
+            } else {
+              setRunning(false);
+              setMode('focus');
+              setTimeLeft(FOCUS);
+              sendNotification("Break finished", "Time to start a new focus session.");
+              sendDiscordNotification('break_complete');
             }
-            return t - 1;
-          });
+          }
         }
-      }, 1000);
+      }, 100); // Check more frequently (every 100ms) for smoother UI, but logic is timestamp-based
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [running, mode, isOvertime, sendNotification, sendDiscordNotification, FOCUS, focusDuration]);

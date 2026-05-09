@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Home } from './components/dashboard/Home';
-import { Water } from './components/dashboard/Hydration';
+import { Water } from './components/dashboard/Water';
 import { Calendar } from './components/dashboard/Calendar';
 import { Pomodoro } from './components/dashboard/Pomodoro';
 import { Prayer } from './components/dashboard/Prayer';
@@ -48,7 +48,7 @@ const AppRoutes: React.FC = () => {
       <CustomCursor />
       <Routes>
         <Route path="/" element={<Home navigate={nav} />} />
-        <Route path="/hydration" element={<Water navigate={nav} />} />
+        <Route path="/water" element={<Water navigate={nav} />} />
         <Route path="/calendar" element={<Calendar navigate={nav} />} />
         <Route path="/pomodoro" element={<Pomodoro navigate={nav} />} />
         <Route path="/prayer" element={<Prayer navigate={nav} />} />

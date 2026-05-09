@@ -21,8 +21,17 @@ export function useFirebaseSync<T>(key: string, initialValue: T) {
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data().value as T;
-        setStoredValue(data);
-        window.localStorage.setItem(key, JSON.stringify(data));
+        const serverUpdatedAt = docSnap.data().updatedAt;
+        const localUpdatedAt = window.localStorage.getItem(`${key}_updatedAt`);
+
+        // Only apply if server data is newer or same as our last local update
+        if (!localUpdatedAt || !serverUpdatedAt || new Date(serverUpdatedAt).getTime() >= new Date(localUpdatedAt).getTime()) {
+          setStoredValue(data);
+          window.localStorage.setItem(key, JSON.stringify(data));
+          if (serverUpdatedAt) {
+            window.localStorage.setItem(`${key}_updatedAt`, serverUpdatedAt);
+          }
+        }
       }
     }, (error) => {
       console.warn("Firestore Listen Error:", error);
@@ -41,8 +50,11 @@ export function useFirebaseSync<T>(key: string, initialValue: T) {
       window.localStorage.setItem(key, JSON.stringify(valueToStore));
 
       // Sync to Firestore
+      const now = new Date().toISOString();
+      window.localStorage.setItem(`${key}_updatedAt`, now);
+      
       const docRef = doc(db, 'dashboard', key);
-      await setDoc(docRef, { value: valueToStore, updatedAt: new Date().toISOString() });
+      await setDoc(docRef, { value: valueToStore, updatedAt: now });
     } catch (error) {
       console.error("Firestore Sync Error:", error);
     }

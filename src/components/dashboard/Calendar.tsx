@@ -79,8 +79,17 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
               } else if (curr.rrule.includes('FREQ=WEEKLY')) {
                 const days = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
                 const yestDate = new Date(today); yestDate.setDate(yestDate.getDate() - 1);
-                if (curr.rrule.includes(days[yestDate.getDay()])) addIfMatches(-1);
-                if (curr.rrule.includes(days[today.getDay()])) addIfMatches(0);
+                
+                let byDays = '';
+                const byDayMatch = curr.rrule.match(/BYDAY=([^;]+)/);
+                if (byDayMatch) {
+                  byDays = byDayMatch[1];
+                } else {
+                  byDays = days[baseStart.getDay()];
+                }
+                
+                if (byDays.includes(days[yestDate.getDay()])) addIfMatches(-1);
+                if (byDays.includes(days[today.getDay()])) addIfMatches(0);
               } else {
                 const durationMins = Math.floor(durationMs / 60000);
                 const timeStr = baseStart.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });

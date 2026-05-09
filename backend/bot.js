@@ -82,6 +82,50 @@ client.once('ready', async () => {
   });
   
   console.log('⏰ Water Reminder Cron Job Scheduled (Runs every 2 hours)!');
+
+  // Daily cleanup cron job at 12:00 AM
+  cron.schedule('0 0 * * *', async () => {
+    try {
+      const channel = await client.channels.fetch(CHANNEL_ID);
+      if (channel) {
+        console.log(`[${new Date().toLocaleTimeString()}] Running daily cleanup...`);
+        let fetched;
+        let totalDeleted = 0;
+        do {
+          fetched = await channel.messages.fetch({ limit: 100 });
+          if (fetched.size === 0) break;
+
+          try {
+            // First try bulkDelete
+            const deleted = await channel.bulkDelete(fetched, true);
+            totalDeleted += deleted.size;
+            
+            // If some messages remain (older than 14 days), delete them manually
+            if (deleted.size < fetched.size) {
+              const remaining = fetched.filter(msg => !deleted.has(msg.id));
+              for (const [id, msg] of remaining) {
+                await msg.delete();
+                totalDeleted++;
+                await new Promise(r => setTimeout(r, 1000)); // Avoid rate limits
+              }
+            }
+          } catch (error) {
+            // If bulkDelete fails entirely, fallback to manual delete
+            for (const [id, msg] of fetched) {
+              await msg.delete();
+              totalDeleted++;
+              await new Promise(r => setTimeout(r, 1000));
+            }
+          }
+        } while (fetched.size >= 100);
+        console.log(`[${new Date().toLocaleTimeString()}] Channel cleaned up successfully! Total deleted: ${totalDeleted}`);
+      }
+    } catch (error) {
+      console.error("Failed to clean up channel:", error);
+    }
+  });
+  
+  console.log('🧹 Channel Cleanup Cron Job Scheduled (Runs daily at 12:00 AM)!');
 });
 
 client.login(BOT_TOKEN).catch(err => {

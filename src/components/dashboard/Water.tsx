@@ -31,7 +31,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   const [history, setHistory] = useFirebaseSync<Record<string, number>>('hydration_history', {});
   const [reportView, setReportView] = useState<'week' | 'month' | 'year'>('week');
   const goal = 8;
-  
+
   React.useEffect(() => {
     document.title = 'Rakeeen - Water';
   }, []);
@@ -111,8 +111,8 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
 
   return (
     <div className="max-w-2xl mx-auto py-10 px-5">
-      <BackBtn onClick={()=>navigate('home')} />
-      
+      <BackBtn onClick={() => navigate('home')} />
+
       <header className="mb-10">
         <h2 className="text-4xl font-black text-ink mb-1">Water</h2>
         <p className="text-[10px] text-ink/40 tracking-[0.2em] font-black">Daily water intake tracker</p>
@@ -127,21 +127,21 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
 
         {/* Progress Bar */}
         <div className="h-3 w-full bg-[var(--paper)] rounded-full mb-10 relative overflow-hidden border border-[var(--ink)] opacity-80">
-          <div 
-            className="h-full bg-[var(--forest)] transition-all duration-700 ease-out" 
-            style={{ width: `${pct}%` }} 
+          <div
+            className="h-full bg-[var(--forest)] transition-all duration-700 ease-out"
+            style={{ width: `${pct}%` }}
           />
         </div>
 
         {/* Visual Glasses Grid with Fill Animation */}
         <div className="flex gap-3 justify-center mb-10 flex-wrap">
-          {Array.from({length:goal}).map((_,i)=>(
+          {Array.from({ length: goal }).map((_, i) => (
             <div key={i} className={`relative w-6 h-9 border-2 overflow-hidden transition-all duration-500 ${i < glasses ? 'border-[var(--forest)]' : 'border-[var(--ink)] opacity-20'}`} style={{ borderRadius: '4px 4px 10px 10px' }}>
-               {/* Fill element sliding up from bottom */}
-               <div 
-                 className="absolute bottom-0 left-0 w-full bg-[var(--forest)] transition-all duration-700 ease-out" 
-                 style={{ height: i < glasses ? '100%' : '0%' }} 
-               />
+              {/* Fill element sliding up from bottom */}
+              <div
+                className="absolute bottom-0 left-0 w-full bg-[var(--forest)] transition-all duration-700 ease-out"
+                style={{ height: i < glasses ? '100%' : '0%' }}
+              />
             </div>
           ))}
         </div>
@@ -165,7 +165,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         <h2 className="text-3xl font-bold tracking-tight mb-8">Today's log</h2>
         {log.length > 0 ? (
           <div className="flex flex-wrap gap-3">
-            {log.map((t, i)=>(
+            {log.map((t, i) => (
               <div key={i} className="flex items-center gap-2 bg-[var(--forest)]/10 border-2 border-[var(--forest)] px-4 py-2 rounded-xl animate-scale-in">
                 <Droplets size={14} className="text-[var(--forest)]" />
                 <span className="text-xs font-black tracking-widest text-[var(--forest)]">{t}</span>
@@ -182,13 +182,13 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         <h2 className="text-3xl font-bold tracking-tight mb-8">Water reports</h2>
         <div className="flex justify-end gap-3 mb-8 -mt-16 relative z-10">
           {(['week', 'month', 'year'] as const).map(v => (
-             <button 
-               key={v} 
-               onClick={() => setReportView(v)}
-               className={`text-[10px] uppercase tracking-widest font-black px-5 py-2 rounded-full border-2 transition-all duration-300 ${reportView === v ? 'border-[var(--forest)] text-[var(--paper)] bg-[var(--forest)]' : 'border-[var(--ink)] text-[var(--ink)] opacity-40 hover:opacity-100 hover:border-[var(--forest)]'}`}
-             >
-               {v}
-             </button>
+            <button
+              key={v}
+              onClick={() => setReportView(v)}
+              className={`text-[10px] uppercase tracking-widest font-black px-5 py-2 rounded-full border-2 transition-all duration-300 ${reportView === v ? 'border-[var(--forest)] text-[var(--paper)] bg-[var(--forest)]' : 'border-[var(--ink)] text-[var(--ink)] opacity-40 hover:opacity-100 hover:border-[var(--forest)]'}`}
+            >
+              {v}
+            </button>
           ))}
         </div>
 
@@ -196,19 +196,19 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
           <ResponsiveContainer>
             <BarChart data={dynamicReports[reportView]} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.05)" />
-              <XAxis dataKey="name" tick={{fill:'var(--ink)',opacity:0.4,fontSize:10,fontWeight:700}} axisLine={false} tickLine={false} dy={10} />
-              <YAxis tick={{fill:'var(--ink)',opacity:0.4,fontSize:10,fontWeight:700}} axisLine={false} tickLine={false} />
-              <Tooltip cursor={{fill:'rgba(124,169,130,0.05)'}} content={<CustomTooltip />} />
-              
+              <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
+              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.05)' }} content={<CustomTooltip />} />
+
               {/* Reference line showing the goal depending on view */}
-              <ReferenceLine 
-                y={reportView === 'week' ? goal : reportView === 'month' ? goal * 7 : goal * 30} 
-                stroke="var(--forest)" 
-                strokeDasharray="5 5" 
-                strokeOpacity={0.4} 
+              <ReferenceLine
+                y={reportView === 'week' ? goal : reportView === 'month' ? goal * 7 : goal * 30}
+                stroke="var(--forest)"
+                strokeDasharray="5 5"
+                strokeOpacity={0.4}
               />
-              
-              <Bar dataKey="glasses" fill="var(--forest)" radius={[4,4,0,0]} maxBarSize={40} />
+
+              <Bar dataKey="glasses" fill="var(--forest)" radius={[4, 4, 0, 0]} maxBarSize={40} />
             </BarChart>
           </ResponsiveContainer>
         </div>
