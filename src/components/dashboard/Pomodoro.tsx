@@ -125,8 +125,9 @@ export const WavyRing: React.FC<{
   const currentPath = generateWavyPath(phase);
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}
-      className="block overflow-visible"
+    <svg viewBox={`0 0 ${size} ${size}`}
+      className="block overflow-visible w-full h-auto max-w-full"
+      style={{ maxWidth: size, maxHeight: size }}
       shapeRendering="geometricPrecision"
     >
       {/* Background Track */}
@@ -290,7 +291,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  className={`text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}
+                  className={`text-6xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}
                 >
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
                 </motion.span>
@@ -332,7 +333,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
       </AnimatePresence>
 
       {/* ── Normal View ────────────────────────────────────────────── */}
-      <div className="max-w-2xl mx-auto py-10 px-5">
+      <div className="max-w-2xl mx-auto py-6 sm:py-10 px-4 sm:px-5">
         <BackBtn onClick={() => navigate('home')} />
 
         <PageHeader 
@@ -342,7 +343,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
         />
 
         {/* Focus Session Card */}
-        <div className="text-center mb-10 sys-card p-8 relative">
+        <div className="text-center mb-6 sm:mb-10 sys-card p-6 sm:p-8 relative">
 
           {/* Fullscreen Button */}
           <button
@@ -360,14 +361,14 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
           </div>
 
           {/* Timer Circle */}
-          <div className="relative w-[300px] h-[300px] mx-auto flex items-center justify-center">
-            <div className={`absolute inset-10 rounded-full blur-[80px] opacity-20 -z-10 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
+          <div className="relative w-full max-w-[300px] aspect-square mx-auto flex items-center justify-center">
+            <div className={`absolute inset-4 sm:inset-10 rounded-full blur-[40px] sm:blur-[80px] opacity-20 -z-10 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
             <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={300} waves={mode === 'focus' ? focusDuration : breakDuration} />
 
             {/* Center content */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <motion.span
-                className={`text-5xl font-black mb-1 transition-colors duration-500 ${isOvertime ? 'text-rust' : 'text-ink'}`}
+                className={`text-4xl sm:text-5xl font-black mb-1 transition-colors duration-500 ${isOvertime ? 'text-rust' : 'text-ink'}`}
                 animate={{ scale: running ? [1, 1.02, 1] : 1 }}
                 transition={{ repeat: Infinity, duration: 3 }}
               >
@@ -422,13 +423,13 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
         </div>
 
         {/* Sessions Reports */}
-        <div className="sys-card pb-4 p-8">
-          <h2 className="text-3xl font-bold tracking-tight mb-8">Sessions reports</h2>
+        <div className="sys-card pb-4 p-6 sm:p-8">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">Sessions reports</h2>
           <Tabs 
             tabs={['week', 'month', 'year']} 
             activeTab={view} 
             onChange={(v) => setView(v as any)} 
-            className="justify-end mb-10 -mt-16"
+            className="flex-wrap sm:justify-end mb-10 sm:-mt-16 gap-2"
           />
 
           <div className="h-[250px] w-full mt-4">

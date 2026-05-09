@@ -168,7 +168,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
   }, [events]);
 
   return (
-    <div className="max-w-2xl mx-auto py-12 px-6 min-h-screen">
+    <div className="max-w-2xl mx-auto py-6 sm:py-12 px-4 sm:px-6 min-h-screen">
       <BackBtn onClick={() => navigate('home')} />
       <PageHeader 
         title="Calendar" 
@@ -177,7 +177,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
 
       {activeEvent ? (
         <div 
-          className="p-12 text-center mb-12 animate-scale-in"
+          className="p-6 sm:p-12 text-center mb-8 sm:mb-12 animate-scale-in"
           style={{ 
             backgroundColor: 'var(--paper)',
             border: '2px solid var(--forest)',
@@ -185,12 +185,12 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
             borderRadius: 'var(--radius-organic)',
           }}
         >
-           <div className="text-xs font-black text-forest uppercase tracking-[0.4em] mb-6">● Active Session</div>
-           <h3 className="text-4xl font-black text-ink mb-6">{activeEvent.title}</h3>
+           <div className="text-[10px] sm:text-xs font-black text-forest uppercase tracking-[0.2em] sm:tracking-[0.4em] mb-4 sm:mb-6">● Active Session</div>
+           <h3 className="text-3xl sm:text-4xl font-black text-ink mb-4 sm:mb-6">{activeEvent.title}</h3>
            {timeLeft < 60 && (
-             <div className="text-2xl font-black text-forest tracking-tighter">
+             <div className="text-xl sm:text-2xl font-black text-forest tracking-tighter">
                {timeLeft} 
-               <span className="text-xs uppercase ml-4 opacity-50 font-black tracking-[0.2em] whitespace-nowrap inline-block">
+               <span className="text-[10px] sm:text-xs uppercase ml-2 sm:ml-4 opacity-50 font-black tracking-[0.2em] whitespace-nowrap inline-block">
                  minutes remaining
                </span>
              </div>
@@ -198,10 +198,10 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
         </div>
       ) : (
         <div 
-          className="p-10 text-center mb-12 bg-paper/30"
+          className="p-6 sm:p-10 text-center mb-8 sm:mb-12 bg-paper/30"
           style={{ borderRadius: 'var(--radius-organic)' }}
         >
-           <p className="text-xs text-ink/20 font-black uppercase tracking-widest">Quiet period — No active events</p>
+           <p className="text-[10px] sm:text-xs text-ink/20 font-black uppercase tracking-widest">Quiet period — No active events</p>
         </div>
       )}
 
@@ -215,7 +215,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
           return (
             <div 
               key={task.id} 
-              className={`p-10 flex justify-between items-center transition-all duration-500 ${isActive ? 'scale-[1.02]' : 'opacity-80 hover:opacity-100 hover:translate-x-1'}`}
+              className={`p-6 sm:p-10 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-500 ${isActive ? 'scale-100 sm:scale-[1.02]' : 'opacity-80 hover:opacity-100 hover:translate-x-1'}`}
               style={{
                 backgroundColor: isActive ? 'var(--paper)' : 'var(--paper-dark)',
                 border: isActive ? '2px solid var(--forest)' : 'none',
@@ -223,16 +223,16 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                 borderRadius: 'var(--radius-organic)'
               }}
             >
-               <div className="flex items-center gap-8">
+               <div className="flex items-center gap-4 sm:gap-8">
                  <div className={`w-1.5 h-12 ${isActive ? 'bg-forest' : 'bg-ink/5'}`} />
                  <div>
-                    <div className={`text-xs font-black uppercase tracking-widest mb-2 ${isActive ? 'text-forest' : 'text-ink/30'}`}>{task.timeStr}</div>
-                    <div className="text-3xl font-black text-ink tracking-tighter">{task.title}</div>
+                    <div className={`text-[10px] sm:text-xs font-black uppercase tracking-widest mb-1 sm:mb-2 ${isActive ? 'text-forest' : 'text-ink/30'}`}>{task.timeStr}</div>
+                    <div className="text-2xl sm:text-3xl font-black text-ink tracking-tighter">{task.title}</div>
                  </div>
                </div>
-               <div className="text-right">
-                  <div className="text-[10px] font-black text-ink/20 uppercase tracking-widest mb-2">Duration</div>
-                  <div className="text-xl font-black text-ink/60 tabular-nums">{formatDuration(task.durationMins)}</div>
+               <div className="text-left sm:text-right mt-4 sm:mt-0 pl-6 sm:pl-0">
+                  <div className="text-[9px] sm:text-[10px] font-black text-ink/20 uppercase tracking-widest mb-1 sm:mb-2">Duration</div>
+                  <div className="text-lg sm:text-xl font-black text-ink/60 tabular-nums">{formatDuration(task.durationMins)}</div>
                </div>
             </div>
           );

@@ -100,25 +100,25 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto py-12 px-6 min-h-screen">
+    <div className="max-w-3xl mx-auto py-6 sm:py-12 px-4 sm:px-6 min-h-screen">
       <BackBtn onClick={()=>navigate('home')} />
       
       <PageHeader 
         title="Prayer" 
         subtitle="Mansoura, Egypt" 
-        className="[&>h2]:text-6xl"
+        className="[&>h2]:text-5xl sm:[&>h2]:text-6xl"
       />
       
       {upcomingEntry && (
-        <div className="sys-card p-12 text-center mb-12 border-l-8 border-l-forest bg-forest/5">
-          <div className="text-xs uppercase tracking-[0.4em] font-black mb-12 text-forest">
+        <div className="sys-card p-6 sm:p-12 text-center mb-8 sm:mb-12 border-l-4 sm:border-l-8 border-l-forest bg-forest/5">
+          <div className="text-[10px] sm:text-xs uppercase tracking-[0.2em] sm:tracking-[0.4em] font-black mb-8 sm:mb-12 text-forest">
             Up Next: {upcomingEntry[0]}
           </div>
-          <div className="relative w-[320px] h-[320px] mx-auto flex items-center justify-center">
+          <div className="relative w-full max-w-[320px] aspect-square mx-auto flex items-center justify-center">
             <WavyRing pct={getUpcomingPct(upcomingEntry[1])} phase={phase} mode="focus" isOvertime={false} running={true} size={320} waves={16} />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none translate-y-1">
-              <span className="text-[54px] font-black text-ink tabular-nums leading-none">{getCountdown(upcomingEntry[1])}</span>
-              <span className="text-[9px] tracking-[0.4em] font-black text-ink/30 uppercase mt-5">Remaining</span>
+              <span className="text-4xl sm:text-[54px] font-black text-ink tabular-nums leading-none">{getCountdown(upcomingEntry[1])}</span>
+              <span className="text-[9px] tracking-[0.2em] sm:tracking-[0.4em] font-black text-ink/30 uppercase mt-3 sm:mt-5">Remaining</span>
             </div>
           </div>
         </div>
@@ -132,17 +132,17 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
           const isActive = status === 'active';
           
           return (
-            <div key={name} className={`sys-card p-12 flex justify-between items-center transition-all duration-500 ${isActive ? 'border-l-8 border-l-forest bg-forest/5 scale-[1.02]' : 'opacity-80'}`}>
+            <div key={name} className={`sys-card p-6 sm:p-12 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-500 ${isActive ? 'border-l-4 sm:border-l-8 border-l-forest bg-forest/5 scale-100 sm:scale-[1.02]' : 'opacity-80'}`}>
               <div className="flex-1">
-                 <div className={`text-4xl font-black tracking-tighter ${statusColors[status]}`}>{name}</div>
-                 <div className={`text-xs font-black uppercase tracking-[0.3em] mt-2 ${isActive ? 'text-forest' : 'text-ink/20'}`}>
+                 <div className={`text-3xl sm:text-4xl font-black tracking-tighter ${statusColors[status]}`}>{name}</div>
+                 <div className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] mt-2 ${isActive ? 'text-forest' : 'text-ink/20'}`}>
                     {isActive ? 'Current Phase' : status}
                  </div>
               </div>
-              <div className="text-right flex-1">
-                 <div className={`text-5xl font-black tracking-tighter ${statusColors[status]}`}>{formatTo12h(time)}</div>
+              <div className="text-left sm:text-right flex-1 mt-4 sm:mt-0">
+                 <div className={`text-4xl sm:text-5xl font-black tracking-tighter ${statusColors[status]}`}>{formatTo12h(time)}</div>
                  {isActive && (
-                    <div className="text-xs font-black text-forest uppercase tracking-widest mt-2">Active now</div>
+                    <div className="text-[10px] sm:text-xs font-black text-forest uppercase tracking-widest mt-1 sm:mt-2">Active now</div>
                  )}
               </div>
             </div>
@@ -151,7 +151,7 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
       </div>
 
       {hijriDate && (
-        <div className="mt-12 sys-card p-10 text-center text-sm font-black uppercase tracking-[0.4em] text-ink/30 bg-paper/30">
+        <div className="mt-8 sm:mt-12 sys-card p-6 sm:p-10 text-center text-xs sm:text-sm font-black uppercase tracking-[0.2em] sm:tracking-[0.4em] text-ink/30 bg-paper/30">
           {hijriDate}
         </div>
       )}

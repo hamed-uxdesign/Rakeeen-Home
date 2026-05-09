@@ -87,7 +87,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
 
 
   return (
-    <div className="max-w-2xl mx-auto py-12 px-6 min-h-screen">
+    <div className="max-w-2xl mx-auto py-6 sm:py-12 px-4 sm:px-6 min-h-screen">
       <BackBtn onClick={() => navigate('home')} />
 
       <PageHeader 
@@ -95,10 +95,10 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         subtitle="Daily intake tracker" 
       />
 
-      <div className="text-center mb-12 sys-card p-10">
-        <div className="relative py-8">
-          <div className="text-[120px] font-black text-sepia leading-none tracking-tighter">{glasses}</div>
-          <div className="text-xs text-ink/30 uppercase tracking-[0.3em] font-black mt-4">of {goal} glasses today</div>
+      <div className="text-center mb-8 sm:mb-12 sys-card p-6 sm:p-10">
+        <div className="relative py-6 sm:py-8">
+          <div className="text-[80px] sm:text-[120px] font-black text-sepia leading-none tracking-tighter">{glasses}</div>
+          <div className="text-[10px] sm:text-xs text-ink/30 uppercase tracking-[0.3em] font-black mt-2 sm:mt-4">of {goal} glasses today</div>
         </div>
 
         <div 
@@ -111,11 +111,11 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
           />
         </div>
 
-        <div className="flex gap-4 justify-center mb-12 flex-wrap">
+        <div className="flex gap-2 sm:gap-4 justify-center mb-8 sm:mb-12 flex-wrap">
           {Array.from({ length: goal }).map((_, i) => (
             <div 
               key={i} 
-              className="relative w-8 h-12 border-2 overflow-hidden transition-all duration-700" 
+              className="relative w-6 h-10 sm:w-8 sm:h-12 border-2 overflow-hidden transition-all duration-700" 
               style={{ 
                 borderRadius: '4px 4px 12px 12px', 
                 borderColor: i < glasses ? 'var(--forest)' : 'var(--ink)',
@@ -130,17 +130,17 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
           ))}
         </div>
 
-        <div className="flex gap-3 justify-center">
-          <Button variant="premium" onClick={addGlass} className="flex items-center justify-center min-w-[200px] h-14 group">
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <Button variant="premium" onClick={addGlass} className="flex items-center justify-center w-full sm:w-auto min-w-[200px] h-14 group">
             <HugeiconsIcon icon={DropletIcon} size={22} className="text-forest mr-3 group-hover:text-paper transition-colors" />
             <span className="tracking-[0.2em] font-black uppercase text-sm">+ Log Glass</span>
           </Button>
           {glasses > 0 && (
-            <div className="flex gap-2">
-              <Button variant="sketchy" onClick={undo} className="px-5 h-14 border-ink/20 opacity-60 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
+            <div className="flex gap-2 w-full sm:w-auto justify-center">
+              <Button variant="sketchy" onClick={undo} className="flex-1 sm:flex-none px-5 h-14 border-ink/20 opacity-60 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
                 <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={20} />
               </Button>
-              <Button variant="sketchy" onClick={reset} className="px-5 h-14 border-ink/20 opacity-30 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
+              <Button variant="sketchy" onClick={reset} className="flex-1 sm:flex-none px-5 h-14 border-ink/20 opacity-30 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
                 <HugeiconsIcon icon={RefreshIcon} size={20} />
               </Button>
             </div>
@@ -148,8 +148,8 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         </div>
       </div>
 
-      <div className="sys-card mb-12 p-10">
-        <h2 className="text-4xl font-black tracking-tighter mb-10 text-ink">Timeline</h2>
+      <div className="sys-card mb-8 sm:mb-12 p-6 sm:p-10">
+        <h2 className="text-3xl sm:text-4xl font-black tracking-tighter mb-8 sm:mb-10 text-ink">Timeline</h2>
         {log.length > 0 ? (
           <div className="flex flex-wrap gap-2">
             {log.map((t, i) => (
@@ -165,13 +165,13 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         )}
       </div>
 
-      <div className="sys-card pb-6 p-10">
-        <h2 className="text-4xl font-black tracking-tighter mb-12 text-ink">Analytics</h2>
+      <div className="sys-card pb-6 p-6 sm:p-10">
+        <h2 className="text-3xl sm:text-4xl font-black tracking-tighter mb-8 sm:mb-12 text-ink">Analytics</h2>
         <Tabs 
           tabs={['week', 'month', 'year']} 
           activeTab={reportView} 
           onChange={(v) => setReportView(v as any)} 
-          className="justify-end mb-10 -mt-20"
+          className="flex-wrap sm:justify-end mb-8 sm:mb-10 sm:-mt-20 gap-2"
         />
 
         <div className="h-[300px] w-full mt-6">
