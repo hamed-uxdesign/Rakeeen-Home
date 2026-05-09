@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import { Home } from './components/dashboard/Home';
 import { Water } from './components/dashboard/Water';
 import { Calendar } from './components/dashboard/Calendar';
@@ -62,19 +62,13 @@ const AppRoutes: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <BrowserRouter 
-      basename="/Rakeeen-Home"
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
+    <HashRouter>
       <AuthProvider>
         <PomodoroProvider>
           <AppRoutes />
         </PomodoroProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 };
 

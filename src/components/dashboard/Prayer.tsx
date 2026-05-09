@@ -29,16 +29,34 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
 
   const fetchPrayerTimes = async () => {
     try {
-      const response = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Mansoura&country=Egypt&method=5');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+      const response = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Mansoura&country=Egypt&method=5', {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
       const data = await response.json();
       if (data.code === 200) {
         const t = data.data.timings;
         setTimes({ Fajr: t.Fajr, Dhuhr: t.Dhuhr, Asr: t.Asr, Maghrib: t.Maghrib, Isha: t.Isha });
         const h = data.data.date.hijri;
         setHijriDate(`${h.day} ${h.month.ar} ${h.year} هـ`);
+      } else {
+        throw new Error("Invalid API response");
       }
     } catch (error) {
-      console.error('Failed to fetch prayer times:', error);
+      console.error('Failed to fetch prayer times, using fallback:', error);
+      // Fallback to MOCK_PRAYER_TIMES so the UI doesn't break
+      setTimes({
+        Fajr: MOCK_PRAYER_TIMES.Fajr,
+        Dhuhr: MOCK_PRAYER_TIMES.Dhuhr,
+        Asr: MOCK_PRAYER_TIMES.Asr,
+        Maghrib: MOCK_PRAYER_TIMES.Maghrib,
+        Isha: MOCK_PRAYER_TIMES.Isha
+      });
+      setHijriDate('Offline Mode (Local Time)');
     } finally {
       setLoading(false);
     }
