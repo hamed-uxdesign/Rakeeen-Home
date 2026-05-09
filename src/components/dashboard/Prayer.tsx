@@ -29,7 +29,10 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
 
   const fetchPrayerTimes = async () => {
     try {
-      const response = await fetch('https://api.aladhan.com/v1/timingsByCity?city=Mansoura&country=Egypt&method=5');
+      const d = new Date();
+      const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+      // Exact coordinates for Mansoura, Egypt to avoid Aladhan's broken geocoding
+      const response = await fetch(`https://api.aladhan.com/v1/timings/${dateStr}?latitude=31.0379&longitude=31.3815&method=5`);
       const data = await response.json();
       if (data.code === 200) {
         const t = data.data.timings;
