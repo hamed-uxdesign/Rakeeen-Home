@@ -105,7 +105,7 @@ export const WavyRing: React.FC<{
   waves: number;
 }> = ({ pct, phase, mode, isOvertime, running, size = 300, waves }) => {
   const half = size / 2;
-  const baseR = half * 0.92; // Maximize space usage inside the SVG box
+  const baseR = half * 0.85; // Balanced radius for premium look
 
   const generateWavyPath = (offset: number) => {
     const amplitude = size * 0.02, points = 360;
@@ -280,10 +280,10 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.92 }}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="relative flex items-center justify-center w-[350px] h-[350px] sm:w-[800px] sm:h-[800px]"
+              className="relative flex items-center justify-center w-[320px] h-[320px] sm:w-[600px] sm:h-[600px]"
             >
-              <div className={`absolute rounded-full blur-[120px] sm:blur-[200px] opacity-20 w-80 h-80 sm:w-[800px] sm:h-[800px] transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 350 : 800} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-80 h-80 sm:w-[600px] sm:h-[600px] transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
+              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <motion.span
                   key={mode + String(isOvertime)}
