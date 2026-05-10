@@ -282,8 +282,8 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
               className="relative flex items-center justify-center px-4"
             >
-              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-64 h-64 sm:w-80 sm:h-80 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 460} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-64 h-64 sm:w-96 sm:h-96 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
+              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 380 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <motion.span
                   key={mode + String(isOvertime)}
