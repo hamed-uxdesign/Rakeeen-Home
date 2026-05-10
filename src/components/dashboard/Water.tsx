@@ -45,14 +45,20 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     const checkMidnight = () => {
       const todayStr = new Date().toDateString();
       if (todayStr !== lastDate) {
-        if (glasses > 0) setHistory({ ...history, [lastDate]: glasses });
+        // Record history before resetting
+        if (glasses > 0) {
+          const newHistory = { ...history, [lastDate]: glasses };
+          setHistory(newHistory);
+        }
+        // Update date first to prevent multiple triggers
+        setLastDate(todayStr);
+        // Reset current day
         setGlasses(0);
         setLog([]);
-        setLastDate(todayStr);
       }
     };
+    const interval = setInterval(checkMidnight, 10000); // Check more frequently
     checkMidnight();
-    const interval = setInterval(checkMidnight, 60000);
     return () => clearInterval(interval);
   }, [lastDate, glasses, history, setHistory, setGlasses, setLog, setLastDate]);
 
@@ -163,6 +169,30 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         ) : (
           <p className="text-ink/20 text-sm font-black uppercase tracking-[0.3em]">No hydration logged yet.</p>
         )}
+      </div>
+
+      <div className="sys-card mb-8 sm:mb-12 p-6 sm:p-10">
+        <h2 className="text-3xl sm:text-4xl font-black tracking-tighter mb-8 sm:mb-10 text-ink">Recent History</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Object.entries(history).length > 0 ? (
+            Object.entries(history)
+              .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+              .slice(0, 7)
+              .map(([date, amount]) => (
+                <div key={date} className="flex justify-between items-center p-4 bg-paper/20 border-l-4 border-forest">
+                  <div>
+                    <div className="text-[10px] uppercase font-black tracking-widest text-ink/30 mb-1">{date}</div>
+                    <div className="text-lg font-black text-ink">{amount} Glasses</div>
+                  </div>
+                  <div className="text-forest text-xs font-black uppercase tracking-widest">
+                    {amount >= goal ? 'Goal Reached' : `${goal - amount} Left`}
+                  </div>
+                </div>
+              ))
+          ) : (
+            <p className="text-ink/20 text-sm font-black uppercase tracking-[0.3em]">No historical data found.</p>
+          )}
+        </div>
       </div>
 
       <div className="sys-card pb-6 p-6 sm:p-10">

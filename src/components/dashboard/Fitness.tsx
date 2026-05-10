@@ -38,6 +38,7 @@ export const Fitness: React.FC = () => {
   const [workouts, setWorkouts] = useFirebaseSync<any[]>('fitness_workouts', []);
   const [sugarChallenge, setSugarChallenge] = useFirebaseSync<any>('fitness_sugar', { lastCheckIn: '', completedDays: 0 });
   const [history, setHistory] = useFirebaseSync<Record<string, number>>('fitness_history', {});
+  const [lastDate, setLastDate] = useFirebaseSync<string>('fitness_last_date', new Date().toDateString());
 
   const [selMeal, setSelMeal] = useState('Breakfast');
   const [selFoodId, setSelFoodId] = useState('');
@@ -48,6 +49,26 @@ export const Fitness: React.FC = () => {
   const [wDuration, setWDuration] = useState('');
 
   const totalToday = Object.values(meals).flat().reduce((a, b) => a + b.kcal, 0);
+
+  React.useEffect(() => {
+    const checkMidnight = () => {
+      const todayStr = new Date().toDateString();
+      if (todayStr !== lastDate) {
+        // Record total calories to history before clearing
+        if (totalToday > 0) {
+          const newHistory = { ...history, [lastDate]: totalToday };
+          setHistory(newHistory);
+        }
+        // Update date first
+        setLastDate(todayStr);
+        // Reset meals for the new day
+        setMeals({ Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
+      }
+    };
+    const interval = setInterval(checkMidnight, 10000);
+    checkMidnight();
+    return () => clearInterval(interval);
+  }, [lastDate, meals, totalToday, history, setHistory, setLastDate, setMeals]);
 
   const addMealItem = () => {
     const food = foodDb.find(f => f.id === selFoodId);
@@ -381,6 +402,30 @@ export const Fitness: React.FC = () => {
                     <Bar dataKey="minutes" fill="var(--sepia)" radius={[0, 0, 0, 0]} maxBarSize={50} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+           </div>
+
+           <div className="sys-card p-6 sm:p-12">
+              <h3 className="text-2xl sm:text-4xl font-black tracking-tighter mb-8 sm:mb-12">Calorie History</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {Object.entries(history).length > 0 ? (
+                   Object.entries(history)
+                     .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+                     .slice(0, 7)
+                     .map(([date, kcal]) => (
+                       <div key={date} className="flex justify-between items-center p-6 bg-paper/20 border-l-4 border-forest">
+                         <div>
+                           <div className="text-[10px] uppercase font-black tracking-widest text-ink/30 mb-1">{date}</div>
+                           <div className="text-xl font-black text-ink">{kcal} kcal</div>
+                         </div>
+                         <div className={`text-xs font-black uppercase tracking-widest ${kcal > CALORIE_GOAL ? 'text-rust' : 'text-forest'}`}>
+                           {kcal > CALORIE_GOAL ? 'Over Goal' : 'Optimal'}
+                         </div>
+                       </div>
+                     ))
+                 ) : (
+                   <p className="text-ink/20 text-sm font-black uppercase tracking-[0.3em]">No calorie history found.</p>
+                 )}
               </div>
            </div>
         </div>

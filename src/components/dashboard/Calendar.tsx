@@ -15,7 +15,7 @@ interface CalEvent {
   durationMins: number;
 }
 
-const ICAL_URL = 'https://calendar.google.com/calendar/ical/hamed.rakeeen%40gmail.com/private-aa7a61a1272c8a39e1d8c9e1d8ecba50/basic.ics';
+const ICAL_URL = 'https://calendar.google.com/calendar/ical/9ce9f7279f0afeef711ae5c21eb29f4f087e8cb74aef36a9bbd0d58751e61587%40group.calendar.google.com/private-8496d29b04f57f4c8452f99dd5dbe203/basic.ics';
 
 export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
   const [events, setEvents] = useState<CalEvent[]>([]);

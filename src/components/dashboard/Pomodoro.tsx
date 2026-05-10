@@ -275,27 +275,26 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               {isOvertime ? 'Over-focusing' : (mode === 'focus' ? 'Focus' : 'Break')}
             </motion.div>
 
-            {/* Giant Ring — scales in from slightly smaller */}
             <motion.div
               initial={{ opacity: 0, scale: 0.88 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.92 }}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="relative flex items-center justify-center"
+              className="relative flex items-center justify-center px-4"
             >
-              <div className={`absolute rounded-full blur-[160px] opacity-15 w-80 h-80 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={460} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-64 h-64 sm:w-80 sm:h-80 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
+              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 460} waves={mode === 'focus' ? focusDuration : breakDuration} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <motion.span
                   key={mode + String(isOvertime)}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  className={`text-6xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}
+                  className={`text-5xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}
                 >
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
                 </motion.span>
-                <span className="text-[10px] tracking-[0.5em] font-bold text-ink/30 uppercase">
+                <span className="text-[9px] sm:text-[10px] tracking-[0.5em] font-bold text-ink/30 uppercase">
                   {isOvertime ? 'Overtime' : mode}
                 </span>
               </div>
