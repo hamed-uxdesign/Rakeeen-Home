@@ -108,7 +108,7 @@ export const WavyRing: React.FC<{
   const baseR = half * 0.85; // Balanced radius for premium look
 
   const generateWavyPath = (offset: number) => {
-    const amplitude = size * 0.02, points = 360;
+    const amplitude = size * (waves > 40 ? 0.015 : 0.02), points = 1000; // More points for high frequency
     const pathPoints: string[] = [];
     for (let i = 0; i <= points; i++) {
       const angle = (i / points) * Math.PI * 2 - Math.PI / 2;
@@ -161,7 +161,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   const {
     timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
     focusDuration, breakDuration, setFocusDuration, setBreakDuration,
-    start, pause, reset, startBreak, startNewSession, skipBreak, setWeekStats
+    start, pause, reset, startBreak, startNewSession, skipBreak, markIndecision, setWeekStats
   } = usePomodoro();
 
   const [view, setView] = React.useState<'week' | 'month' | 'year'>('week');
@@ -217,21 +217,31 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   // Controls block (reused in both normal & fullscreen)
   const controls = (
     <div className="flex flex-col items-center gap-4">
-      <div className="flex justify-center gap-4">
+      <div className="flex justify-center items-center gap-2">
         {isOvertime || (mode === 'break' && timeLeft === 0) ? (
           <Button variant="premium" onClick={isOvertime ? startBreak : startNewSession} className="min-w-[180px]">
             <HugeiconsIcon icon={mode === 'focus' ? RefreshIcon : PlayIcon} size={18} />
             <span className="ml-2 tracking-widest">{isOvertime ? 'Take a break' : 'Start new session'}</span>
           </Button>
         ) : (
-          <Button variant="premium" onClick={running ? pause : start} className="min-w-[140px]">
-            {running ? <HugeiconsIcon icon={PauseIcon} size={18} /> : <HugeiconsIcon icon={PlayIcon} size={18} />}
-            <span className="ml-2 tracking-widest">{running ? 'Pause' : 'Start'}</span>
-          </Button>
+          <>
+            <Button onClick={running ? pause : start} variant="ghost" className="p-4 sm:p-5 text-forest border-ink/10">
+              <HugeiconsIcon icon={running ? PauseIcon : PlayIcon} size={22} />
+            </Button>
+            <Button onClick={reset} variant="ghost" className="p-4 sm:p-5 text-ink/30 border-ink/10">
+              <HugeiconsIcon icon={RefreshIcon} size={22} />
+            </Button>
+          </>
         )}
-        <Button variant="sketchy" onClick={reset} className="border-ink/20 opacity-60 hover:opacity-100 px-5">
-          <HugeiconsIcon icon={RefreshIcon} size={18} />
-        </Button>
+        
+        {mode === 'focus' && running && !isOvertime && (
+          <button 
+            onClick={markIndecision}
+            className="text-[10px] uppercase font-black tracking-widest text-rust/40 hover:text-rust transition-all border-b border-rust/20 ml-2"
+          >
+            Indecision
+          </button>
+        )}
       </div>
       {mode === 'break' && (
         <button onClick={skipBreak} className="text-[10px] uppercase tracking-[0.2em] font-black text-ink/40 hover:text-sepia transition-all underline underline-offset-4">

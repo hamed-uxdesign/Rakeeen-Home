@@ -15,7 +15,7 @@ interface TabsProps {
 
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className = '', size = 'sm' }) => {
   return (
-    <div className={`flex gap-3 relative z-10 ${className}`}>
+    <div className={`flex flex-nowrap gap-2 overflow-x-auto pb-2 -mb-2 no-scrollbar relative z-10 ${className}`}>
       {tabs.map(t => {
         const id = typeof t === 'string' ? t : t.id;
         const label = typeof t === 'string' ? t : t.label;

@@ -23,6 +23,7 @@ interface PomodoroContextType {
   startBreak: () => void;
   startNewSession: () => void;
   skipBreak: () => void;
+  markIndecision: () => void;
 }
 
 const PomodoroContext = createContext<PomodoroContextType | null>(null);
@@ -219,12 +220,25 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setRunning(false);
   }, [FOCUS]);
 
+  const markIndecision = useCallback(() => {
+    if (mode !== 'focus') return;
+    
+    setSessions(s => s + 1);
+    const updated = weekStats.map((d: any, i: number) => 
+      i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + focusDuration } : d
+    );
+    setWeekStats(updated);
+    sendDiscordNotification('focus_complete', { duration: focusDuration, overtime: 0 });
+    
+    reset();
+  }, [mode, focusDuration, weekStats, todayIdx, setWeekStats, sendDiscordNotification, reset]);
+
   return (
     <PomodoroContext.Provider value={{
       timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
       focusDuration, breakDuration, setFocusDuration, setBreakDuration,
       setWeekStats,
-      start, pause, reset, startBreak, startNewSession, skipBreak
+      start, pause, reset, startBreak, startNewSession, skipBreak, markIndecision
     }}>
       {children}
     </PomodoroContext.Provider>

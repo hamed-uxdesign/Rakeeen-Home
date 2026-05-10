@@ -23,7 +23,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [avatarUrl, setAvatarUrl] = useFirebaseSync<string | null>('avatar_url', null);
   
   const [glasses] = useFirebaseSync<number>('hydration_glasses', 0);
-  const [meals] = useFirebaseSync<Record<string, any[]>>('meals', { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
+  const [meals] = useFirebaseSync<Record<string, any[]>>('fitness_meals', { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
+  const totalCalories = Object.values(meals || {}).flat().reduce((a, i) => a + (i.kcal || 0), 0);
   const { weekStats, todayIdx } = usePomodoro();
 
   const [uploading, setUploading] = React.useState(false);
@@ -31,7 +32,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [logoutModal, setLogoutModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const totalCalories = Object.values(meals || {}).flat().reduce((a, i) => a + (i.kcal || 0), 0);
+
   const focusMinutes = weekStats?.[todayIdx]?.minutes || 0;
   const focusHours = (focusMinutes / 60).toFixed(1).replace('.0', '');
   const { running: pomodoroRunning, isOvertime: pomodoroOvertime } = usePomodoro();
@@ -121,10 +122,11 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         {[
           {label:'Glasses', value:`${glasses} / 8`},
           {label:'Focus time', value: focusMinutes > 0 ? `${focusHours}h` : '0h'},
+          {label:'Calories', value: `${totalCalories} / 2200`},
         ].map((item, idx)=>(
           <div key={idx} className="text-center">
             <Label className="mb-1 text-[8px] sm:text-[9px] opacity-40 font-black tracking-widest">{item.label}</Label>
-            <div className="text-sm sm:text-base font-bold text-sepia tracking-tight">{item.value}</div>
+            <div className="text-sm sm:text-base font-bold text-sepia tracking-tight whitespace-nowrap">{item.value}</div>
           </div>
         ))}
       </div>
