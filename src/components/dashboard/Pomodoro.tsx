@@ -105,7 +105,7 @@ export const WavyRing: React.FC<{
   waves: number;
 }> = ({ pct, phase, mode, isOvertime, running, size = 300, waves }) => {
   const half = size / 2;
-  const baseR = half * 0.8;
+  const baseR = half * 0.88; // Increased from 0.8 to make circle larger relative to box
 
   const generateWavyPath = (offset: number) => {
     const amplitude = size * 0.02, points = 360;
@@ -282,8 +282,8 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
               className="relative flex items-center justify-center px-4"
             >
-              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-64 h-64 sm:w-96 sm:h-96 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 380 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-64 h-64 sm:w-[500px] sm:h-[500px] transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
+              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 450 : 800} waves={mode === 'focus' ? focusDuration : breakDuration} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <motion.span
                   key={mode + String(isOvertime)}
