@@ -108,7 +108,7 @@ export const WavyRing: React.FC<{
   const baseR = half * 0.85; // Balanced radius for premium look
 
   const generateWavyPath = (offset: number) => {
-    const amplitude = size * (waves > 40 ? 0.015 : 0.02), points = 1000; // More points for high frequency
+    const amplitude = size * (waves > 40 ? 0.015 : 0.02), points = 500; // Reduced from 1000 to 500 for better performance
     const pathPoints: string[] = [];
     for (let i = 0; i <= points; i++) {
       const angle = (i / points) * Math.PI * 2 - Math.PI / 2;
@@ -161,7 +161,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   const {
     timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
     focusDuration, breakDuration, setFocusDuration, setBreakDuration,
-    start, pause, reset, startBreak, startNewSession, skipBreak, markIndecision, setWeekStats
+    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, setWeekStats
   } = usePomodoro();
 
   const [view, setView] = React.useState<'week' | 'month' | 'year'>('week');
@@ -236,10 +236,10 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
         
         {mode === 'focus' && running && !isOvertime && (
           <button 
-            onClick={markIndecision}
-            className="text-[10px] uppercase font-black tracking-widest text-rust/40 hover:text-rust transition-all border-b border-rust/20 ml-2"
+            onClick={saveProgress}
+            className="text-[10px] uppercase font-black tracking-widest text-forest/40 hover:text-forest transition-all border-b border-forest/20 ml-2"
           >
-            Indecision
+            Done
           </button>
         )}
       </div>

@@ -122,7 +122,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         {[
           {label:'Glasses', value:`${glasses} / 8`},
           {label:'Focus time', value: focusMinutes > 0 ? `${focusHours}h` : '0h'},
-          {label:'Calories', value: `${totalCalories} / 2200`},
+          {label:'Calories', value: `${totalCalories} kcal`},
         ].map((item, idx)=>(
           <div key={idx} className="text-center">
             <Label className="mb-1 text-[8px] sm:text-[9px] opacity-40 font-black tracking-widest">{item.label}</Label>
