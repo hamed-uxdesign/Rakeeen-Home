@@ -53,14 +53,12 @@ const DurationEditor: React.FC<{
       className="absolute top-full left-1/2 -translate-x-1/2 mt-3 z-50 w-64 bg-[var(--paper-dark)] border-2 border-ink rounded-[var(--radius-btn)] shadow-[4px_4px_0px_0px_rgba(232,224,208,0.1)] p-5"
     >
       <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/40 mb-4">Duration Settings</div>
-      
-      {/* Focus Row */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] uppercase tracking-widest font-black text-forest">Focus</span>
+
+      {/* Focus Row - Locked as per user request */}
+      <div className="flex items-center justify-between mb-3 opacity-40">
+        <span className="text-[10px] uppercase tracking-widest font-black text-forest">Focus (Locked)</span>
         <div className="flex items-center gap-2">
-          {numBtn(f, setF, -5, 5, 120)}
           <span className="text-lg font-black text-ink w-10 text-center">{f}m</span>
-          {numBtn(f, setF, 5, 5, 120)}
         </div>
       </div>
 
@@ -161,7 +159,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   const {
     timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
     focusDuration, breakDuration, setFocusDuration, setBreakDuration,
-    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, addTime, setWeekStats
+    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, setWeekStats
   } = usePomodoro();
 
   const [view, setView] = React.useState<'week' | 'month' | 'year'>('week');
@@ -192,13 +190,13 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsFullscreen(false); };
     window.addEventListener('keydown', handler);
-    
+
     if (isFullscreen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = 'unset';
     }
-    
+
     return () => {
       window.removeEventListener('keydown', handler);
       document.body.style.overflow = 'unset';
@@ -233,22 +231,14 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
             </Button>
           </>
         )}
-        
+
         {mode === 'focus' && running && !isOvertime && (
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => addTime(5)}
-              className="text-[10px] uppercase font-black tracking-widest text-forest/60 hover:text-forest transition-all border border-forest/20 px-2 py-1 rounded"
-            >
-              +5m
-            </button>
-            <button 
-              onClick={saveProgress}
-              className="text-[10px] uppercase font-black tracking-widest text-forest/40 hover:text-forest transition-all border-b border-forest/20 ml-1"
-            >
-              Done
-            </button>
-          </div>
+          <button
+            onClick={saveProgress}
+            className="text-[10px] uppercase font-black tracking-widest text-forest/40 hover:text-forest transition-all border-b border-forest/20 ml-2"
+          >
+            Done
+          </button>
         )}
       </div>
       {mode === 'break' && (
@@ -353,9 +343,9 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
       <div className="max-w-2xl mx-auto py-6 sm:py-10 px-4 sm:px-5">
         <BackBtn onClick={() => navigate('home')} />
 
-        <PageHeader 
-          title="Pomodoro" 
-          subtitle="Focus sessions & productivity analytics" 
+        <PageHeader
+          title="Pomodoro"
+          subtitle="Focus sessions & productivity analytics"
           size="md"
         />
 
@@ -442,10 +432,10 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
         {/* Sessions Reports */}
         <div className="sys-card pb-4 p-6 sm:p-8">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">Sessions reports</h2>
-          <Tabs 
-            tabs={['week', 'month', 'year']} 
-            activeTab={view} 
-            onChange={(v) => setView(v as any)} 
+          <Tabs
+            tabs={['week', 'month', 'year']}
+            activeTab={view}
+            onChange={(v) => setView(v as any)}
             className="flex-wrap sm:justify-end mb-10 sm:-mt-16 gap-2"
           />
 
@@ -459,13 +449,13 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                   cursor={{ fill: 'rgba(124,169,130,0.05)' }}
                   content={<ChartTooltip unit="Sessions" getTipMessage={(val) => getTip(val, view)} />}
                 />
-                
+
                 {/* Goal Reference Line (Matches Hydration) */}
-                <ReferenceLine 
-                  y={view === 'week' ? 8 : view === 'month' ? 40 : 1000} 
-                  stroke="var(--forest)" 
-                  strokeDasharray="5 5" 
-                  strokeOpacity={0.4} 
+                <ReferenceLine
+                  y={view === 'week' ? 8 : view === 'month' ? 40 : 1000}
+                  stroke="var(--forest)"
+                  strokeDasharray="5 5"
+                  strokeOpacity={0.4}
                 />
 
                 <Bar dataKey="sessions" radius={[0, 0, 0, 0]} maxBarSize={40}>
