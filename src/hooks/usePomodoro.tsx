@@ -24,6 +24,7 @@ interface PomodoroContextType {
   startNewSession: () => void;
   skipBreak: () => void;
   saveProgress: () => void;
+  addTime: (mins: number) => void;
 }
 
 const PomodoroContext = createContext<PomodoroContextType | null>(null);
@@ -238,12 +239,16 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     reset();
   }, [mode, focusDuration, timeLeft, overtime, weekStats, todayIdx, setWeekStats, sendDiscordNotification, reset]);
 
+  const addTime = useCallback((mins: number) => {
+    setTimeLeft(prev => prev + mins * 60);
+  }, []);
+
   return (
     <PomodoroContext.Provider value={{
       timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
       focusDuration, breakDuration, setFocusDuration, setBreakDuration,
       setWeekStats,
-      start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress
+      start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, addTime
     }}>
       {children}
     </PomodoroContext.Provider>

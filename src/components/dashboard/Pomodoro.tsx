@@ -105,10 +105,10 @@ export const WavyRing: React.FC<{
   waves: number;
 }> = ({ pct, phase, mode, isOvertime, running, size = 300, waves }) => {
   const half = size / 2;
-  const baseR = half * 0.85; // Balanced radius for premium look
+  const baseR = half * 0.8;
 
   const generateWavyPath = (offset: number) => {
-    const amplitude = size * (waves > 40 ? 0.015 : 0.02), points = 500; // Reduced from 1000 to 500 for better performance
+    const amplitude = size * 0.02, points = 360;
     const pathPoints: string[] = [];
     for (let i = 0; i <= points; i++) {
       const angle = (i / points) * Math.PI * 2 - Math.PI / 2;
@@ -161,7 +161,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   const {
     timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
     focusDuration, breakDuration, setFocusDuration, setBreakDuration,
-    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, setWeekStats
+    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, addTime, setWeekStats
   } = usePomodoro();
 
   const [view, setView] = React.useState<'week' | 'month' | 'year'>('week');
@@ -235,12 +235,20 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
         )}
         
         {mode === 'focus' && running && !isOvertime && (
-          <button 
-            onClick={saveProgress}
-            className="text-[10px] uppercase font-black tracking-widest text-forest/40 hover:text-forest transition-all border-b border-forest/20 ml-2"
-          >
-            Done
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => addTime(5)}
+              className="text-[10px] uppercase font-black tracking-widest text-forest/60 hover:text-forest transition-all border border-forest/20 px-2 py-1 rounded"
+            >
+              +5m
+            </button>
+            <button 
+              onClick={saveProgress}
+              className="text-[10px] uppercase font-black tracking-widest text-forest/40 hover:text-forest transition-all border-b border-forest/20 ml-1"
+            >
+              Done
+            </button>
+          </div>
         )}
       </div>
       {mode === 'break' && (
