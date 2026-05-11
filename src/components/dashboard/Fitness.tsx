@@ -51,24 +51,9 @@ export const Fitness: React.FC = () => {
   const totalToday = Object.values(meals).flat().reduce((a, b) => a + b.kcal, 0);
 
   React.useEffect(() => {
-    const checkMidnight = () => {
-      const todayStr = new Date().toDateString();
-      if (todayStr !== lastDate) {
-        // Record total calories to history before clearing
-        if (totalToday > 0) {
-          const newHistory = { ...history, [lastDate]: totalToday };
-          setHistory(newHistory);
-        }
-        // Update date first
-        setLastDate(todayStr);
-        // Reset meals for the new day
-        setMeals({ Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
-      }
-    };
-    const interval = setInterval(checkMidnight, 10000);
-    checkMidnight();
-    return () => clearInterval(interval);
-  }, [lastDate, meals, totalToday, history, setHistory, setLastDate, setMeals]);
+    // Client-side reset logic removed. 
+    // Handled by Firebase Cloud Function (midnightReset)
+  }, []);
 
   const addMealItem = () => {
     const food = foodDb.find(f => f.id === selFoodId);

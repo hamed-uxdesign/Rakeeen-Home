@@ -42,25 +42,9 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   }, []);
 
   React.useEffect(() => {
-    const checkMidnight = () => {
-      const todayStr = new Date().toDateString();
-      if (todayStr !== lastDate) {
-        // Record history before resetting
-        if (glasses > 0) {
-          const newHistory = { ...history, [lastDate]: glasses };
-          setHistory(newHistory);
-        }
-        // Update date first to prevent multiple triggers
-        setLastDate(todayStr);
-        // Reset current day
-        setGlasses(0);
-        setLog([]);
-      }
-    };
-    const interval = setInterval(checkMidnight, 10000); // Check more frequently
-    checkMidnight();
-    return () => clearInterval(interval);
-  }, [lastDate, glasses, history, setHistory, setGlasses, setLog, setLastDate]);
+    // Client-side reset logic removed. 
+    // Handled by Firebase Cloud Function (midnightReset)
+  }, []);
 
   const addGlass = () => {
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });

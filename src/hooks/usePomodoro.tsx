@@ -96,7 +96,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!webhookUrl) return;
 
     const embeds: any[] = [];
-
+    
     if (type === 'focus_complete') {
       const totalMins = (data?.duration || focusDuration) + Math.floor((data?.overtime || 0) / 60);
       embeds.push({
@@ -104,7 +104,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         description: `Excellent! You've completed **${totalMins} minutes** of deep work.`,
         fields: [
           { name: 'Base Goal', value: `${data?.duration || focusDuration}m`, inline: true },
-          { name: 'Overtime', value: `${Math.floor((data?.overtime || 0) / 60)}m ${(data?.overtime || 0) % 60}s`, inline: true }
+          { name: 'Overtime', value: `${Math.floor((data?.overtime || 0) / 60)}m ${ (data?.overtime || 0) % 60}s`, inline: true }
         ],
         color: 0x7ca982,
         footer: { text: 'Rakeeen Productivity System' },
@@ -144,7 +144,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       timerRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - (startTimeRef.current || Date.now())) / 1000);
-
+        
         if (isOvertime) {
           setOvertime(baseOvertimeRef.current + elapsed);
         } else {
@@ -188,11 +188,11 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startBreak = useCallback(() => {
     const focusGained = focusDuration + Math.floor(overtime / 60);
     setSessions(s => s + 1);
-
+    
     // Send Discord Report with full time (Base + Overtime)
     sendDiscordNotification('focus_complete', { duration: focusDuration, overtime });
 
-    const updated = weekStats.map((d: any, i: number) =>
+    const updated = weekStats.map((d: any, i: number) => 
       i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + focusGained } : d
     );
     setWeekStats(updated);
@@ -222,19 +222,19 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const saveProgress = useCallback(() => {
     if (mode !== 'focus') return;
-
+    
     // Calculate spent minutes
     const spentMins = Math.floor((focusDuration * 60 - timeLeft + overtime) / 60);
-
+    
     if (spentMins > 0) {
       setSessions(s => s + 1);
-      const updated = weekStats.map((d: any, i: number) =>
+      const updated = weekStats.map((d: any, i: number) => 
         i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + spentMins } : d
       );
       setWeekStats(updated);
       sendDiscordNotification('focus_complete', { duration: spentMins, overtime: 0 });
     }
-
+    
     reset();
   }, [mode, focusDuration, timeLeft, overtime, weekStats, todayIdx, setWeekStats, sendDiscordNotification, reset]);
 
