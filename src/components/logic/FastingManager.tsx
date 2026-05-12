@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+// @ts-ignore
 const FASTING_WEBHOOK = import.meta.env.VITE_DISCORD_FASTING_WEBHOOK || import.meta.env.VITE_DISCORD_POMODORO_WEBHOOK;
 
 export const FastingManager: React.FC = () => {

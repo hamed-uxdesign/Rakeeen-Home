@@ -11,6 +11,8 @@ interface PomodoroContextType {
   mode: 'focus' | 'break';
   sessions: number;
   weekStats: any[];
+  logs: any[];
+  history: Record<string, { sessions: number, minutes: number, logs?: any[] }>;
   todayIdx: number;
   focusDuration: number;
   breakDuration: number;
@@ -38,9 +40,10 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [overtime, setOvertime] = useState(0);
   const [isOvertime, setIsOvertime] = useState(false);
-  const [sessions, setSessions] = useState(0);
-  const [lastDate, setLastDate] = useState(new Date().toDateString());
+  const [sessions, setSessions] = useFirebaseSync<number>('pomodoro_sessions', 0);
   const [weekStats, setWeekStats] = useFirebaseSync('pomodoro_week', POMODORO_WEEKLY_MOCK);
+  const [logs, setLogs] = useFirebaseSync<any[]>('pomodoro_logs', []);
+  const [history] = useFirebaseSync<Record<string, { sessions: number, minutes: number, logs?: any[] }>>('pomodoro_history', {});
   const todayIdx = getTodayIdx();
   const timerRef = useRef<any>(null);
 
@@ -64,14 +67,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, []);
 
-  // Daily Reset
-  useEffect(() => {
-    const today = new Date().toDateString();
-    if (today !== lastDate) {
-      setSessions(0);
-      setLastDate(today);
-    }
-  }, [lastDate]);
+  // Daily Reset handled by CalendarResetManager
 
   // Warn before leaving site while timer is running
   useEffect(() => {
@@ -92,6 +88,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const sendDiscordNotification = useCallback(async (type: 'focus_started' | 'focus_complete' | 'break_complete' | 'test', data?: { duration?: number, overtime?: number }) => {
+    // @ts-ignore
     const webhookUrl = import.meta.env.VITE_DISCORD_POMODORO_WEBHOOK;
     if (!webhookUrl) return;
 
@@ -188,6 +185,8 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startBreak = useCallback(() => {
     const focusGained = focusDuration + Math.floor(overtime / 60);
     setSessions(s => s + 1);
+    const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    setLogs(l => [{ time: nowTime, duration: focusGained }, ...l]);
     
     // Send Discord Report with full time (Base + Overtime)
     sendDiscordNotification('focus_complete', { duration: focusDuration, overtime });
@@ -228,6 +227,9 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     
     if (spentMins > 0) {
       setSessions(s => s + 1);
+      const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      setLogs(l => [{ time: now, duration: spentMins }, ...l]);
+      
       const updated = weekStats.map((d: any, i: number) => 
         i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + spentMins } : d
       );
@@ -236,13 +238,13 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
     
     reset();
-  }, [mode, focusDuration, timeLeft, overtime, weekStats, todayIdx, setWeekStats, sendDiscordNotification, reset]);
+  }, [mode, focusDuration, timeLeft, overtime, weekStats, todayIdx, setWeekStats, sendDiscordNotification, reset, setLogs]);
 
   return (
     <PomodoroContext.Provider value={{
-      timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
+      timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, history, todayIdx,
       focusDuration, breakDuration, setFocusDuration, setBreakDuration,
-      setWeekStats,
+      setWeekStats, logs,
       start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress
     }}>
       {children}

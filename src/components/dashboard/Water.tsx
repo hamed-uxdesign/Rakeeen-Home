@@ -3,7 +3,7 @@ import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { BackBtn } from '../layout/Common';
 import { Button, PageHeader, ChartTooltip } from '../ui/UIComponents';
 import { Tabs } from '../ui/Tabs';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from 'recharts';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { 
   DropletIcon, 
@@ -15,25 +15,12 @@ interface WaterProps {
   navigate: (to: string) => void;
 }
 
-const BASE_REPORTS = {
-  week: [
-    { name: 'Mon', glasses: 0 }, { name: 'Tue', glasses: 0 }, { name: 'Wed', glasses: 0 },
-    { name: 'Thu', glasses: 0 }, { name: 'Fri', glasses: 0 }, { name: 'Sat', glasses: 0 }, { name: 'Sun', glasses: 0 }
-  ],
-  month: [
-    { name: 'Week 1', glasses: 0 }, { name: 'Week 2', glasses: 0 }, { name: 'Week 3', glasses: 0 }, { name: 'Week 4', glasses: 0 }
-  ],
-  year: [
-    { name: 'Jan', glasses: 0 }, { name: 'Feb', glasses: 0 }, { name: 'Mar', glasses: 0 }, { name: 'Apr', glasses: 0 },
-    { name: 'May', glasses: 0 }, { name: 'Jun', glasses: 0 }, { name: 'Jul', glasses: 0 }
-  ]
-};
+
 
 export const Water: React.FC<WaterProps> = ({ navigate }) => {
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
   const [log, setLog] = useFirebaseSync<string[]>('hydration_log', []);
-  const [lastDate, setLastDate] = useFirebaseSync<string>('hydration_last_date', new Date().toDateString());
-  const [history, setHistory] = useFirebaseSync<Record<string, number>>('hydration_history', {});
+  const [history] = useFirebaseSync<Record<string, number>>('hydration_history', {});
   const [reportView, setReportView] = useState<'week' | 'month' | 'year'>('week');
   const goal = 8;
 
@@ -42,8 +29,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   }, []);
 
   React.useEffect(() => {
-    // Client-side reset logic removed. 
-    // Handled by Firebase Cloud Function (midnightReset)
+    // Client-side reset logic handled by CalendarResetManager
   }, []);
 
   const addGlass = () => {
@@ -64,16 +50,59 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   };
 
   const pct = Math.min((glasses / goal) * 100, 100);
-  const now = new Date();
-  const dayIndex = now.getDay() === 0 ? 6 : now.getDay() - 1;
-  const weekIndex = Math.floor(now.getDate() / 7);
-  const monthIndex = now.getMonth();
 
-  const dynamicReports = {
-    week: BASE_REPORTS.week.map((d, i) => i === dayIndex ? { ...d, glasses: glasses } : d),
-    month: BASE_REPORTS.month.map((d, i) => i === Math.min(weekIndex, 3) ? { ...d, glasses: glasses } : d),
-    year: BASE_REPORTS.year.map((d, i) => i === monthIndex ? { ...d, glasses: glasses } : d),
+  // --- ANALYTICS: Current period only. No cross-period accumulation. ---
+  const getDynamicReports = () => {
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentDayIdx = now.getDay(); // 0=Sun
+
+    // ── WEEK: Sat-Fri of THIS calendar week only ──────────────────────────────
+    const weekDays = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const weekData = weekDays.map((name, i) => {
+      const targetDayIdx = [6, 0, 1, 2, 3, 4, 5][i];
+      const date = new Date(now);
+      date.setDate(now.getDate() - ((currentDayIdx - targetDayIdx + 7) % 7));
+      const dateStr = date.toDateString();
+      const isFuture = date > now && dateStr !== todayStr;
+      if (isFuture) return { name, glasses: 0 };
+      if (dateStr === todayStr) return { name, glasses };
+      return { name, glasses: history[dateStr] || 0 };
+    });
+
+    // ── MONTH: Week 1-4 of THIS calendar month only ───────────────────────────
+    const monthData = [
+      { name: 'Week 1', glasses: 0 }, { name: 'Week 2', glasses: 0 },
+      { name: 'Week 3', glasses: 0 }, { name: 'Week 4', glasses: 0 }
+    ];
+    Object.entries(history).forEach(([dateStr, val]) => {
+      const d = new Date(dateStr);
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear && dateStr !== todayStr) {
+        const weekIdx = Math.min(Math.floor((d.getDate() - 1) / 7), 3);
+        monthData[weekIdx].glasses += val;
+      }
+    });
+    const todayWeekIdx = Math.min(Math.floor((now.getDate() - 1) / 7), 3);
+    monthData[todayWeekIdx].glasses += glasses;
+
+    // ── YEAR: Jan-Dec of THIS calendar year only ──────────────────────────────
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const yearData = monthNames.map(name => ({ name, glasses: 0 }));
+    Object.entries(history).forEach(([dateStr, val]) => {
+      const d = new Date(dateStr);
+      if (d.getFullYear() === currentYear && dateStr !== todayStr) {
+        yearData[d.getMonth()].glasses += val;
+      }
+    });
+    yearData[currentMonth].glasses += glasses;
+
+    return { week: weekData, month: monthData, year: yearData };
   };
+
+  const dynamicReports = getDynamicReports();
+
 
 
   return (
@@ -166,15 +195,48 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
           className="flex-wrap sm:justify-end mb-8 sm:mb-10 sm:-mt-20 gap-2"
         />
 
-        <div className="h-[300px] w-full mt-6">
+        <div className="h-[320px] w-full mt-10">
           <ResponsiveContainer>
-            <BarChart data={dynamicReports[reportView]} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.05)" />
-              <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.3, fontSize: 11, fontWeight: 900 }} axisLine={false} tickLine={false} dy={10} />
-              <YAxis tick={{ fill: 'var(--ink)', opacity: 0.3, fontSize: 11, fontWeight: 900 }} axisLine={false} tickLine={false} />
-              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.05)' }} content={<ChartTooltip unit="Glasses" getTipMessage={(val) => val >= goal ? 'Goal Achieved' : 'Hydration Pending'} />} />
-              <ReferenceLine y={reportView === 'week' ? goal : reportView === 'month' ? goal * 7 : goal * 30} stroke="var(--forest)" strokeDasharray="6 6" strokeOpacity={0.4} />
-              <Bar dataKey="glasses" fill="var(--forest)" radius={[0, 0, 0, 0]} maxBarSize={45} />
+            <BarChart data={dynamicReports[reportView]} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.08)" strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
+              <YAxis 
+                tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} 
+                axisLine={false} tickLine={false} 
+                width={35}
+                domain={[0, (dataMax: number) => {
+                  const target = reportView === 'week' ? 8 : reportView === 'month' ? 56 : 240;
+                  return Math.max(dataMax, target + (reportView === 'year' ? 20 : 2));
+                }]}
+                ticks={
+                  reportView === 'week' ? [0, 2, 4, 6, 8, 10] : 
+                  reportView === 'month' ? [0, 15, 30, 45, 56, 70] :
+                  [0, 60, 120, 180, 240, 300]
+                }
+              />
+              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.06)' }} content={<ChartTooltip unit="Glasses" getTipMessage={(val) => val >= (reportView === 'week' ? 8 : reportView === 'month' ? 56 : 240) ? 'Goal Achieved' : 'Hydration Pending'} />} />
+              
+              <ReferenceLine 
+                y={reportView === 'week' ? 8 : reportView === 'month' ? 56 : 240} 
+                stroke="var(--forest)" 
+                strokeDasharray="6 6" 
+                strokeOpacity={0.5} 
+                strokeWidth={2}
+                label={{ 
+                  value: reportView === 'week' ? '8' : reportView === 'month' ? '56' : '240', 
+                  position: 'insideTopRight', 
+                  fill: 'var(--forest)', 
+                  fontSize: 10, 
+                  fontWeight: 900,
+                  opacity: 0.5
+                }} 
+              />
+
+              <Bar dataKey="glasses" fill="var(--forest)" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                {dynamicReports[reportView].map((_: any, i: number) => (
+                  <Cell key={i} fillOpacity={0.9} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>

@@ -1,13 +1,12 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
-import { POMODORO_MONTHLY_MOCK, POMODORO_WEEKLY_MOCK } from '../../constants/mockData';
 import { formatTime } from '../../utils/timeHelpers';
 import { BackBtn } from '../layout/Common';
 import { Button, PageHeader, ChartTooltip } from '../ui/UIComponents';
 import { Tabs } from '../ui/Tabs';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { PlayIcon, PauseIcon, RefreshIcon, ArrowExpand01Icon, Cancel01Icon, Delete02Icon } from '@hugeicons/core-free-icons';
+import { PlayIcon, PauseIcon, RefreshIcon, ArrowExpand01Icon, Cancel01Icon } from '@hugeicons/core-free-icons';
 import { usePomodoro } from '../../hooks/usePomodoro';
 
 interface PomodoroProps {
@@ -85,10 +84,10 @@ const DurationEditor: React.FC<{
 };
 
 // Custom tooltip logic moved to ChartTooltip
-const getTip = (value: number, type: string) => {
-  let target = 8;
-  if (type === 'month') target = 8 * 5;
-  if (type === 'year') target = 8 * 250;
+const getTip = (value: number, type: string, reportType: 'sessions' | 'minutes') => {
+  let target = reportType === 'sessions' ? 25 : 12;
+  if (type === 'month') target *= 7;
+  if (type === 'year') target *= 30;
   if (value >= target) return "Elite Focus!";
   if (value >= target * 0.7) return "Almost there!";
   return "Keep pushing";
@@ -100,10 +99,9 @@ export const WavyRing: React.FC<{
   phase: number;
   mode: 'focus' | 'break';
   isOvertime: boolean;
-  running: boolean;
   size?: number;
   waves: number;
-}> = ({ pct, phase, mode, isOvertime, running, size = 300, waves }) => {
+}> = ({ pct, phase, mode, isOvertime, size = 300, waves }) => {
   const half = size / 2;
   const baseR = half * 0.85; // Balanced radius for premium look
 
@@ -159,21 +157,15 @@ export const WavyRing: React.FC<{
 // ─── Main Component ───────────────────────────────────────────────────────────
 export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   const {
-    timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, todayIdx,
+    timeLeft, overtime, isOvertime, running, mode, sessions, weekStats, history, todayIdx,
     focusDuration, breakDuration, setFocusDuration, setBreakDuration,
-    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, setWeekStats
+    start, pause, reset, startBreak, startNewSession, skipBreak, saveProgress, logs
   } = usePomodoro();
 
   const [view, setView] = React.useState<'week' | 'month' | 'year'>('week');
   const [phase, setPhase] = React.useState(0);
   const [showDurationEditor, setShowDurationEditor] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
-
-  // ── Reset all focus time data from Firebase + localStorage ──
-  const resetFocusData = useCallback(async () => {
-    const zeroed = POMODORO_WEEKLY_MOCK.map(d => ({ ...d, sessions: 0, minutes: 0 }));
-    await setWeekStats(zeroed);
-  }, [setWeekStats]);
 
   useEffect(() => { document.title = 'Rakeeen - Pomodoro'; }, []);
 
@@ -213,6 +205,78 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   );
 
   const activeColor = isOvertime ? 'text-rust' : (mode === 'focus' ? 'text-forest' : 'text-sepia');
+
+  // --- ANALYTICS LOGIC ---
+  // Each view only shows data from the current period window. No cross-period accumulation.
+  const getDynamicReports = () => {
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const focusMinsToday = Math.round(weekStats?.[todayIdx]?.minutes || 0);
+
+    // ── WEEK: Sat-Fri of THIS calendar week only ──────────────────────────────
+    const weekDays = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const currentDayIdx = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const weekData = weekDays.map((name, i) => {
+      // Sat is i=0. Saturday's native getDay() is 6.
+      // We need to find the date of the "Saturday" of THIS week.
+      // The offset formula to find a target day in the current week:
+      const targetDayIdx = [6, 0, 1, 2, 3, 4, 5][i]; 
+      const date = new Date(now);
+      date.setDate(now.getDate() - ((currentDayIdx - targetDayIdx + 7) % 7));
+      const dateStr = date.toDateString();
+      const isFuture = date > now && dateStr !== todayStr;
+      if (isFuture) return { name, sessions: 0, minutes: 0 };
+      if (dateStr === todayStr) return { name, sessions, minutes: focusMinsToday };
+      
+      const wsEntry = weekStats?.find((d: any) => (d.day || d.name) === name);
+      const hEntry = history[dateStr];
+      return { 
+        name,
+        sessions: wsEntry?.sessions || hEntry?.sessions || 0,
+        minutes: wsEntry?.minutes || hEntry?.minutes || 0
+      };
+    });
+
+    // ── MONTH: Week 1-4 of THIS calendar month only ───────────────────────────
+    const monthData = [
+      { name: 'Week 1', sessions: 0, minutes: 0 },
+      { name: 'Week 2', sessions: 0, minutes: 0 },
+      { name: 'Week 3', sessions: 0, minutes: 0 },
+      { name: 'Week 4', sessions: 0, minutes: 0 },
+    ];
+    Object.entries(history).forEach(([dateStr, val]) => {
+      const d = new Date(dateStr);
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear && dateStr !== todayStr) {
+        const weekIdx = Math.min(Math.floor((d.getDate() - 1) / 7), 3);
+        monthData[weekIdx].sessions += (val.sessions || 0);
+        monthData[weekIdx].minutes += (val.minutes || 0);
+      }
+    });
+    const todayWeekIdx = Math.min(Math.floor((now.getDate() - 1) / 7), 3);
+    monthData[todayWeekIdx].sessions += sessions;
+    monthData[todayWeekIdx].minutes += focusMinsToday;
+
+    // ── YEAR: Jan-Dec of THIS calendar year only ──────────────────────────────
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const yearData = monthNames.map(name => ({ name, sessions: 0, minutes: 0 }));
+    Object.entries(history).forEach(([dateStr, val]) => {
+      const d = new Date(dateStr);
+      if (d.getFullYear() === currentYear && dateStr !== todayStr) {
+        yearData[d.getMonth()].sessions += (val.sessions || 0);
+        yearData[d.getMonth()].minutes += (val.minutes || 0);
+      }
+    });
+    yearData[currentMonth].sessions += sessions;
+    yearData[currentMonth].minutes += focusMinsToday;
+
+    return { week: weekData, month: monthData, year: yearData };
+  };
+
+  const dynamicReports = getDynamicReports();
+  const [reportType, setReportType] = useState<'sessions' | 'minutes'>('sessions');
+  const DAILY_TARGET_HOURS = 12;
 
   // Controls block (reused in both normal & fullscreen)
   const controls = (
@@ -293,7 +357,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               className="relative flex items-center justify-center w-[320px] h-[320px] sm:w-[600px] sm:h-[600px]"
             >
               <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-80 h-80 sm:w-[600px] sm:h-[600px] transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <motion.span
                   key={mode + String(isOvertime)}
@@ -372,7 +436,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
           {/* Timer Circle */}
           <div className="relative w-full max-w-[300px] aspect-square mx-auto flex items-center justify-center">
             <div className={`absolute inset-4 sm:inset-10 rounded-full blur-[40px] sm:blur-[80px] opacity-20 -z-10 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-            <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={300} waves={mode === 'focus' ? focusDuration : breakDuration} />
+            <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={300} waves={mode === 'focus' ? focusDuration : breakDuration} />
 
             {/* Center content */}
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -420,54 +484,118 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
           {/* Session Stats */}
           <div className="mt-10 flex justify-center gap-8">
             <div className="text-center">
-              <div className="text-[10px] uppercase tracking-[0.2em] font-black text-ink/30 mb-1">Sessions</div>
-              <div className="text-2xl font-black text-sepia">{sessions}</div>
+              <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/20 mb-1">Sessions</div>
+              <div className="text-3xl font-black text-sepia">{sessions}</div>
             </div>
             <div className="w-px bg-ink/10" />
             <div className="text-center">
-              <div className="text-[10px] uppercase tracking-[0.2em] font-black text-ink/30 mb-1">Focus time</div>
-              <div className="text-2xl font-black text-sepia">{Math.round(weekStats?.[todayIdx]?.minutes || 0)}m</div>
+              <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/20 mb-1">Focus Today</div>
+              <div className="text-3xl font-black text-sepia">{Number((( weekStats?.[todayIdx]?.minutes || 0) / 60).toFixed(1))}h</div>
             </div>
           </div>
         </div>
 
-        {/* Sessions Reports */}
-        <div className="sys-card pb-4 p-6 sm:p-8">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-8">Sessions reports</h2>
-          <Tabs 
-            tabs={['week', 'month', 'year']} 
-            activeTab={view} 
-            onChange={(v) => setView(v as any)} 
-            className="flex-wrap sm:justify-end mb-10 sm:-mt-16 gap-2"
-          />
+        {/* Performance Reports */}
+        <div className="sys-card pb-6 p-6 sm:p-8">
 
-          <div className="h-[250px] w-full mt-4">
+          {/* Header row */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Performance</h2>
+              <p className="text-[10px] uppercase tracking-[0.3em] font-black text-ink/20 mt-1">
+                {reportType === 'sessions' ? 'Sessions per period' : 'Focus hours per period · Target 12h/day'}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-5">
+              {/* Period toggle — Now ON TOP */}
+              <Tabs 
+                tabs={['week', 'month', 'year']} 
+                activeTab={view} 
+                onChange={(v) => setView(v as any)} 
+                className="gap-2"
+              />
+
+              {/* Metric toggle — Now BELOW the period toggle */}
+              <div className="flex gap-6">
+                {(['sessions', 'minutes'] as const).map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setReportType(type)}
+                    className={`text-[9px] uppercase font-black tracking-[0.2em] pb-1.5 border-b-2 transition-all ${
+                      reportType === type
+                        ? 'text-forest border-forest'
+                        : 'text-ink/20 border-transparent hover:text-ink/40'
+                    }`}
+                  >
+                    {type === 'sessions' ? 'Sessions' : 'Hrs Focus'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Chart */}
+          <div className="h-[240px] w-full">
             <ResponsiveContainer>
-              <BarChart data={view === 'week' ? weekStats : POMODORO_MONTHLY_MOCK} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.05)" />
-                <XAxis dataKey={view === 'week' ? 'day' : 'week'} tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
-                <YAxis tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} />
+              <BarChart 
+                data={dynamicReports[view].map((d: any) => ({ 
+                  ...d, 
+                  displayHours: Number((d.minutes / 60).toFixed(2))
+                }))} 
+                margin={{ top: 20, right: 10, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.08)" strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} 
+                  axisLine={false} tickLine={false} dy={10} 
+                />
+                <YAxis 
+                  tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} 
+                  axisLine={false} tickLine={false}
+                  width={30}
+                  domain={[0, (dataMax: number) => Math.max(dataMax, reportType === 'sessions' ? 25 : DAILY_TARGET_HOURS)]}
+                  ticks={reportType === 'sessions' ? [0, 5, 10, 15, 20, 25] : [0, 2, 4, 6, 8, 10, 12]}
+                />
                 <Tooltip
-                  cursor={{ fill: 'rgba(124,169,130,0.05)' }}
-                  content={<ChartTooltip unit="Sessions" getTipMessage={(val) => getTip(val, view)} />}
+                  cursor={{ fill: 'rgba(124,169,130,0.06)' }}
+                  content={<ChartTooltip unit={reportType === 'sessions' ? 'Sessions' : 'Hours'} getTipMessage={(val) => getTip(val, view, reportType)} />}
                 />
                 
-                {/* Goal Reference Line (Matches Hydration) */}
                 <ReferenceLine 
-                  y={view === 'week' ? 8 : view === 'month' ? 40 : 1000} 
+                  y={reportType === 'sessions' ? 25 : DAILY_TARGET_HOURS} 
                   stroke="var(--forest)" 
-                  strokeDasharray="5 5" 
-                  strokeOpacity={0.4} 
+                  strokeDasharray="6 6" 
+                  strokeOpacity={0.4}
+                  strokeWidth={1.5}
                 />
 
-                <Bar dataKey="sessions" radius={[0, 0, 0, 0]} maxBarSize={40}>
-                  {(view === 'week' ? weekStats : POMODORO_MONTHLY_MOCK).map((_: any, i: number) => (
-                    <Cell key={i} fill="var(--forest)" />
+                <Bar dataKey={reportType === 'sessions' ? 'sessions' : 'displayHours'} radius={[4, 4, 0, 0]} maxBarSize={32}>
+                  {dynamicReports[view].map((_: any, i: number) => (
+                    <Cell key={i} fill={reportType === 'sessions' ? 'var(--forest)' : 'var(--sepia)'} fillOpacity={0.9} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          {/* Individual Sessions Log */}
+          {logs && logs.length > 0 && (
+            <div className="mt-10 pt-8 border-t border-ink/5">
+              <h3 className="text-[10px] uppercase font-black tracking-[0.3em] text-ink/20 mb-5">Today's Sessions</h3>
+              <div className="space-y-2">
+                {logs.map((log: any, i: number) => (
+                  <div key={i} className="flex justify-between items-center py-3 px-4 border border-ink/5 rounded-lg">
+                    <span className="text-xs font-black text-ink/40 tracking-wide">{log.time}</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-xl font-black text-forest tabular-nums">{log.duration}</span>
+                      <span className="text-[9px] uppercase tracking-widest text-ink/20">min</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

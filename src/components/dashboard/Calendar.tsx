@@ -15,7 +15,7 @@ interface CalEvent {
   durationMins: number;
 }
 
-const ICAL_URL = 'https://calendar.google.com/calendar/ical/hamed.rakeeen%40gmail.com/private-aa7a61a1272c8a39e1d8c9e1d8ecba50/basic.ics';
+const ICAL_URL = 'https://calendar.google.com/calendar/ical/9ce9f7279f0afeef711ae5c21eb29f4f087e8cb74aef36a9bbd0d58751e61587%40group.calendar.google.com/private-8496d29b04f57f4c8452f99dd5dbe203/basic.ics';
 
 export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
   const [events, setEvents] = useState<CalEvent[]>([]);
@@ -58,6 +58,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
 
   useEffect(() => {
     const fetchICS = async () => {
+      setLoading(true);
       try {
         const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(ICAL_URL)}`);
         const text = await res.text();
@@ -65,10 +66,14 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
         const lines = unfoldedText.split(/\r?\n/);
         const tempEvents: CalEvent[] = [];
         let curr: any = { rrule: '' };
-        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+        
+        // Recalculate today's window on every fetch
+        const now = new Date();
+        const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(now); todayEnd.setHours(23, 59, 59, 999);
         const todayTime = todayStart.getTime();
         const tomorrowTime = todayEnd.getTime();
+        const todayStr = now.toDateString();
 
         for (let line of lines) {
           if (line.startsWith('BEGIN:VEVENT')) {
@@ -88,7 +93,6 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                   const instEnd = new Date(instStart.getTime() + durationMs);
                   
                   // ABSOLUTE SINGLE DAY CHECK
-                  const todayStr = new Date().toDateString();
                   const startsToday = instStart.toDateString() === todayStr;
                   const endsToday = instEnd.toDateString() === todayStr;
                   const spansToday = instStart.getTime() < todayTime && instEnd.getTime() > tomorrowTime;
@@ -108,7 +112,6 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                 };
 
                 if (curr.rrule && curr.rrule.includes('FREQ=DAILY')) {
-                  // Only if the recurring series started before or on today
                   if (baseStart.getTime() <= tomorrowTime) {
                     const inst = new Date(todayStart);
                     inst.setHours(baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds());
@@ -126,14 +129,13 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                     }
                   }
                 } else {
-                  // Non-recurring: must be today
                   checkAndAdd(baseStart);
                 }
               }
             }
             curr = { rrule: '' };
           }
- else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
+          else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
           else if (line.startsWith('DTSTART')) curr.dtstart = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
           else if (line.startsWith('DTEND')) curr.dtend = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
           else if (line.startsWith('RRULE:')) curr.rrule = line;
@@ -149,7 +151,10 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
       }
     };
     fetchICS();
+    const interval = setInterval(fetchICS, 5 * 60 * 1000); // Re-sync every 5 mins
+    return () => clearInterval(interval);
   }, []);
+
 
   useEffect(() => {
     const checkActive = () => {
@@ -209,7 +214,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
         {loading ? (
           <div className="py-24 text-center text-ink/20 font-black uppercase tracking-widest text-sm animate-pulse">Syncing Cloud Calendar...</div>
         ) : events.length === 0 ? (
-          <div className="py-24 text-center text-ink/20 font-black uppercase tracking-widest text-sm border-2 border-dashed border-ink/5" style={{ borderRadius: 'var(--radius-organic)' }}>Empty Horizon</div>
+          <div className="py-24 text-center text-ink/20 font-black uppercase tracking-widest text-sm border-2 border-dashed border-ink/5" style={{ borderRadius: 'var(--radius-organic)' }}>Not Busy</div>
         ) : events.map((task) => {
           const isActive = activeEvent?.id === task.id;
           return (

@@ -4,8 +4,7 @@ import { uploadImage } from '../../utils/cloudinary';
 import { Droplet, Calendar as CalIcon, Timer, Moon, Activity, ChevronRight, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { getTodayIdx } from '../../utils/timeHelpers';
-import { Button, Label } from '../ui/UIComponents';
+import { Label } from '../ui/UIComponents';
 import { usePomodoro } from '../../hooks/usePomodoro';
 import { CustomModal } from '../ui/CustomModal';
 
@@ -23,8 +22,10 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [avatarUrl, setAvatarUrl] = useFirebaseSync<string | null>('avatar_url', null);
   
   const [glasses] = useFirebaseSync<number>('hydration_glasses', 0);
-  const [meals] = useFirebaseSync<Record<string, any[]>>('fitness_meals', { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
-  const totalCalories = Object.values(meals || {}).flat().reduce((a, i) => a + (i.kcal || 0), 0);
+  const [workouts] = useFirebaseSync<any[]>('fitness_workouts', []);
+  const workoutMinsToday = workouts
+    .filter(w => w.date === new Date().toDateString())
+    .reduce((a, b) => a + (Number(b.duration) || 0), 0);
   const { weekStats, todayIdx } = usePomodoro();
 
   const [uploading, setUploading] = React.useState(false);
@@ -83,6 +84,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [timeOnly, amPm] = timeString.split(' ');
   const dateString = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center py-10 px-5 relative overflow-hidden">
       <button 
@@ -118,18 +120,20 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
       </div>
 
       {/* Summary bar - Non-interactive */}
-      <div className="flex gap-4 sm:gap-8 mb-8 sm:mb-12 px-6 sm:px-10 py-4 sm:py-5 sys-card relative shadow-none">
+      <div className="grid grid-cols-2 sm:flex gap-6 sm:gap-10 mb-8 sm:mb-12 px-6 sm:px-12 py-5 sm:py-6 sys-card relative shadow-none justify-center">
         {[
-          {label:'Glasses', value:`${glasses} / 8`},
-          {label:'Focus time', value: focusMinutes > 0 ? `${focusHours}h` : '0h'},
-          {label:'Calories', value: `${totalCalories} kcal`},
+          {label:'Glasses', value:`${glasses}/8`},
+          {label:'Focus', value: focusMinutes > 0 ? `${focusHours}h` : '0h'},
+          {label:'Training', value: `${workoutMinsToday}m`},
         ].map((item, idx)=>(
-          <div key={idx} className="text-center">
-            <Label className="mb-1 text-[8px] sm:text-[9px] opacity-40 font-black tracking-widest">{item.label}</Label>
-            <div className="text-sm sm:text-base font-bold text-sepia tracking-tight whitespace-nowrap">{item.value}</div>
+          <div key={idx} className="text-center min-w-[60px]">
+            <Label className="mb-1.5 text-[8px] sm:text-[9px] opacity-40 font-black uppercase tracking-[0.2em]">{item.label}</Label>
+            <div className="text-base sm:text-lg font-black text-sepia tracking-tighter whitespace-nowrap">{item.value}</div>
           </div>
         ))}
       </div>
+
+      {/* Main menu ... */}
 
       {/* Main menu */}
       <nav className="flex flex-col gap-2 sm:gap-3 w-full max-w-[340px]">
@@ -140,7 +144,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
             className="w-full py-3 sm:py-4 px-6 sm:px-8 flex items-center justify-start group rounded-[var(--radius-btn)] border-2 border-transparent transition-all duration-300 hover:border-[var(--ink)] hover:bg-[var(--paper)] hover:shadow-[4px_4px_0px_0px_var(--ink)] hover:-translate-y-1 hover:-translate-x-1 outline-none"
           >
             <span className="text-[var(--ink)] opacity-40 group-hover:opacity-100 transition-all">{m.icon}</span>
-            <span className="text-base sm:text-lg ml-3 sm:ml-4 flex-1 text-left text-[var(--ink)] transition-all">{m.label}</span>
+            <span className="text-base sm:text-lg ml-3 sm:ml-4 flex-1 text-left text-[var(--ink)] transition-all">{m.id === 'fitness' ? 'Fitness' : m.label}</span>
             <ChevronRight size={18} className="text-[var(--ink)] opacity-20 group-hover:opacity-100 transition-all group-hover:translate-x-1" />
           </button>
         ))}

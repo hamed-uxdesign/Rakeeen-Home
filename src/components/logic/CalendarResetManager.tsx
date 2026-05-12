@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 
-const ICAL_URL = 'https://calendar.google.com/calendar/ical/hamed.rakeeen%40gmail.com/private-aa7a61a1272c8a39e1d8c9e1d8ecba50/basic.ics';
+const ICAL_URL = 'https://calendar.google.com/calendar/ical/9ce9f7279f0afeef711ae5c21eb29f4f087e8cb74aef36a9bbd0d58751e61587%40group.calendar.google.com/private-8496d29b04f57f4c8452f99dd5dbe203/basic.ics';
 
 export const CalendarResetManager: React.FC = () => {
   // Sync states for resetting
@@ -12,12 +12,17 @@ export const CalendarResetManager: React.FC = () => {
   const [meals, setMeals] = useFirebaseSync<Record<string, any[]>>('fitness_meals', { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
   const [fitHistory, setFitHistory] = useFirebaseSync<Record<string, number>>('fitness_history', {});
   
+  const [, setPomoSessions] = useFirebaseSync<number>('pomodoro_sessions', 0);
+  const [pomoWeek, setPomoWeek] = useFirebaseSync<any[]>('pomodoro_week', []);
+  const [pomoHistory, setPomoHistory] = useFirebaseSync<Record<string, { sessions: number, minutes: number }>>('pomodoro_history', {});
+
   const [lastResetDate, setLastResetDate] = useFirebaseSync<string>('system_last_reset_date', '');
 
   useEffect(() => {
     const performReset = async (sleepDate: Date) => {
-      const todayStr = new Date().toDateString();
-      const lastDateStr = sleepDate.toDateString(); 
+      const now = new Date();
+      const todayStr = now.toDateString();
+      const lastDateStr = new Date(sleepDate.getTime() - 12 * 60 * 60 * 1000).toDateString(); // Yesterday relative to sleep
 
       console.log(`[CalendarResetManager] Recording history and resetting for: ${lastDateStr}`);
 
@@ -37,6 +42,22 @@ export const CalendarResetManager: React.FC = () => {
       }
       setMeals({ Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
 
+      // 3. Pomodoro History
+      const todayIdx = (new Date(lastDateStr).getDay() + 6) % 7; // Mon-Sun
+      const todayPomo = pomoWeek[todayIdx] || { sessions: 0, minutes: 0 };
+      if (todayPomo.sessions > 0) {
+        const newPomoHistory = { ...pomoHistory, [lastDateStr]: { sessions: todayPomo.sessions, minutes: todayPomo.minutes } };
+        setPomoHistory(newPomoHistory);
+      }
+      setPomoSessions(0);
+      // Reset only today's slot in pomoWeek or reset whole week if it's Monday?
+      // User said "every week the analysis starts from the beginning".
+      // Let's reset the whole week if today is Monday.
+      // Reset whole week if it's Saturday
+      if (new Date().getDay() === 6) { // Saturday
+        setPomoWeek(pomoWeek.map(d => ({ ...d, sessions: 0, minutes: 0 })));
+      }
+
       // Update the marker
       setLastResetDate(todayStr);
     };
@@ -44,15 +65,18 @@ export const CalendarResetManager: React.FC = () => {
     const checkCalendar = async () => {
       try {
         const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(ICAL_URL)}`);
+        if (!res.ok) throw new Error('Failed to fetch calendar');
         const text = await res.text();
         const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
         const lines = unfoldedText.split(/\r?\n/);
         
-        let sleepStart: Date | null = null;
+        let nextSleepStart: Date | null = null;
         let curr: any = { rrule: '' };
 
         const parseDate = (str: string) => {
+          if (!str) return null;
           const cleanStr = str.replace(/[:;].*$/, '').trim();
+          if (cleanStr.length < 8) return null;
           const y = parseInt(cleanStr.slice(0, 4));
           const m = parseInt(cleanStr.slice(4, 6)) - 1;
           const d = parseInt(cleanStr.slice(6, 8));
@@ -67,44 +91,50 @@ export const CalendarResetManager: React.FC = () => {
         for (let line of lines) {
           if (line.startsWith('BEGIN:VEVENT')) curr = { rrule: '' };
           else if (line.startsWith('END:VEVENT')) {
-            if (curr.summary?.toLowerCase().includes('sleep') && curr.dtstart) {
+            const isSleep = curr.summary?.toLowerCase().includes('sleep') || curr.summary?.toLowerCase().includes('أسليب');
+            if (isSleep && curr.dtstart) {
               const start = parseDate(curr.dtstart);
-              const today = new Date();
+              const now = new Date();
               
-              // Handle recurring or specific instances
-              // We want the instance that starts today or tomorrow morning
               if (start) {
-                const diffHours = (start.getTime() - today.getTime()) / (1000 * 60 * 60);
-                // If it's the closest sleep event (within next 24 hours)
-                if (diffHours > -12 && diffHours < 24) {
-                  if (!sleepStart || start.getTime() < sleepStart.getTime()) {
-                    sleepStart = start;
+                // We want the next sleep event (either later today or early tomorrow)
+                const diffMs = start.getTime() - now.getTime();
+                const diffHours = diffMs / (1000 * 60 * 60);
+
+                // If it's starting in the future (up to 24h) or very recently started (past 2h)
+                if (diffHours > -2 && diffHours < 24) {
+                  if (!nextSleepStart || start.getTime() < nextSleepStart.getTime()) {
+                    nextSleepStart = start;
                   }
                 }
               }
             }
+            curr = { rrule: '' };
           }
           else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
           else if (line.startsWith('DTSTART')) curr.dtstart = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
         }
 
-        if (sleepStart) {
-          const resetTime = new Date(sleepStart.getTime() - 3 * 60 * 60 * 1000);
+        if (nextSleepStart) {
+          const resetTime = new Date(nextSleepStart.getTime() - 3 * 60 * 60 * 1000);
           const now = new Date();
           const todayStr = now.toDateString();
 
-          console.log(`[CalendarResetManager] Next Sleep: ${sleepStart.toLocaleString()}. Reset planned at: ${resetTime.toLocaleString()}`);
+          console.log(`[CalendarResetManager] Found Sleep: ${nextSleepStart.toLocaleString()}. Reset scheduled 3h before: ${resetTime.toLocaleString()}`);
 
           if (now >= resetTime && lastResetDate !== todayStr) {
-            performReset(sleepStart);
+            console.log(`[CalendarResetManager] Triggering reset...`);
+            performReset(nextSleepStart);
           }
         } else {
-          // Fallback to midnight if no sleep event found
+          // Fallback to midnight
           const now = new Date();
           if (now.getHours() === 0 && lastResetDate !== now.toDateString()) {
+             console.log(`[CalendarResetManager] No sleep event found, falling back to midnight reset.`);
              performReset(now);
           }
         }
+
 
       } catch (e) {
         console.error('CalendarResetManager error:', e);

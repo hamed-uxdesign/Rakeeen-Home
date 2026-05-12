@@ -48,7 +48,7 @@ export const FloatingTimer: React.FC<FloatingTimerProps> = ({ onNavigate }) => {
         {/* Glow effect behind the ring */}
         <div className={`absolute inset-4 rounded-full blur-[20px] opacity-20 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
         
-        <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} running={running} size={140} waves={waves} />
+        <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={140} waves={waves} />
         
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
