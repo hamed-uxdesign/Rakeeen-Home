@@ -37,12 +37,29 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
   const checkInSugar = () => {
     const today = new Date().toDateString();
     if (sugarChallenge.lastCheckIn === today) return;
-    setSugarChallenge({ lastCheckIn: today, completedDays: sugarChallenge.completedDays + 1 });
+    setSugarChallenge({ lastCheckIn: today, completedDays: (sugarChallenge.completedDays || 0) + 1 });
   };
   const undoSugar = () => {
     if (sugarChallenge.completedDays <= 0) return;
     setSugarChallenge({ lastCheckIn: '', completedDays: sugarChallenge.completedDays - 1 });
   };
+
+  // --- Streak Reset Logic: If a day is missed, reset to 0 ---
+  useEffect(() => {
+    const now = new Date();
+    const todayStr = now.toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+
+    // Only reset if challenge is in progress (1-20 days)
+    if (sugarChallenge.completedDays > 0 && sugarChallenge.completedDays < 21) {
+      const last = sugarChallenge.lastCheckIn;
+      if (last && last !== todayStr && last !== yesterdayStr) {
+        setSugarChallenge({ lastCheckIn: '', completedDays: 0 });
+      }
+    }
+  }, [sugarChallenge.completedDays, sugarChallenge.lastCheckIn, setSugarChallenge]);
 
   const isTodayChecked = sugarChallenge.lastCheckIn === new Date().toDateString();
   const isChallengeDone = sugarChallenge.completedDays >= 21;
@@ -54,7 +71,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
   const today = new Date();
   const todayIdx = today.getDay();
   const isWorkoutDay = WORKOUT_DAYS.includes(todayIdx);
-  const workoutLoggedToday = workouts.some(w => w.date === today.toLocaleDateString());
+  const workoutLoggedToday = workouts.some(w => w.date === today.toDateString());
   
   const getNextWorkout = () => {
     let next = new Date();
@@ -126,7 +143,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
 
   // --- ANALYTICS: Current period only. No cross-period accumulation. ---
   const getWorkoutReports = () => {
-    const todayStr = today.toLocaleDateString();
+    const todayStr = today.toDateString();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
     const currentDayIdx = today.getDay(); // 0=Sun
