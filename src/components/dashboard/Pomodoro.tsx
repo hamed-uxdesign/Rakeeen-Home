@@ -553,9 +553,20 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                 <YAxis 
                   tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} 
                   axisLine={false} tickLine={false}
-                  width={30}
-                  domain={[0, (dataMax: number) => Math.max(dataMax, reportType === 'sessions' ? 25 : DAILY_TARGET_HOURS)]}
-                  ticks={reportType === 'sessions' ? [0, 5, 10, 15, 20, 25] : [0, 2, 4, 6, 8, 10, 12]}
+                  width={35}
+                  domain={[0, (dataMax: number) => {
+                    let target = reportType === 'sessions' ? 25 : DAILY_TARGET_HOURS;
+                    if (view === 'month') target *= 7;
+                    if (view === 'year') target *= 30;
+                    return Math.max(dataMax, target);
+                  }]}
+                  ticks={(() => {
+                    let base = reportType === 'sessions' ? 25 : 12;
+                    if (view === 'month') base *= 7;
+                    if (view === 'year') base *= 30;
+                    const step = base / 5;
+                    return [0, step, step*2, step*3, step*4, base, base + step];
+                  })()}
                 />
                 <Tooltip
                   cursor={{ fill: 'rgba(124,169,130,0.06)' }}
@@ -563,7 +574,12 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                 />
                 
                 <ReferenceLine 
-                  y={reportType === 'sessions' ? 25 : DAILY_TARGET_HOURS} 
+                  y={(() => {
+                    let target = reportType === 'sessions' ? 25 : DAILY_TARGET_HOURS;
+                    if (view === 'month') target *= 7;
+                    if (view === 'year') target *= 30;
+                    return target;
+                  })()} 
                   stroke="var(--forest)" 
                   strokeDasharray="6 6" 
                   strokeOpacity={0.4}
