@@ -60,12 +60,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setBreakDurationState(m);
   }, []);
 
-  // Request Notification permission
-  useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
+
 
   // Daily Reset handled by CalendarResetManager
 
@@ -81,24 +76,28 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [running, isOvertime]);
 
-  const sendNotification = useCallback((title: string, body: string) => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: '/favicon.png' });
-    }
-  }, []);
 
-  const sendDiscordNotification = useCallback(async (type: 'focus_started' | 'focus_complete' | 'break_complete' | 'test', data?: { duration?: number, overtime?: number }) => {
+
+  const sendDiscordNotification = useCallback(async (type: 'focus_started' | 'focus_timer_up' | 'focus_complete' | 'break_complete' | 'test', data?: { duration?: number, overtime?: number }) => {
     // @ts-ignore
     const webhookUrl = import.meta.env.VITE_DISCORD_POMODORO_WEBHOOK;
     if (!webhookUrl) return;
 
     const embeds: any[] = [];
     
-    if (type === 'focus_complete') {
+    if (type === 'focus_timer_up') {
+      embeds.push({
+        title: '🔔 Focus Session Finished!',
+        description: `You finished **${focusDuration} minutes**, take a break.`,
+        color: 0x7ca982,
+        footer: { text: 'Rakeeen Productivity System' },
+        timestamp: new Date().toISOString()
+      });
+    } else if (type === 'focus_complete') {
       const totalMins = (data?.duration || focusDuration) + Math.floor((data?.overtime || 0) / 60);
       embeds.push({
-        title: '🧠 Focus Session Finished',
-        description: `Excellent! You've completed **${totalMins} minutes** of deep work.`,
+        title: '🧠 Focus Session Logged',
+        description: `Excellent! You've logged **${totalMins} minutes** of deep work.`,
         fields: [
           { name: 'Base Goal', value: `${data?.duration || focusDuration}m`, inline: true },
           { name: 'Overtime', value: `${Math.floor((data?.overtime || 0) / 60)}m ${ (data?.overtime || 0) % 60}s`, inline: true }
@@ -110,7 +109,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else if (type === 'break_complete') {
       embeds.push({
         title: '☕ Break Time Over',
-        description: `Your **${breakDuration}-minute** break is done. Time to return to flow state.`,
+        description: `Your break is done? Time to get back to work! 🚀`,
         color: 0xc8a96e,
         footer: { text: 'Rakeeen Productivity System' },
         timestamp: new Date().toISOString()
@@ -151,7 +150,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           if (newTime <= 0) {
             if (mode === 'focus') {
               setIsOvertime(true);
-              sendNotification("Focus session complete", `You've finished ${focusDuration} minutes. Take a break or keep going.`);
+              sendDiscordNotification('focus_timer_up');
               // We only send a "Time's up" browser notification at 0, 
               // but we'll send the final Discord report when they actually click "Start Break"
               // to capture the full time spent.
@@ -160,7 +159,6 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               setRunning(false);
               setMode('focus');
               setTimeLeft(FOCUS);
-              sendNotification("Break finished", "Time to start a new focus session.");
               sendDiscordNotification('break_complete');
             }
           }
@@ -168,7 +166,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }, 200);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [running, mode, isOvertime, sendNotification, sendDiscordNotification, FOCUS, focusDuration]);
+  }, [running, mode, isOvertime, sendDiscordNotification, FOCUS, focusDuration]);
 
   const start = useCallback(() => setRunning(true), []);
   const pause = useCallback(() => setRunning(false), []);

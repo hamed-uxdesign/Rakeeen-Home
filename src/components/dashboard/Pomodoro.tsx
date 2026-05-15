@@ -595,23 +595,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
             </ResponsiveContainer>
           </div>
 
-          {/* Individual Sessions Log */}
-          {logs && logs.length > 0 && (
-            <div className="mt-10 pt-8 border-t border-ink/5">
-              <h3 className="text-[10px] uppercase font-black tracking-[0.3em] text-ink/20 mb-5">Today's Sessions</h3>
-              <div className="space-y-2">
-                {logs.map((log: any, i: number) => (
-                  <div key={i} className="flex justify-between items-center py-3 px-4 border border-ink/5 rounded-lg">
-                    <span className="text-xs font-black text-ink/40 tracking-wide">{log.time}</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-xl font-black text-forest tabular-nums">{log.duration}</span>
-                      <span className="text-[9px] uppercase tracking-widest text-ink/20">min</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
       </div>
     </>
