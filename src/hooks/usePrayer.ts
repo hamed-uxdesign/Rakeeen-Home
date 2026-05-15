@@ -15,7 +15,7 @@ export const usePrayer = () => {
       if (data.code === 200) {
         setTimes(data.data.timings);
         const h = data.data.date.hijri;
-        setHijri(`${h.day} ${h.month.en} ${h.year}`);
+        setHijri(`${h.day} ${h.month.ar} ${h.year} هـ`);
       }
     } catch (error) {
       console.error('Failed to fetch prayer times', error);
@@ -42,11 +42,13 @@ export const usePrayer = () => {
         const diffMs = pDate.getTime() - now.getTime();
         const mins = Math.floor(diffMs / 60000);
         const secs = Math.floor((diffMs % 60000) / 1000);
+        const totalSecs = Math.floor(diffMs / 1000);
         found = { 
           name, 
           time: timeStr, 
           countdown: `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
-          remainingMinutes: mins
+          remainingMinutes: mins,
+          totalRemainingSeconds: totalSecs
         };
         break;
       }
@@ -55,7 +57,7 @@ export const usePrayer = () => {
     if (!found) {
         // If all prayers passed, next is Fajr tomorrow
         const timeStr = times['Fajr'];
-        found = { name: 'Fajr', time: timeStr, countdown: '--:--', remainingMinutes: 999 };
+        found = { name: 'Fajr', time: timeStr, countdown: '--:--', remainingMinutes: 999, totalRemainingSeconds: 0 };
     }
     setNextPrayer(found as any);
   }, [times]);

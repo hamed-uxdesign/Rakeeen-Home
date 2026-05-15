@@ -24,8 +24,8 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
   const [workouts, setWorkouts] = useFirebaseSync<any[]>('fitness_workouts', []);
   const [sugarChallenge, setSugarChallenge] = useFirebaseSync<any>('fitness_sugar', { lastCheckIn: '', completedDays: 0 });
   const [reportView, setReportView] = useState<'week' | 'month' | 'year'>('week');
-
   const [wDuration, setWDuration] = useState('');
+  const [nextSleepTime, setNextSleepTime] = useState<Date | null>(null);
 
   const addWorkout = () => {
     if (!wDuration) return;
@@ -39,9 +39,8 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
     if (sugarChallenge.lastCheckIn === today) return;
     setSugarChallenge({ lastCheckIn: today, completedDays: (sugarChallenge.completedDays || 0) + 1 });
   };
-  const undoSugar = () => {
-    if (sugarChallenge.completedDays <= 0) return;
-    setSugarChallenge({ lastCheckIn: '', completedDays: sugarChallenge.completedDays - 1 });
+  const resetSugar = () => {
+    setSugarChallenge({ lastCheckIn: '', completedDays: 0 });
   };
 
   // --- Streak Reset Logic: If a day is missed, reset to 0 ---
@@ -55,11 +54,19 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
     // Only reset if challenge is in progress (1-20 days)
     if (sugarChallenge.completedDays > 0 && sugarChallenge.completedDays < 21) {
       const last = sugarChallenge.lastCheckIn;
-      if (last && last !== todayStr && last !== yesterdayStr) {
+      
+      // 1. Natural day-after reset (if they woke up and yesterday was missed)
+      const dayMissed = last && last !== todayStr && last !== yesterdayStr;
+      
+      // 2. Bedtime reset (if it's past bedtime and today isn't checked)
+      const isPastBedtime = nextSleepTime && now >= nextSleepTime;
+      const bedtimeMissed = isPastBedtime && last !== todayStr;
+
+      if (dayMissed || bedtimeMissed) {
         setSugarChallenge({ lastCheckIn: '', completedDays: 0 });
       }
     }
-  }, [sugarChallenge.completedDays, sugarChallenge.lastCheckIn, setSugarChallenge]);
+  }, [sugarChallenge.completedDays, sugarChallenge.lastCheckIn, setSugarChallenge, nextSleepTime]);
 
   const isTodayChecked = sugarChallenge.lastCheckIn === new Date().toDateString();
   const isChallengeDone = sugarChallenge.completedDays >= 21;
@@ -83,7 +90,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
     return next;
   };
 
-  const [nextSleepTime, setNextSleepTime] = useState<Date | null>(null);
+
 
   useEffect(() => {
     const fetchSleep = async () => {
@@ -304,7 +311,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                  </div>
                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                     <Button variant="premium" onClick={checkInSugar} disabled={isTodayChecked} className="flex-1 h-16 sm:h-20 !bg-forest !text-paper !border-forest text-sm sm:text-lg tracking-widest font-black uppercase">{isTodayChecked ? 'Day Secured' : 'Log Success'}</Button>
-                    {isTodayChecked && <button onClick={undoSugar} className="h-16 sm:h-20 px-8 border-2 border-rust text-rust hover:bg-rust/10 transition-all font-black uppercase text-xs tracking-widest">Undo</button>}
+
                  </div>
                </>
              ) : (
@@ -318,7 +325,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                     <div className="text-2xl font-black text-forest tracking-tighter">SUGAR REWARD UNLOCKED</div>
                  </div>
                  <div className="mt-12">
-                    <button onClick={undoSugar} className="text-[10px] font-black uppercase tracking-widest text-ink/20 hover:text-rust transition-all italic">Reset Challenge (Not Recommended)</button>
+                    <button onClick={resetSugar} className="text-[10px] font-black uppercase tracking-widest text-ink/20 hover:text-rust transition-all italic">Reset Challenge (Not Recommended)</button>
                  </div>
                </div>
              )}
@@ -350,9 +357,19 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                      tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} 
                      axisLine={false} tickLine={false} 
                      width={35}
-                     domain={[0, (dataMax: number) => Math.max(dataMax, 60)]}
+                     domain={[0, (dataMax: number) => {
+                       let target = 30;
+                       if (reportView === 'month') target = 210;
+                       if (reportView === 'year') target = 900;
+                       return Math.max(dataMax, target);
+                     }]}
                    />
-                   <Tooltip cursor={{ fill: 'rgba(124,169,130,0.06)' }} content={<ChartTooltip unit="min" getTipMessage={(val) => val >= 45 ? 'Peak Performance' : 'Keep Pushing'} />} />
+                   <Tooltip cursor={{ fill: 'rgba(124,169,130,0.06)' }} content={<ChartTooltip unit="min" getTipMessage={(val) => {
+                     let target = 30;
+                     if (reportView === 'month') target = 210;
+                     if (reportView === 'year') target = 900;
+                     return val >= target ? 'Peak Performance' : 'Keep Pushing';
+                   }} />} />
                    <Bar dataKey="minutes" fill="var(--sepia)" radius={[4, 4, 0, 0]} maxBarSize={40}>
                      {workoutReports[reportView].map((_: any, i: number) => (
                        <Cell key={i} fillOpacity={0.9} />

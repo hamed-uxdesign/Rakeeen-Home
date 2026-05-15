@@ -72,7 +72,14 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
             Up Next: {nextPrayer.name} ({nextPrayer.time})
           </div>
           <div className="relative w-full max-w-[320px] aspect-square mx-auto flex items-center justify-center">
-            <WavyRing pct={50} phase={phase} mode="focus" isOvertime={false} size={320} waves={16} />
+            <WavyRing 
+              pct={Math.max(0, Math.min(100, ((nextPrayer as any).totalRemainingSeconds / (15 * 60)) * 100))} 
+              phase={phase} 
+              mode="focus" 
+              isOvertime={false} 
+              size={320} 
+              waves={16} 
+            />
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none translate-y-1">
               <span className="text-4xl sm:text-[54px] font-black text-ink tabular-nums leading-none">{nextPrayer.countdown}</span>
               <span className="text-[9px] tracking-[0.2em] sm:tracking-[0.4em] font-black text-ink/30 uppercase mt-3 sm:mt-5">Remaining</span>
