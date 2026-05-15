@@ -65,19 +65,8 @@ export const FastingManager: React.FC = () => {
         }
       };
 
-      // Check Start Eating (15m after Dhuhr)
-      const lastStart = localStorage.getItem('fasting_last_start');
-      if (lastStart !== today && now >= startEatingTime && now < new Date(startEatingTime.getTime() + 10 * 60 * 1000)) {
-        sendDiscord('حان وقت الأكل! استمتع بوجبتك الأولى بنشاط. 🍽️', '🍱 Eating Window Opened', 0x7ca982);
-        localStorage.setItem('fasting_last_start', today);
-      }
-
-      // Check Stop Eating (30m before Maghrib)
-      const lastStop = localStorage.getItem('fasting_last_stop');
-      if (lastStop !== today && now >= stopEatingTime && now < new Date(stopEatingTime.getTime() + 10 * 60 * 1000)) {
-        sendDiscord('أوقف الأكل فوراً! ابدأ صيامك الآن لتنقية جسمك. 🚫', '⏳ Fasting Window Starting', 0xc8a96e);
-        localStorage.setItem('fasting_last_stop', today);
-      }
+      // Eating Window logic moved to Discord Bot scheduler.
+      // Removed Arabic notifications as per user request.
 
       // --- Phase 4: Workout Guilt-trip ---
       const WORKOUT_DAYS = [0, 3]; // Sun, Wed

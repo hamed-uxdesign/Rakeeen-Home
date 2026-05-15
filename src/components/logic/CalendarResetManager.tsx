@@ -70,8 +70,8 @@ export const CalendarResetManager: React.FC = () => {
         const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
         const lines = unfoldedText.split(/\r?\n/);
         
-        let nextSleepStart: Date | null = null;
-        let curr: any = { rrule: '' };
+        const events: { start: Date; summary: string }[] = [];
+        let curr: any = {};
 
         const parseDate = (str: string) => {
           if (!str) return null;
@@ -89,62 +89,58 @@ export const CalendarResetManager: React.FC = () => {
         };
 
         for (let line of lines) {
-          if (line.startsWith('BEGIN:VEVENT')) curr = { rrule: '' };
+          if (line.startsWith('BEGIN:VEVENT')) curr = {};
           else if (line.startsWith('END:VEVENT')) {
             const isSleep = curr.summary?.toLowerCase().includes('sleep') || curr.summary?.toLowerCase().includes('أسليب');
             if (isSleep && curr.dtstart) {
               const start = parseDate(curr.dtstart);
-              const now = new Date();
-              
-              if (start) {
-                // We want the next sleep event (either later today or early tomorrow)
-                const diffMs = start.getTime() - now.getTime();
-                const diffHours = diffMs / (1000 * 60 * 60);
-
-                // If it's starting in the future (up to 24h) or very recently started (past 2h)
-                if (diffHours > -2 && diffHours < 24) {
-                  if (!nextSleepStart || start.getTime() < nextSleepStart.getTime()) {
-                    nextSleepStart = start;
-                  }
-                }
-              }
+              if (start) events.push({ start, summary: curr.summary });
             }
-            curr = { rrule: '' };
           }
           else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
           else if (line.startsWith('DTSTART')) curr.dtstart = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
         }
 
-        if (nextSleepStart) {
-          const resetTime = new Date(nextSleepStart.getTime() - 3 * 60 * 60 * 1000);
-          const now = new Date();
-          const todayStr = now.toDateString();
+        const now = new Date();
 
-          console.log(`[CalendarResetManager] Found Sleep: ${nextSleepStart.toLocaleString()}. Reset scheduled 3h before: ${resetTime.toLocaleString()}`);
+        // Sort events by start time
+        events.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-          if (now >= resetTime && lastResetDate !== todayStr) {
-            console.log(`[CalendarResetManager] Triggering reset...`);
-            performReset(nextSleepStart);
-          }
-        } else {
-          // Fallback to midnight
-          const now = new Date();
-          if (now.getHours() === 0 && lastResetDate !== now.toDateString()) {
-             console.log(`[CalendarResetManager] No sleep event found, falling back to midnight reset.`);
-             performReset(now);
+        // Find the most relevant sleep event (either the one we are currently in or the next one)
+        // We want to find the sleep event whose reset time (start - 3h) is the most recent one that has passed.
+        let targetEvent = null;
+        for (let i = events.length - 1; i >= 0; i--) {
+          const resetTime = new Date(events[i].start.getTime() - 3 * 60 * 60 * 1000);
+          if (now >= resetTime) {
+            targetEvent = events[i];
+            break;
           }
         }
 
+        if (targetEvent) {
+          const resetTime = new Date(targetEvent.start.getTime() - 3 * 60 * 60 * 1000);
+          // If we haven't reset for THIS specific sleep's cycle yet
+          // We use the resetTime's date as the unique marker
+          const resetMarker = resetTime.toDateString(); 
+
+          if (lastResetDate !== resetMarker) {
+            console.log(`[CalendarResetManager] Triggering reset for sleep at ${targetEvent.start.toLocaleString()} (Reset was due at ${resetTime.toLocaleString()})`);
+            performReset(targetEvent.start);
+            setLastResetDate(resetMarker);
+          }
+        } else {
+          console.log(`[CalendarResetManager] Waiting for upcoming sleep event reset time...`);
+        }
 
       } catch (e) {
         console.error('CalendarResetManager error:', e);
       }
     };
 
-    const interval = setInterval(checkCalendar, 5 * 60 * 1000); // Check every 5 minutes
+    const interval = setInterval(checkCalendar, 2 * 60 * 1000); // Check every 2 minutes for precision
     checkCalendar();
     return () => clearInterval(interval);
-  }, [lastResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate]);
+  }, [lastResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory]);
 
   return null;
 };
