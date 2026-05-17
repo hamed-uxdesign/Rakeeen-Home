@@ -21,8 +21,8 @@ export const CalendarResetManager: React.FC = () => {
   useEffect(() => {
     const performReset = async (sleepDate: Date) => {
       const now = new Date();
-      const todayStr = now.toDateString();
-      const lastDateStr = new Date(sleepDate.getTime() - 12 * 60 * 60 * 1000).toDateString(); // Yesterday relative to sleep
+      // We calculate the logical "yesterday" relative to the sleep date
+      const lastDateStr = new Date(sleepDate.getTime() - 12 * 60 * 60 * 1000).toDateString(); 
 
       console.log(`[CalendarResetManager] Recording history and resetting for: ${lastDateStr}`);
 
@@ -50,16 +50,11 @@ export const CalendarResetManager: React.FC = () => {
         setPomoHistory(newPomoHistory);
       }
       setPomoSessions(0);
-      // Reset only today's slot in pomoWeek or reset whole week if it's Monday?
-      // User said "every week the analysis starts from the beginning".
-      // Let's reset the whole week if today is Monday.
       // Reset whole week if it's Saturday
-      if (new Date().getDay() === 6) { // Saturday
+      if (now.getDay() === 6) { // Saturday
         setPomoWeek(pomoWeek.map(d => ({ ...d, sessions: 0, minutes: 0 })));
       }
-
-      // Update the marker
-      setLastResetDate(todayStr);
+      // Note: We don't setLastResetDate here anymore, to avoid race conditions with the caller.
     };
 
     const checkCalendar = async () => {
@@ -70,8 +65,9 @@ export const CalendarResetManager: React.FC = () => {
         const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
         const lines = unfoldedText.split(/\r?\n/);
         
-        const events: { start: Date; summary: string }[] = [];
-        let curr: any = {};
+        let curr: any = { rrule: '' };
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
         const parseDate = (str: string) => {
           if (!str) return null;
@@ -88,44 +84,67 @@ export const CalendarResetManager: React.FC = () => {
           return new Date(y, m, d);
         };
 
+        const parsedEvents: { start: Date, summary: string }[] = [];
+
         for (let line of lines) {
-          if (line.startsWith('BEGIN:VEVENT')) curr = {};
-          else if (line.startsWith('END:VEVENT')) {
+          if (line.startsWith('BEGIN:VEVENT')) {
+            curr = { rrule: '' };
+          } else if (line.startsWith('END:VEVENT')) {
             const isSleep = curr.summary?.toLowerCase().includes('sleep') || curr.summary?.toLowerCase().includes('أسليب');
             if (isSleep && curr.dtstart) {
-              const start = parseDate(curr.dtstart);
-              if (start) events.push({ start, summary: curr.summary });
+              const baseStart = parseDate(curr.dtstart);
+              if (baseStart) {
+                let untilDate = null;
+                if (curr.rrule.includes('UNTIL=')) {
+                  const match = curr.rrule.match(/UNTIL=([0-9T]+Z?)/);
+                  if (match) untilDate = parseDate(match[1]);
+                }
+
+                const addIfMatches = (offsetDays: number) => {
+                  if (untilDate && untilDate.getTime() < today.getTime()) return;
+                  const instStart = new Date(baseStart.getTime());
+                  const targetDate = new Date(today);
+                  targetDate.setDate(targetDate.getDate() + offsetDays);
+                  instStart.setFullYear(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+                  parsedEvents.push({ start: instStart, summary: curr.summary });
+                };
+
+                if (curr.rrule.includes('FREQ=DAILY')) {
+                  addIfMatches(-1); // Yesterday's occurrence
+                  addIfMatches(0);  // Today's occurrence
+                  addIfMatches(1);  // Tomorrow's occurrence
+                } else {
+                  parsedEvents.push({ start: baseStart, summary: curr.summary });
+                }
+              }
             }
-          }
-          else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
+            curr = { rrule: '' };
+          } else if (line.startsWith('SUMMARY:')) curr.summary = line.substring(8);
           else if (line.startsWith('DTSTART')) curr.dtstart = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
+          else if (line.startsWith('RRULE:')) curr.rrule = line;
         }
 
-        const now = new Date();
-
         // Sort events by start time
-        events.sort((a, b) => a.start.getTime() - b.start.getTime());
+        parsedEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-        // Find the most relevant sleep event (either the one we are currently in or the next one)
-        // We want to find the sleep event whose reset time (start - 3h) is the most recent one that has passed.
+        // Find the most relevant sleep event that HAS ALREADY PASSED its reset time
         let targetEvent = null;
-        for (let i = events.length - 1; i >= 0; i--) {
-          const resetTime = new Date(events[i].start.getTime() - 3 * 60 * 60 * 1000);
+        for (let i = parsedEvents.length - 1; i >= 0; i--) {
+          const resetTime = new Date(parsedEvents[i].start.getTime() - 3 * 60 * 60 * 1000);
           if (now >= resetTime) {
-            targetEvent = events[i];
+            targetEvent = parsedEvents[i];
             break;
           }
         }
 
         if (targetEvent) {
           const resetTime = new Date(targetEvent.start.getTime() - 3 * 60 * 60 * 1000);
-          // If we haven't reset for THIS specific sleep's cycle yet
-          // We use the resetTime's date as the unique marker
+          // Use the date of the reset time itself as the unique marker
           const resetMarker = resetTime.toDateString(); 
 
           if (lastResetDate !== resetMarker) {
             console.log(`[CalendarResetManager] Triggering reset for sleep at ${targetEvent.start.toLocaleString()} (Reset was due at ${resetTime.toLocaleString()})`);
-            performReset(targetEvent.start);
+            await performReset(targetEvent.start);
             setLastResetDate(resetMarker);
           }
         } else {
@@ -137,7 +156,7 @@ export const CalendarResetManager: React.FC = () => {
       }
     };
 
-    const interval = setInterval(checkCalendar, 2 * 60 * 1000); // Check every 2 minutes for precision
+    const interval = setInterval(checkCalendar, 2 * 60 * 1000); // Check every 2 minutes
     checkCalendar();
     return () => clearInterval(interval);
   }, [lastResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory]);
