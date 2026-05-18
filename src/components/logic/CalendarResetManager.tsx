@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
+import { POMODORO_WEEKLY_MOCK } from '../../constants/mockData';
 
 const ICAL_URL = 'https://calendar.google.com/calendar/ical/9ce9f7279f0afeef711ae5c21eb29f4f087e8cb74aef36a9bbd0d58751e61587%40group.calendar.google.com/private-8496d29b04f57f4c8452f99dd5dbe203/basic.ics';
 
@@ -13,7 +14,7 @@ export const CalendarResetManager: React.FC = () => {
   const [fitHistory, setFitHistory, fitHistoryReady] = useFirebaseSync<Record<string, number>>('fitness_history', {});
   
   const [, setPomoSessions, pomoReady] = useFirebaseSync<number>('pomodoro_sessions', 0);
-  const [pomoWeek, setPomoWeek, pomoWeekReady] = useFirebaseSync<any[]>('pomodoro_week', []);
+  const [pomoWeek, setPomoWeek, pomoWeekReady] = useFirebaseSync<any[]>('pomodoro_week', POMODORO_WEEKLY_MOCK);
   const [pomoHistory, setPomoHistory, pomoHistoryReady] = useFirebaseSync<Record<string, { sessions: number, minutes: number }>>('pomodoro_history', {});
 
   const [lastResetDate, setLastResetDate, lastResetDateReady] = useFirebaseSync<string>('system_last_reset_date', '');
@@ -60,7 +61,8 @@ export const CalendarResetManager: React.FC = () => {
 
       // 3. Pomodoro History
       const todayIdx = (new Date(lastDateStr).getDay() + 6) % 7; // Mon-Sun
-      const todayPomo = pomoWeek[todayIdx] || { sessions: 0, minutes: 0 };
+      const currentPomoWeek = Array.isArray(pomoWeek) && pomoWeek.length === 7 ? pomoWeek : POMODORO_WEEKLY_MOCK;
+      const todayPomo = currentPomoWeek[todayIdx] || { sessions: 0, minutes: 0 };
       if (todayPomo.sessions > 0) {
         const newPomoHistory = { ...pomoHistory, [lastDateStr]: { sessions: todayPomo.sessions, minutes: todayPomo.minutes } };
         setPomoHistory(newPomoHistory);

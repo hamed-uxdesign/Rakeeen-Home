@@ -41,7 +41,8 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [overtime, setOvertime] = useState(0);
   const [isOvertime, setIsOvertime] = useState(false);
   const [sessions, setSessions] = useFirebaseSync<number>('pomodoro_sessions', 0);
-  const [weekStats, setWeekStats] = useFirebaseSync('pomodoro_week', POMODORO_WEEKLY_MOCK);
+  const [rawWeekStats, setWeekStats] = useFirebaseSync<any[]>('pomodoro_week', POMODORO_WEEKLY_MOCK);
+  const weekStats = Array.isArray(rawWeekStats) && rawWeekStats.length === 7 ? rawWeekStats : POMODORO_WEEKLY_MOCK;
   const [logs, setLogs] = useFirebaseSync<any[]>('pomodoro_logs', []);
   const [history] = useFirebaseSync<Record<string, { sessions: number, minutes: number, logs?: any[] }>>('pomodoro_history', {});
   const todayIdx = getTodayIdx();
@@ -189,7 +190,8 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     // Send Discord Report with full time (Base + Overtime)
     sendDiscordNotification('focus_complete', { duration: focusDuration, overtime });
 
-    const updated = weekStats.map((d: any, i: number) => 
+    const currentWeekStats = Array.isArray(weekStats) && weekStats.length === 7 ? weekStats : POMODORO_WEEKLY_MOCK;
+    const updated = currentWeekStats.map((d: any, i: number) => 
       i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + focusGained } : d
     );
     setWeekStats(updated);
@@ -228,7 +230,8 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
       setLogs(l => [{ time: now, duration: spentMins }, ...l]);
       
-      const updated = weekStats.map((d: any, i: number) => 
+      const currentWeekStats = Array.isArray(weekStats) && weekStats.length === 7 ? weekStats : POMODORO_WEEKLY_MOCK;
+      const updated = currentWeekStats.map((d: any, i: number) => 
         i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + spentMins } : d
       );
       setWeekStats(updated);
