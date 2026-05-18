@@ -5,20 +5,36 @@ const ICAL_URL = 'https://calendar.google.com/calendar/ical/9ce9f7279f0afeef711a
 
 export const CalendarResetManager: React.FC = () => {
   // Sync states for resetting
-  const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
-  const [, setLog] = useFirebaseSync<any[]>('hydration_log', []);
-  const [history, setHistory] = useFirebaseSync<Record<string, number>>('hydration_history', {});
+  const [glasses, setGlasses, glassesReady] = useFirebaseSync<number>('hydration_glasses', 0);
+  const [, setLog, logReady] = useFirebaseSync<any[]>('hydration_log', []);
+  const [history, setHistory, historyReady] = useFirebaseSync<Record<string, number>>('hydration_history', {});
   
-  const [meals, setMeals] = useFirebaseSync<Record<string, any[]>>('fitness_meals', { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
-  const [fitHistory, setFitHistory] = useFirebaseSync<Record<string, number>>('fitness_history', {});
+  const [meals, setMeals, mealsReady] = useFirebaseSync<Record<string, any[]>>('fitness_meals', { Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
+  const [fitHistory, setFitHistory, fitHistoryReady] = useFirebaseSync<Record<string, number>>('fitness_history', {});
   
-  const [, setPomoSessions] = useFirebaseSync<number>('pomodoro_sessions', 0);
-  const [pomoWeek, setPomoWeek] = useFirebaseSync<any[]>('pomodoro_week', []);
-  const [pomoHistory, setPomoHistory] = useFirebaseSync<Record<string, { sessions: number, minutes: number }>>('pomodoro_history', {});
+  const [, setPomoSessions, pomoReady] = useFirebaseSync<number>('pomodoro_sessions', 0);
+  const [pomoWeek, setPomoWeek, pomoWeekReady] = useFirebaseSync<any[]>('pomodoro_week', []);
+  const [pomoHistory, setPomoHistory, pomoHistoryReady] = useFirebaseSync<Record<string, { sessions: number, minutes: number }>>('pomodoro_history', {});
 
-  const [lastResetDate, setLastResetDate] = useFirebaseSync<string>('system_last_reset_date', '');
+  const [lastResetDate, setLastResetDate, lastResetDateReady] = useFirebaseSync<string>('system_last_reset_date', '');
 
   useEffect(() => {
+    // Wait until ALL Firebase sync hooks are ready before we check the calendar and potentially run reset
+    if (
+      !glassesReady ||
+      !logReady ||
+      !historyReady ||
+      !mealsReady ||
+      !fitHistoryReady ||
+      !pomoReady ||
+      !pomoWeekReady ||
+      !pomoHistoryReady ||
+      !lastResetDateReady
+    ) {
+      console.log('[CalendarResetManager] Waiting for Firebase sync to be ready...');
+      return;
+    }
+
     const performReset = async (sleepDate: Date) => {
       const now = new Date();
       // We calculate the logical "yesterday" relative to the sleep date
@@ -159,7 +175,10 @@ export const CalendarResetManager: React.FC = () => {
     const interval = setInterval(checkCalendar, 2 * 60 * 1000); // Check every 2 minutes
     checkCalendar();
     return () => clearInterval(interval);
-  }, [lastResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory]);
+  }, [
+    lastResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory,
+    glassesReady, logReady, historyReady, mealsReady, fitHistoryReady, pomoReady, pomoWeekReady, pomoHistoryReady, lastResetDateReady
+  ]);
 
   return null;
 };

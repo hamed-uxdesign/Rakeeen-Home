@@ -14,6 +14,8 @@ export function useFirebaseSync<T>(key: string, initialValue: T) {
     }
   });
 
+  const [isReady, setIsReady] = useState(false);
+
   // 2. Listen to Firestore changes (for sync across devices)
   useEffect(() => {
     const docRef = doc(db, 'dashboard', key);
@@ -33,8 +35,10 @@ export function useFirebaseSync<T>(key: string, initialValue: T) {
           }
         }
       }
+      setIsReady(true);
     }, (error) => {
       console.warn("Firestore Listen Error:", error);
+      setIsReady(true);
     });
 
     return () => unsubscribe();
@@ -60,5 +64,5 @@ export function useFirebaseSync<T>(key: string, initialValue: T) {
     }
   };
 
-  return [storedValue, setValue] as const;
+  return [storedValue, setValue, isReady] as const;
 }
