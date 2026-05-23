@@ -142,6 +142,19 @@ export const CalendarResetManager: React.FC = () => {
           else if (line.startsWith('RRULE:')) curr.rrule = line;
         }
 
+        // If no sleep events are found in the calendar, default to 5:00 AM to 11:00 AM sleep time (reset at 2:00 AM)
+        if (parsedEvents.length === 0) {
+          const fallbackSleepToday = new Date(today);
+          fallbackSleepToday.setHours(5, 0, 0, 0); // 5:00 AM today
+
+          const fallbackSleepYesterday = new Date(today);
+          fallbackSleepYesterday.setDate(fallbackSleepYesterday.getDate() - 1);
+          fallbackSleepYesterday.setHours(5, 0, 0, 0); // 5:00 AM yesterday
+
+          parsedEvents.push({ start: fallbackSleepYesterday, summary: 'Fallback Sleep' });
+          parsedEvents.push({ start: fallbackSleepToday, summary: 'Fallback Sleep' });
+        }
+
         // Sort events by start time
         parsedEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
 

@@ -144,7 +144,16 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
   const nextWorkout = getNextWorkout();
   const diffDays = Math.ceil((nextWorkout.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   
-  const lateThreshold = nextSleepTime ? new Date(nextSleepTime.getTime() - 3 * 60 * 60 * 1000) : new Date(today.getFullYear(), today.getMonth(), today.getDate(), 20, 0);
+  const getFallbackLateThreshold = () => {
+    const t = new Date(today);
+    t.setHours(2, 0, 0, 0);
+    if (today.getHours() >= 2) {
+      t.setDate(t.getDate() + 1);
+    }
+    return t;
+  };
+  
+  const lateThreshold = nextSleepTime ? new Date(nextSleepTime.getTime() - 3 * 60 * 60 * 1000) : getFallbackLateThreshold();
   const isLate = today >= lateThreshold;
   const isMissed = isWorkoutDay && isLate && !workoutLoggedToday;
 

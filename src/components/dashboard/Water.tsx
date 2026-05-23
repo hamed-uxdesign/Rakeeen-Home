@@ -22,7 +22,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   const [log, setLog] = useFirebaseSync<string[]>('hydration_log', []);
   const [history] = useFirebaseSync<Record<string, number>>('hydration_history', {});
   const [reportView, setReportView] = useState<'week' | 'month' | 'year'>('week');
-  const goal = 16;
+  const goal = 14;
 
   React.useEffect(() => {
     document.title = 'Rakeeen - Water';
@@ -205,25 +205,25 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
                 axisLine={false} tickLine={false} 
                 width={35}
                 domain={[0, (dataMax: number) => {
-                  const target = reportView === 'week' ? 16 : reportView === 'month' ? 112 : 480;
+                  const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
                   return Math.max(dataMax, target + (reportView === 'year' ? 40 : 4));
                 }]}
                 ticks={
-                  reportView === 'week' ? [0, 4, 8, 12, 16, 20] : 
-                  reportView === 'month' ? [0, 30, 60, 90, 112, 140] :
-                  [0, 120, 240, 360, 480, 600]
+                  reportView === 'week' ? [0, 4, 8, 12, 14, 16] : 
+                  reportView === 'month' ? [0, 25, 50, 75, 98, 120] :
+                  [0, 100, 200, 300, 420, 500]
                 }
               />
-              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.06)' }} content={<ChartTooltip unit="Glasses" getTipMessage={(val) => val >= (reportView === 'week' ? 16 : reportView === 'month' ? 112 : 480) ? 'Goal Achieved' : 'Hydration Pending'} />} />
+              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.06)' }} content={<ChartTooltip unit="Glasses" getTipMessage={(val) => val >= (reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420) ? 'Goal Achieved' : 'Hydration Pending'} />} />
               
               <ReferenceLine 
-                y={reportView === 'week' ? 16 : reportView === 'month' ? 112 : 480} 
+                y={reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420} 
                 stroke="var(--forest)" 
                 strokeDasharray="6 6" 
                 strokeOpacity={0.5} 
                 strokeWidth={2}
                 label={{ 
-                  value: reportView === 'week' ? '16' : reportView === 'month' ? '112' : '480', 
+                  value: reportView === 'week' ? '14' : reportView === 'month' ? '98' : '420', 
                   position: 'insideTopRight', 
                   fill: 'var(--forest)', 
                   fontSize: 10, 

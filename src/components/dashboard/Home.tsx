@@ -122,7 +122,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
       {/* Summary bar - Non-interactive */}
       <div className="grid grid-cols-2 sm:flex gap-6 sm:gap-10 mb-8 sm:mb-12 px-6 sm:px-12 py-5 sm:py-6 sys-card relative shadow-none justify-center">
         {[
-          {label:'Glasses', value:`${glasses}/16`},
+          {label:'Glasses', value:`${glasses}/14`},
           {label:'Focus', value: focusMinutes > 0 ? `${focusHours}h` : '0h'},
           {label:'Training', value: `${workoutMinsToday}m`},
         ].map((item, idx)=>(

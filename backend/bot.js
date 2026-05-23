@@ -12,13 +12,13 @@ const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || 'PUT_YOUR_BOT_TOKEN_HERE';
 // Mocking Calendar Data (This will be replaced by your actual database/calendar integration later)
 // Assume we fetch this daily to know when to stop and start
 const MOCK_CALENDAR_TODAY = {
-  wakeUpTime: '06:00', // 24-hour format
-  sleepTime: '22:00'   // 10:00 PM
+  wakeUpTime: '11:00', // 24-hour format
+  sleepTime: '05:00'   // 5:00 AM
 };
 
 /**
  * Helper to check if current time is within the "Do Not Disturb" window
- * DND Window: 3 hours before sleepTime UNTIL 1 hour after wakeUpTime
+ * DND Window: 3 hours before sleepTime UNTIL 2 hours after wakeUpTime
  */
 function isDoNotDisturb(currentTime) {
   const [sleepHour, sleepMin] = MOCK_CALENDAR_TODAY.sleepTime.split(':').map(Number);
@@ -30,8 +30,8 @@ function isDoNotDisturb(currentTime) {
   let dndStartHour = sleepHour - 3;
   if (dndStartHour < 0) dndStartHour += 24;
 
-  // Calculate DND end (1 hour after wake)
-  let dndEndHour = wakeHour + 1;
+  // Calculate DND end (2 hours after wake)
+  let dndEndHour = wakeHour + 2;
   if (dndEndHour >= 24) dndEndHour -= 24;
 
   // Check if current hour falls inside DND window
@@ -60,8 +60,8 @@ client.once('ready', async () => {
   }
   // -----------------------------------------------------
 
-  // Schedule a cron job to run at the top of every 2 hours
-  cron.schedule('0 */2 * * *', async () => {
+  // Schedule a cron job to run at the top of every hour (first run at 1:00 PM)
+  cron.schedule('0 * * * *', async () => {
     const now = new Date();
     
     // Check our smart Calendar logic before sending
@@ -81,10 +81,10 @@ client.once('ready', async () => {
     }
   });
   
-  console.log('⏰ Water Reminder Cron Job Scheduled (Runs every 2 hours)!');
+  console.log('⏰ Water Reminder Cron Job Scheduled (Runs every hour)!');
 
-  // Daily cleanup cron job at 12:00 AM
-  cron.schedule('0 0 * * *', async () => {
+  // Daily cleanup cron job at 2:00 AM
+  cron.schedule('0 2 * * *', async () => {
     try {
       const channel = await client.channels.fetch(CHANNEL_ID);
       if (channel) {
@@ -125,7 +125,7 @@ client.once('ready', async () => {
     }
   });
   
-  console.log('🧹 Channel Cleanup Cron Job Scheduled (Runs daily at 12:00 AM)!');
+  console.log('🧹 Channel Cleanup Cron Job Scheduled (Runs daily at 02:00 AM)!');
 });
 
 client.login(BOT_TOKEN).catch(err => {
