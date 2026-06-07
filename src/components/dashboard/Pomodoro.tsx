@@ -198,23 +198,31 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
     const focusMinsToday = Math.round(weekStats?.[todayIdx]?.minutes || 0);
 
     // WEEK
+    const getStartOfWeek = (d: Date): Date => {
+      const date = new Date(d);
+      const day = date.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+      const diff = (day + 1) % 7; 
+      date.setDate(date.getDate() - diff);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
+
+    const startOfWeek = getStartOfWeek(now);
     const weekDays = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-    const currentDayIdx = now.getDay();
     const weekData = weekDays.map((name, i) => {
-      const targetDayIdx = [6, 0, 1, 2, 3, 4, 5][i]; 
-      const date = new Date(now);
-      date.setDate(now.getDate() - ((currentDayIdx - targetDayIdx + 7) % 7));
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
       const dateStr = date.toDateString();
       const isFuture = date > now && dateStr !== todayStr;
+      
       if (isFuture) return { name, sessions: 0, minutes: 0 };
       if (dateStr === todayStr) return { name, sessions, minutes: focusMinsToday };
       
-      const wsEntry = weekStats?.find((d: any) => (d.day || d.name) === name);
       const hEntry = history[dateStr];
       return { 
         name,
-        sessions: wsEntry?.sessions || hEntry?.sessions || 0,
-        minutes: wsEntry?.minutes || hEntry?.minutes || 0
+        sessions: hEntry?.sessions || 0,
+        minutes: hEntry?.minutes || 0
       };
     });
 
@@ -329,11 +337,16 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
 
             <div className="relative flex items-center justify-center w-[320px] h-[320px] sm:w-[600px] sm:h-[600px]">
               <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-80 h-80 sm:w-[600px] sm:h-[600px] transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <motion.div layoutId="pomodoroWavyRing" className="absolute inset-0 flex items-center justify-center">
+                <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              </motion.div>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className={`text-5xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}>
+                <motion.span 
+                  layoutId="pomodoroTimerText"
+                  className={`text-5xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}
+                >
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
-                </span>
+                </motion.span>
                 <span className="text-[9px] sm:text-[10px] tracking-[0.5em] font-bold text-ink/30 uppercase">
                   {isOvertime ? 'Overtime' : mode}
                 </span>
@@ -408,12 +421,15 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
             {/* Timer Circle */}
             <div className="relative w-full max-w-[280px] aspect-square mx-auto flex items-center justify-center">
               <div className={`absolute inset-6 rounded-full blur-[40px] opacity-20 -z-10 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={280} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              <motion.div layoutId="pomodoroWavyRing" className="absolute inset-0 flex items-center justify-center">
+                <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={280} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              </motion.div>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <motion.span
+                  layoutId="pomodoroTimerText"
                   className={`text-4xl sm:text-5xl font-black mb-1 transition-colors duration-500 ${isOvertime ? 'text-rust' : 'text-ink'}`}
-                  animate={{ scale: running ? [1, 1.02, 1] : 1 }}
+                  animate={{ scale: (running && !isOvertime) ? [1, 1.02, 1] : 1 }}
                   transition={{ repeat: Infinity, duration: 3 }}
                 >
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}

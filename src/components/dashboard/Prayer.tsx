@@ -14,6 +14,7 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
   const [now, setNow] = useState(new Date());
   
   const [isPlaying, setIsPlaying] = useState(false);
+  const [volume, setVolume] = useState(() => quranRadioManager.getVolume());
 
   useEffect(() => {
     const unsubscribe = quranRadioManager.subscribe((playing) => {
@@ -165,21 +166,41 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                         إذاعة القرآن الكريم
                      </div>
                   </div>
-                  <div className="text-left sm:text-right flex items-center gap-4 mt-3 sm:mt-0">
-                     {isPlaying && (
-                        <div className="flex items-end gap-0.5 h-4 w-8 pr-2">
-                           <span className="w-0.5 bg-sepia animate-[pulseWave_0.8s_infinite_ease-in-out_alternate]" style={{ height: '30%' }} />
-                           <span className="w-0.5 bg-sepia animate-[pulseWave_1.2s_infinite_ease-in-out_alternate_0.2s]" style={{ height: '50%' }} />
-                           <span className="w-0.5 bg-sepia animate-[pulseWave_0.9s_infinite_ease-in-out_alternate_0.4s]" style={{ height: '70%' }} />
-                           <span className="w-0.5 bg-sepia animate-[pulseWave_1.1s_infinite_ease-in-out_alternate_0.1s]" style={{ height: '40%' }} />
+                  <div className="text-left sm:text-right flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-3 sm:mt-0 w-full sm:w-auto">
+                     <div className="flex items-center gap-3 justify-between sm:justify-start">
+                        {isPlaying && (
+                           <div className="flex items-end gap-0.5 h-4 w-8 pr-2">
+                              <span className="w-0.5 bg-sepia animate-[pulseWave_0.8s_infinite_ease-in-out_alternate]" style={{ height: '30%' }} />
+                              <span className="w-0.5 bg-sepia animate-[pulseWave_1.2s_infinite_ease-in-out_alternate_0.2s]" style={{ height: '50%' }} />
+                              <span className="w-0.5 bg-sepia animate-[pulseWave_0.9s_infinite_ease-in-out_alternate_0.4s]" style={{ height: '70%' }} />
+                              <span className="w-0.5 bg-sepia animate-[pulseWave_1.1s_infinite_ease-in-out_alternate_0.1s]" style={{ height: '40%' }} />
+                           </div>
+                        )}
+                        {/* Volume Control */}
+                        <div className="flex items-center gap-2 border border-ink/20 px-3 py-1.5 bg-[var(--paper-dark)] flex-1 sm:flex-initial">
+                          <span className="font-mono-main text-[9px] font-bold text-ink/40 uppercase tracking-widest">Vol</span>
+                          <input 
+                            type="range" 
+                            min="0" 
+                            max="1" 
+                            step="0.05"
+                            value={volume}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              setVolume(v);
+                              quranRadioManager.setVolume(v);
+                            }}
+                            className="w-20 brutalist-slider cursor-pointer"
+                          />
+                          <span className="font-mono-main text-[9px] font-bold text-ink/60 min-w-[24px] text-right">{Math.round(volume * 100)}%</span>
                         </div>
-                     )}
+                     </div>
                      <button
                         onClick={togglePlay}
-                        className="btn-brutalist px-6 py-2.5 text-xs font-mono-main cursor-pointer"
+                        className="btn-brutalist px-6 py-2.5 text-xs font-mono-main cursor-pointer w-full sm:w-auto"
                      >
                         {isPlaying ? 'PAUSE' : 'PLAY LIVE'}
-                      </button>
+                       </button>
                   </div>
                 </div>
               </>

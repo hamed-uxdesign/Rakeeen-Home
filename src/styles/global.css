@@ -265,6 +265,43 @@
   }
 }
 
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
+/* Brutalist Custom Range Slider */
+.brutalist-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--ink);
+  opacity: 0.15;
+  height: 4px;
+  outline: none;
+  transition: opacity 0.2s ease;
+}
+.brutalist-slider:hover {
+  opacity: 0.3;
+}
+.brutalist-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--ink);
+  border: 1px solid var(--paper);
+  border-radius: 0px;
+  cursor: none !important;
+}
+.brutalist-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: var(--ink);
+  border: 1px solid var(--paper);
+  border-radius: 0px;
+  cursor: none !important;
+}
+
 @keyframes pulseWave {
   0% {
     height: 20%;

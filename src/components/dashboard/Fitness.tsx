@@ -149,16 +149,25 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
     const todayStr = today.toDateString();
     const currentYear = today.getFullYear();
     const currentMonth = today.getMonth();
-    const currentDayIdx = today.getDay();
+
+    // Helper to get most recent Saturday
+    const getStartOfWeek = (d: Date): Date => {
+      const date = new Date(d);
+      const day = date.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+      const diff = (day + 1) % 7; 
+      date.setDate(date.getDate() - diff);
+      date.setHours(0, 0, 0, 0);
+      return date;
+    };
 
     // WEEK
+    const startOfWeek = getStartOfWeek(today);
     const weekDays = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     const weekData = weekDays.map((name, i) => {
-      const targetDayIdx = [6, 0, 1, 2, 3, 4, 5][i];
-      const d = new Date(today);
-      d.setDate(today.getDate() - ((currentDayIdx - targetDayIdx + 7) % 7));
-      const dateStr = d.toDateString();
-      const isFuture = d > today && dateStr !== todayStr;
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
+      const dateStr = date.toDateString();
+      const isFuture = date > today && dateStr !== todayStr;
       if (isFuture) return { name, minutes: 0 };
       const mins = workouts.filter(w => w.date === dateStr).reduce((a, b) => a + (Number(b.duration) || 0), 0);
       return { name, minutes: mins };
@@ -222,7 +231,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
 
         {/* Brutalist Tab Switcher with sliding animation */}
         <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)]">
-          {(['workout', 'challenge', 'analytics'] as const).map((view) => (
+          {(['workout', 'challenge'] as const).map((view) => (
             <button
               key={view}
               onClick={() => setTab(view)}
@@ -239,7 +248,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                   style={{ zIndex: 0 }}
                 />
               )}
-              <span className="relative z-10">{view === 'workout' ? 'Workouts' : view === 'challenge' ? 'No Sugar' : 'Analytics'}</span>
+              <span className="relative z-10">{view === 'workout' ? 'Workouts' : 'No Sugar'}</span>
             </button>
           ))}
         </div>
@@ -262,7 +271,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                      const isW = WORKOUT_DAYS.includes(i);
                      return (
                        <div key={d} className={`text-[10px] font-black px-3 py-1 border border-ink ${isW ? (i === todayIdx ? 'bg-forest text-paper border-forest' : 'border-forest text-forest') : 'opacity-20 border-transparent'}`}>
-                         {d.toUpperCase()}
+                          {d.toUpperCase()}
                        </div>
                      );
                    })}
@@ -298,6 +307,72 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                     Log Session
                   </button>
                 </div>
+             </div>
+
+             {/* Training Flow Analytics inside Workouts page */}
+             <div className="brutalist-card no-lift p-6 sm:p-12">
+               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-12">
+                 <h3 className="text-2xl sm:text-4xl font-black tracking-tighter whitespace-nowrap">Training Flow</h3>
+                 <div className="flex flex-col items-end gap-4">
+                   <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs font-black uppercase tracking-widest text-sepia">
+                     <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-sepia rounded-full" />
+                     Daily Minutes
+                   </div>
+                   {/* Period Tab Switch with sliding indicator */}
+                   <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)]">
+                     {(['week', 'month', 'year'] as const).map((viewOption) => (
+                       <button
+                         key={viewOption}
+                         onClick={() => setReportView(viewOption)}
+                         className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-4 py-2 transition-colors duration-200 cursor-pointer"
+                         style={{
+                           color: reportView === viewOption ? 'var(--paper)' : 'var(--ink)',
+                         }}
+                       >
+                         {reportView === viewOption && (
+                           <motion.div
+                             layoutId="fitnessReportTabBg"
+                             className="absolute inset-0 bg-[var(--ink)]"
+                             transition={{ type: 'spring', stiffness: 450, damping: 36 }}
+                             style={{ zIndex: 0 }}
+                           />
+                         )}
+                         <span className="relative z-10">{viewOption}</span>
+                       </button>
+                     ))}
+                   </div>
+                 </div>
+               </div>
+               <div className="h-[250px] sm:h-[350px] w-full mt-8">
+                 <ResponsiveContainer>
+                   <BarChart data={workoutReports[reportView]} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                     <CartesianGrid vertical={false} stroke="var(--ink)" strokeOpacity={0.05} strokeDasharray="0" />
+                     <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }} axisLine={false} tickLine={false} dy={10} />
+                     <YAxis 
+                       tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }} 
+                       axisLine={false} tickLine={false} 
+                       width={35}
+                       domain={[0, (dataMax: number) => {
+                         let target = 30;
+                         if (reportView === 'month') target = 210;
+                         if (reportView === 'year') target = 900;
+                         return Math.max(dataMax, target);
+                       }]}
+                     />
+                     <Tooltip cursor={{ fill: 'var(--ink)', fillOpacity: 0.04 }} content={<ChartTooltip unit="min" getTipMessage={(val) => {
+                       let target = 30;
+                       if (reportView === 'month') target = 210;
+                       if (reportView === 'year') target = 900;
+                       return val >= target ? 'Peak Performance' : 'Keep Pushing';
+                     }} />} />
+                     <Bar dataKey="minutes" fill="var(--sepia)" radius={[0, 0, 0, 0]} maxBarSize={40}>
+                       {workoutReports[reportView].map((_: any, i: number) => (
+                         <Cell key={i} fillOpacity={0.9} />
+                       ))}
+                     </Bar>
+                   </BarChart>
+                 </ResponsiveContainer>
+               </div>
              </div>
 
           </div>
@@ -367,75 +442,6 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
                  </div>
                )}
             </div>
-          </div>
-        )}
-
-        {tab === 'analytics' && (
-          <div className="space-y-6">
-             <div className="brutalist-card no-lift p-6 sm:p-12">
-               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 sm:mb-12">
-                 <h3 className="text-2xl sm:text-4xl font-black tracking-tighter whitespace-nowrap">Training Flow</h3>
-                 <div className="flex flex-col items-end gap-4">
-                   <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs font-black uppercase tracking-widest text-sepia">
-                     <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-sepia rounded-full" />
-                     Daily Minutes
-                   </div>
-                   {/* Period Tab Switch with sliding indicator */}
-                   <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)]">
-                     {(['week', 'month', 'year'] as const).map((viewOption) => (
-                       <button
-                         key={viewOption}
-                         onClick={() => setReportView(viewOption)}
-                         className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-4 py-2 transition-colors duration-200 cursor-pointer"
-                         style={{
-                           color: reportView === viewOption ? 'var(--paper)' : 'var(--ink)',
-                         }}
-                       >
-                         {reportView === viewOption && (
-                           <motion.div
-                             layoutId="fitnessReportTabBg"
-                             className="absolute inset-0 bg-[var(--ink)]"
-                             transition={{ type: 'spring', stiffness: 450, damping: 36 }}
-                             style={{ zIndex: 0 }}
-                           />
-                         )}
-                         <span className="relative z-10">{viewOption}</span>
-                       </button>
-                     ))}
-                   </div>
-                 </div>
-               </div>
-               <div className="h-[250px] sm:h-[350px] w-full mt-8">
-                 <ResponsiveContainer>
-                   <BarChart data={workoutReports[reportView]} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                     <CartesianGrid vertical={false} stroke="var(--ink)" strokeOpacity={0.05} strokeDasharray="0" />
-                     <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }} axisLine={false} tickLine={false} dy={10} />
-                     <YAxis 
-                       tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }} 
-                       axisLine={false} tickLine={false} 
-                       width={35}
-                       domain={[0, (dataMax: number) => {
-                         let target = 30;
-                         if (reportView === 'month') target = 210;
-                         if (reportView === 'year') target = 900;
-                         return Math.max(dataMax, target);
-                       }]}
-                     />
-                     <Tooltip cursor={{ fill: 'var(--ink)', fillOpacity: 0.04 }} content={<ChartTooltip unit="min" getTipMessage={(val) => {
-                       let target = 30;
-                       if (reportView === 'month') target = 210;
-                       if (reportView === 'year') target = 900;
-                       return val >= target ? 'Peak Performance' : 'Keep Pushing';
-                     }} />} />
-                     <Bar dataKey="minutes" fill="var(--sepia)" radius={[0, 0, 0, 0]} maxBarSize={40}>
-                       {workoutReports[reportView].map((_: any, i: number) => (
-                         <Cell key={i} fillOpacity={0.9} />
-                       ))}
-                     </Bar>
-                   </BarChart>
-                 </ResponsiveContainer>
-               </div>
-             </div>
           </div>
         )}
 

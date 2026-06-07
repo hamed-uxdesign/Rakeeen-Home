@@ -18,7 +18,9 @@ export function getLogicalDate(): Date {
       const nextSleep = new Date(nextSleepStr);
       if (!isNaN(nextSleep.getTime())) {
         const resetTime = new Date(nextSleep.getTime() - 3 * 60 * 60 * 1000);
-        if (now < resetTime) {
+        // Only subtract 24 hours if we are on the same calendar day as the sleep event
+        // but we haven't reached the reset time yet (i.e., early morning before sleeping).
+        if (now.toDateString() === nextSleep.toDateString() && now < resetTime) {
           const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
           return logical;
         }
