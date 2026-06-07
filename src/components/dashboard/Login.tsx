@@ -31,29 +31,26 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-paper p-6 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center bg-bg p-6 relative overflow-hidden transition-colors duration-300">
       {/* Background patterns */}
       <div 
         className="absolute inset-0 opacity-5 pointer-events-none" 
         style={{ backgroundImage: 'radial-gradient(var(--ink) 1px, transparent 1px)', backgroundSize: '24px 24px' }} 
       />
       
-      <div className="w-full max-w-md bg-paper-dark sketchy-border p-10 md:p-12 relative z-10 text-center shadow-[8px_8px_0px_0px_rgba(232,224,208,0.1)]">
+      <div className="w-full max-w-md brutalist-card no-lift p-10 md:p-12 relative z-10 text-center">
         <div className="flex justify-center mb-8">
-          <div className="p-4 sketchy-border bg-white/5 border-white/20 text-sepia">
+          <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink" style={{ borderRadius: 0 }}>
             <HugeiconsIcon icon={LockIcon} size={28} strokeWidth={1.5} />
           </div>
         </div>
         
         <div className="mb-10">
-          <h1 className="text-3xl font-black tracking-tight mb-2">Vault gatekeeper</h1>
-          <p className="text-[10px] text-ink/40 font-bold tracking-widest leading-relaxed">
-            Secure entry restricted to <br/> <span className="text-sepia italic">hamed.rakeeen@gmail.com</span>
-          </p>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Vault gatekeeper</h1>
         </div>
 
         {error && (
-          <div className="bg-rust/10 border-2 border-rust/20 text-rust text-[11px] font-black px-4 py-3 mb-8 rounded-lg animate-pulse">
+          <div className="bg-rust/10 border-2 border-rust text-rust text-[11px] font-black px-4 py-3 mb-8" style={{ borderRadius: 0 }}>
              {error}
           </div>
         )}
@@ -61,21 +58,18 @@ export const Login: React.FC = () => {
         <button 
           onClick={handleGoogleLogin} 
           disabled={loading}
-          className="sketchy-btn filled w-full flex items-center justify-center gap-3 py-4 text-lg hover:scale-[1.02] active:scale-95 transition-all bg-forest border-forest text-paper"
+          className="btn-brutalist w-full flex items-center justify-center gap-3 py-4 text-base font-mono-main"
+          style={{ background: 'var(--sepia)', color: 'var(--ink)' }}
         >
           {loading ? (
-             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+             <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
           ) : (
             <>
               <HugeiconsIcon icon={Login03Icon} size={20} strokeWidth={1.5} />
-              <span className="pt-1">Continue with Google</span>
+              <span>CONTINUE WITH GOOGLE</span>
             </>
           )}
         </button>
-
-        <p className="mt-10 text-[9px] tracking-widest text-ink/30 font-bold italic">
-           Admin clearance required • AI assisted entry
-        </p>
       </div>
     </div>
   );

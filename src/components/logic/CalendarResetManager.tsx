@@ -151,12 +151,26 @@ export const CalendarResetManager: React.FC = () => {
           fallbackSleepYesterday.setDate(fallbackSleepYesterday.getDate() - 1);
           fallbackSleepYesterday.setHours(5, 0, 0, 0); // 5:00 AM yesterday
 
+          const fallbackSleepTomorrow = new Date(today);
+          fallbackSleepTomorrow.setDate(fallbackSleepTomorrow.getDate() + 1);
+          fallbackSleepTomorrow.setHours(5, 0, 0, 0); // 5:00 AM tomorrow
+
           parsedEvents.push({ start: fallbackSleepYesterday, summary: 'Fallback Sleep' });
           parsedEvents.push({ start: fallbackSleepToday, summary: 'Fallback Sleep' });
+          parsedEvents.push({ start: fallbackSleepTomorrow, summary: 'Fallback Sleep' });
         }
 
         // Sort events by start time
         parsedEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+        // Find and cache the next upcoming sleep event
+        const upcomingEvent = parsedEvents.find(e => {
+          const resetTime = new Date(e.start.getTime() - 3 * 60 * 60 * 1000);
+          return resetTime > now;
+        });
+        if (upcomingEvent) {
+          localStorage.setItem('system_next_sleep_time', upcomingEvent.start.toISOString());
+        }
 
         // Find the most relevant sleep event that HAS ALREADY PASSED its reset time
         let targetEvent = null;

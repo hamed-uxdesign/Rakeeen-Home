@@ -14,28 +14,31 @@ export const CustomCursor = () => {
         top: 0,
         left: 0,
         pointerEvents: 'none',
-        zIndex: 9999,
-        width: '24px',
-        height: '24px',
-        transform: 'translate(-50%, -50%)',
+        zIndex: 99999,
+        width: '28px',
+        height: '28px',
         willChange: 'transform',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        transition: 'transform 0.08s ease-out' // Smooth transitions when resizing/moving
       }}
     >
+      {/* Dynamic vector pointer: fill matches ink (dark in light theme, paper in dark theme), stroke matches background container */}
       <svg
-        width="32" height="32" viewBox="0 0 24 24" fill="none"
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
         style={{
-          position: 'absolute',
-          top: 0, left: 0,
-          transform: 'translate(-10%, -10%) rotate(-5deg)'
+          transform: 'rotate(-4deg) translate(-2px, -2px)',
+          filter: 'drop-shadow(2px 2px 0px rgba(0,0,0,0.15))'
         }}
       >
-        <path 
-          d="M5.5 3.5L18.5 10.5L11.5 12.5L9.5 20.5L5.5 3.5Z" 
-          fill="#ffffff" 
-          stroke="none"
+        <path
+          d="M4.5 3L18.5 11.2L11.8 12.8L9.2 19.5L4.5 3Z"
+          fill="var(--ink)"
+          stroke="var(--paper-dark)"
+          strokeWidth="1"
+          strokeLinejoin="miter"
+          strokeMiterlimit="4"
         />
       </svg>
     </div>

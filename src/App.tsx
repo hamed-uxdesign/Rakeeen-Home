@@ -1,5 +1,5 @@
 import React from 'react';
-import { HashRouter, Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import { Home } from './components/dashboard/Home';
 import { Water } from './components/dashboard/Water';
 import { Calendar } from './components/dashboard/Calendar';
@@ -13,10 +13,23 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { PomodoroProvider } from './hooks/usePomodoro';
 import { FastingManager } from './components/logic/FastingManager';
 import { CalendarResetManager } from './components/logic/CalendarResetManager';
+import { motion, AnimatePresence } from 'framer-motion';
 import './styles/global.css';
 
+const AnimatedPage: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 15 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -15 }}
+    transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+    className="w-full"
+  >
+    {children}
+  </motion.div>
+);
 const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading } = useAuth();
 
   const nav = (to: string) => {
@@ -26,7 +39,7 @@ const AppRoutes: React.FC = () => {
   };
 
   // Derive current page from location
-  const currentPage = window.location.pathname.replace('/Rakeeen-Home', '').replace('/', '') || 'home';
+  const currentPage = location.pathname.replace('/Rakeeen-Home', '').replace('/', '') || 'home';
 
   if (loading) {
     return (
@@ -46,19 +59,23 @@ const AppRoutes: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
       <CustomCursor />
       <FastingManager />
       <CalendarResetManager />
-      <Routes>
-        <Route path="/" element={<Home navigate={nav} />} />
-        <Route path="/water" element={<Water navigate={nav} />} />
-        <Route path="/calendar" element={<Calendar navigate={nav} />} />
-        <Route path="/pomodoro" element={<Pomodoro navigate={nav} />} />
-        <Route path="/prayer" element={<Prayer navigate={nav} />} />
-        <Route path="/fitness" element={<Fitness navigate={nav} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/" element={<AnimatedPage><Home navigate={nav} /></AnimatedPage>} />
+          <Route path="/water" element={<AnimatedPage><Water navigate={nav} /></AnimatedPage>} />
+          <Route path="/calendar" element={<AnimatedPage><Calendar navigate={nav} /></AnimatedPage>} />
+          <Route path="/pomodoro" element={<AnimatedPage><Pomodoro navigate={nav} /></AnimatedPage>} />
+          <Route path="/prayer" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
+          <Route path="/fitness" element={<AnimatedPage><Fitness navigate={nav} /></AnimatedPage>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AnimatePresence>
+      
       <FloatingTimer currentPage={currentPage} onNavigate={() => nav('pomodoro')} />
     </div>
   );
@@ -66,7 +83,7 @@ const AppRoutes: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <HashRouter>
+    <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <PomodoroProvider>
           <AppRoutes />

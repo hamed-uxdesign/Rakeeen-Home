@@ -1,21 +1,125 @@
 import React, { useState } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
-import { BackBtn } from '../layout/Common';
-import { Button, PageHeader, ChartTooltip } from '../ui/UIComponents';
-import { Tabs } from '../ui/Tabs';
+import { ChartTooltip } from '../ui/UIComponents';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from 'recharts';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { 
-  DropletIcon, 
-  RefreshIcon, 
-  ArrowTurnBackwardIcon 
-} from '@hugeicons/core-free-icons';
+import { Droplet, RotateCcw, Undo2, Plus, ArrowLeft, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface WaterProps {
   navigate: (to: string) => void;
 }
 
+// ─── DOT MATRIX DIGITS DEFINITIONS (5x4 Grid) ───
+const DIGIT_MATRICES: Record<string, number[][]> = {
+  '0': [
+    [1, 1, 1, 1],
+    [1, 0, 0, 1],
+    [1, 0, 0, 1],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1]
+  ],
+  '1': [
+    [0, 0, 1, 0],
+    [0, 1, 1, 0],
+    [0, 0, 1, 0],
+    [0, 0, 1, 0],
+    [0, 1, 1, 1]
+  ],
+  '2': [
+    [1, 1, 1, 1],
+    [0, 0, 0, 1],
+    [1, 1, 1, 1],
+    [1, 0, 0, 0],
+    [1, 1, 1, 1]
+  ],
+  '3': [
+    [1, 1, 1, 1],
+    [0, 0, 0, 1],
+    [0, 1, 1, 1],
+    [0, 0, 0, 1],
+    [1, 1, 1, 1]
+  ],
+  '4': [
+    [1, 0, 0, 1],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1],
+    [0, 0, 0, 1],
+    [0, 0, 0, 1]
+  ],
+  '5': [
+    [1, 1, 1, 1],
+    [1, 0, 0, 0],
+    [1, 1, 1, 1],
+    [0, 0, 0, 1],
+    [1, 1, 1, 1]
+  ],
+  '6': [
+    [1, 1, 1, 1],
+    [1, 0, 0, 0],
+    [1, 1, 1, 1],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1]
+  ],
+  '7': [
+    [1, 1, 1, 1],
+    [0, 0, 0, 1],
+    [0, 0, 1, 0],
+    [0, 1, 0, 0],
+    [0, 1, 0, 0]
+  ],
+  '8': [
+    [1, 1, 1, 1],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1]
+  ],
+  '9': [
+    [1, 1, 1, 1],
+    [1, 0, 0, 1],
+    [1, 1, 1, 1],
+    [0, 0, 0, 1],
+    [0, 0, 0, 1]
+  ]
+};
 
+const DotMatrixText: React.FC<{ 
+  text: string; 
+  dotSizeClassName?: string;
+  gapClassName?: string;
+}> = ({ 
+  text, 
+  dotSizeClassName = 'w-2.5 h-2.5 sm:w-3 sm:h-3',
+  gapClassName = 'gap-1 sm:gap-1.5'
+}) => {
+  const chars = text.split('');
+  return (
+    <div className="flex gap-4 select-none">
+      {chars.map((char, charIdx) => {
+        const matrix = DIGIT_MATRICES[char];
+        if (!matrix) return null;
+        return (
+          <div key={charIdx} className={`grid grid-cols-4 ${gapClassName}`}>
+            {matrix.map((row, rowIdx) =>
+              row.map((val, colIdx) => (
+                <motion.div
+                  key={`${rowIdx}-${colIdx}`}
+                  initial={false}
+                  animate={{
+                    scale: val ? 1 : 0.8,
+                    opacity: val ? 1 : 0
+                  }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                  className={`${dotSizeClassName} rounded-full bg-[var(--ink)]`}
+                />
+              ))
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const Water: React.FC<WaterProps> = ({ navigate }) => {
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
@@ -26,10 +130,6 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
 
   React.useEffect(() => {
     document.title = 'Rakeeen - Water';
-  }, []);
-
-  React.useEffect(() => {
-    // Client-side reset logic handled by CalendarResetManager
   }, []);
 
   const addGlass = () => {
@@ -51,15 +151,14 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
 
   const pct = Math.min((glasses / goal) * 100, 100);
 
-  // --- ANALYTICS: Current period only. No cross-period accumulation. ---
+  // --- ANALYTICS ---
   const getDynamicReports = () => {
     const now = new Date();
     const todayStr = now.toDateString();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
-    const currentDayIdx = now.getDay(); // 0=Sun
+    const currentDayIdx = now.getDay();
 
-    // ── WEEK: Sat-Fri of THIS calendar week only ──────────────────────────────
     const weekDays = ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
     const weekData = weekDays.map((name, i) => {
       const targetDayIdx = [6, 0, 1, 2, 3, 4, 5][i];
@@ -72,7 +171,6 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
       return { name, glasses: history[dateStr] || 0 };
     });
 
-    // ── MONTH: Week 1-4 of THIS calendar month only ───────────────────────────
     const monthData = [
       { name: 'Week 1', glasses: 0 }, { name: 'Week 2', glasses: 0 },
       { name: 'Week 3', glasses: 0 }, { name: 'Week 4', glasses: 0 }
@@ -87,7 +185,6 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     const todayWeekIdx = Math.min(Math.floor((now.getDate() - 1) / 7), 3);
     monthData[todayWeekIdx].glasses += glasses;
 
-    // ── YEAR: Jan-Dec of THIS calendar year only ──────────────────────────────
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const yearData = monthNames.map(name => ({ name, glasses: 0 }));
     Object.entries(history).forEach(([dateStr, val]) => {
@@ -103,144 +200,198 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
 
   const dynamicReports = getDynamicReports();
 
-
-
   return (
-    <div className="max-w-2xl mx-auto py-6 sm:py-12 px-4 sm:px-6 min-h-screen">
-      <BackBtn onClick={() => navigate('home')} />
+    <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300">
 
-      <PageHeader 
-        title="Water" 
-        subtitle="Daily intake tracker" 
-      />
-
-      <div className="text-center mb-8 sm:mb-12 sys-card p-6 sm:p-10">
-        <div className="relative py-6 sm:py-8">
-          <div className="text-[80px] sm:text-[120px] font-black text-sepia leading-none tracking-tighter">{glasses}</div>
-          <div className="text-[10px] sm:text-xs text-ink/30 uppercase tracking-[0.3em] font-black mt-2 sm:mt-4">of {goal} glasses today</div>
+      {/* HEADER */}
+      <header className="w-full max-w-[1000px] mx-auto mb-12">
+        {/* Breadcrumb / Back */}
+        <div className="flex items-center gap-2 mb-8">
+          <button
+            onClick={() => navigate('home')}
+            className="flex items-center gap-2 text-ink/40 hover:text-ink transition-colors group"
+          >
+            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+            <span className="font-mono-main text-[10px] uppercase tracking-[0.25em] font-bold">Home</span>
+          </button>
+          <ChevronRight size={12} className="text-ink/20" />
+          <span className="font-mono-main text-[10px] uppercase tracking-[0.25em] font-bold text-ink/50">Water</span>
         </div>
 
-        <div 
-          className="h-4 w-full bg-paper rounded-none mb-12 relative overflow-hidden border-2 transition-all duration-500"
-          style={{ borderColor: glasses > 0 ? 'var(--forest)' : 'var(--ink)' }}
-        >
-          <div 
-            className="h-full transition-all duration-1000 ease-out" 
-            style={{ width: `${pct}%`, backgroundColor: 'var(--forest)' }} 
-          />
-        </div>
-
-        <div className="flex gap-2 sm:gap-4 justify-center mb-8 sm:mb-12 flex-wrap">
-          {Array.from({ length: goal }).map((_, i) => (
-            <div 
-              key={i} 
-              className="relative w-6 h-10 sm:w-8 sm:h-12 border-2 overflow-hidden transition-all duration-700" 
-              style={{ 
-                borderRadius: '4px 4px 12px 12px', 
-                borderColor: i < glasses ? 'var(--forest)' : 'var(--ink)',
-                opacity: i < glasses ? 1 : 0.1
-              }}
-            >
-              <div 
-                className="absolute bottom-0 left-0 w-full transition-all duration-1000 ease-out" 
-                style={{ height: i < glasses ? '100%' : '0%', backgroundColor: 'var(--forest)' }} 
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-          <Button variant="premium" onClick={addGlass} className="flex items-center justify-center w-full sm:w-auto min-w-[200px] h-14 group">
-            <HugeiconsIcon icon={DropletIcon} size={22} className="text-forest mr-3 group-hover:text-paper transition-colors" />
-            <span className="tracking-[0.2em] font-black uppercase text-sm">+ Log Glass</span>
-          </Button>
-          {glasses > 0 && (
-            <div className="flex gap-2 w-full sm:w-auto justify-center">
-              <Button variant="sketchy" onClick={undo} className="flex-1 sm:flex-none px-5 h-14 border-ink/20 opacity-60 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
-                <HugeiconsIcon icon={ArrowTurnBackwardIcon} size={20} />
-              </Button>
-              <Button variant="sketchy" onClick={reset} className="flex-1 sm:flex-none px-5 h-14 border-ink/20 opacity-30 hover:opacity-100 hover:border-rust hover:text-rust transition-all">
-                <HugeiconsIcon icon={RefreshIcon} size={20} />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="sys-card mb-8 sm:mb-12 p-6 sm:p-10">
-        <h2 className="text-3xl sm:text-4xl font-black tracking-tighter mb-8 sm:mb-10 text-ink">Timeline</h2>
-        {log.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {log.map((t, i) => (
-              <div key={i} className="flex items-center gap-2.5 px-3 py-2 border-2 transition-all animate-scale-in" 
-                style={{ borderColor: 'var(--forest)', backgroundColor: 'transparent' }}>
-                <HugeiconsIcon icon={DropletIcon} size={13} style={{ color: 'var(--forest)' }} />
-                <span className="text-xs font-black tracking-widest tabular-nums" style={{ color: 'var(--forest)' }}>{t}</span>
-              </div>
-            ))}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <h1 className="font-sans-main text-4xl sm:text-5xl md:text-6xl font-black uppercase tracking-tight text-ink">
+              WATER <span className="text-ink/30">INTAKE</span>
+            </h1>
           </div>
-        ) : (
-          <p className="text-ink/20 text-sm font-black uppercase tracking-[0.3em]">No hydration logged yet.</p>
-        )}
-      </div>
-
-
-
-      <div className="sys-card pb-6 p-6 sm:p-10">
-        <h2 className="text-3xl sm:text-4xl font-black tracking-tighter mb-8 sm:mb-12 text-ink">Analytics</h2>
-        <Tabs 
-          tabs={['week', 'month', 'year']} 
-          activeTab={reportView} 
-          onChange={(v) => setReportView(v as any)} 
-          className="flex-wrap sm:justify-end mb-8 sm:mb-10 sm:-mt-20 gap-2"
-        />
-
-        <div className="h-[320px] w-full mt-10">
-          <ResponsiveContainer>
-            <BarChart data={dynamicReports[reportView]} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-              <CartesianGrid vertical={false} stroke="rgba(232,224,208,0.08)" strokeDasharray="3 3" />
-              <XAxis dataKey="name" tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} axisLine={false} tickLine={false} dy={10} />
-              <YAxis 
-                tick={{ fill: 'var(--ink)', opacity: 0.4, fontSize: 10, fontWeight: 700 }} 
-                axisLine={false} tickLine={false} 
-                width={35}
-                domain={[0, (dataMax: number) => {
-                  const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
-                  return Math.max(dataMax, target + (reportView === 'year' ? 40 : 4));
-                }]}
-                ticks={
-                  reportView === 'week' ? [0, 4, 8, 12, 14, 16] : 
-                  reportView === 'month' ? [0, 25, 50, 75, 98, 120] :
-                  [0, 100, 200, 300, 420, 500]
-                }
-              />
-              <Tooltip cursor={{ fill: 'rgba(124,169,130,0.06)' }} content={<ChartTooltip unit="Glasses" getTipMessage={(val) => val >= (reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420) ? 'Goal Achieved' : 'Hydration Pending'} />} />
-              
-              <ReferenceLine 
-                y={reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420} 
-                stroke="var(--forest)" 
-                strokeDasharray="6 6" 
-                strokeOpacity={0.5} 
-                strokeWidth={2}
-                label={{ 
-                  value: reportView === 'week' ? '14' : reportView === 'month' ? '98' : '420', 
-                  position: 'insideTopRight', 
-                  fill: 'var(--forest)', 
-                  fontSize: 10, 
-                  fontWeight: 900,
-                  opacity: 0.5
-                }} 
-              />
-
-              <Bar dataKey="glasses" fill="var(--forest)" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                {dynamicReports[reportView].map((_: any, i: number) => (
-                  <Cell key={i} fillOpacity={0.9} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
         </div>
-      </div>
+      </header>
+
+      {/* MAIN CONTENT */}
+      <main className="w-full max-w-[1000px] mx-auto flex flex-col gap-6">
+
+        {/* HERO COUNTER CARD - STATIC (no hover lift) */}
+        <div className="brutalist-dashed-card no-lift flex flex-col md:flex-row md:items-center md:justify-between gap-10">
+          {/* Dot Matrix Counter */}
+          <div className="flex-grow flex flex-col sm:flex-row sm:items-center gap-8">
+            <div className="flex items-center gap-6">
+              <DotMatrixText text={String(glasses)} />
+              <div className="flex items-center gap-4 self-end pb-1">
+                <span className="font-mono-main text-4xl font-black text-ink/20">/</span>
+                {/* Goal 14 in matching dot matrix style */}
+                <DotMatrixText 
+                  text={String(goal)} 
+                  dotSizeClassName="w-1.5 h-1.5 sm:w-2 sm:h-2" 
+                  gapClassName="gap-0.5 sm:gap-1" 
+                />
+              </div>
+            </div>
+            <span className="font-sans-main text-xs font-bold uppercase tracking-widest text-ink/40">
+              glasses today
+            </span>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-3 min-w-[180px]">
+            <button
+              onClick={addGlass}
+              className="btn-brutalist flex items-center justify-center gap-2 w-full py-4 text-sm"
+            >
+              <Plus size={16} strokeWidth={3} />
+              Add Glass
+            </button>
+            <div 
+              className={`flex gap-2 transition-all duration-200 ${glasses > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none invisible'}`}
+              style={{ visibility: glasses > 0 ? 'visible' : 'hidden' }}
+            >
+              <button
+                onClick={undo}
+                className="flex-1 flex items-center justify-center gap-2 py-3 border border-ink/20 text-ink/40 hover:text-ink hover:border-ink transition-all font-mono-main text-[10px] uppercase tracking-widest font-bold"
+              >
+                <Undo2 size={14} />
+                Undo
+              </button>
+              <button
+                onClick={reset}
+                className="flex-1 flex items-center justify-center gap-2 py-3 border border-ink/10 text-ink/20 hover:text-ink/60 hover:border-ink/40 transition-all font-mono-main text-[10px] uppercase tracking-widest font-bold"
+              >
+                <RotateCcw size={14} />
+                Reset
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ANALYTICS CARD - STATIC (no hover lift) */}
+        <div className="brutalist-card no-lift">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
+            <h2 className="font-sans-main text-2xl font-black uppercase tracking-tight">Analytics</h2>
+
+            {/* Brutalist Sliding Tab Switcher */}
+            <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)]">
+              {(['week', 'month', 'year'] as const).map((view) => (
+                <button
+                  key={view}
+                  onClick={() => setReportView(view)}
+                  className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-4 py-2 cursor-pointer transition-colors duration-200"
+                  style={{
+                    color: reportView === view ? 'var(--paper)' : 'var(--ink)',
+                  }}
+                >
+                  {reportView === view && (
+                    <motion.div
+                      layoutId="waterTabBg"
+                      className="absolute inset-0 bg-[var(--ink)]"
+                      transition={{ type: 'spring', stiffness: 450, damping: 36 }}
+                      style={{ zIndex: 0 }}
+                    />
+                  )}
+                  <span className="relative z-10">{view}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="h-[280px] w-full">
+            <ResponsiveContainer>
+              <BarChart data={dynamicReports[reportView]} margin={{ top: 16, right: 8, left: -10, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="var(--ink)" strokeOpacity={0.05} strokeDasharray="0" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fill: 'var(--ink)', opacity: 0.3, fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }}
+                  axisLine={false}
+                  tickLine={false}
+                  dy={10}
+                />
+                <YAxis
+                  tick={{ fill: 'var(--ink)', opacity: 0.3, fontSize: 10, fontWeight: 700, fontFamily: 'Geist Mono, monospace' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={32}
+                  domain={[0, (dataMax: number) => {
+                    const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
+                    return Math.max(dataMax, target + (reportView === 'year' ? 40 : 4));
+                  }]}
+                  ticks={
+                    reportView === 'week' ? [0, 4, 8, 12, 14] :
+                    reportView === 'month' ? [0, 25, 50, 75, 98] :
+                    [0, 100, 200, 300, 420]
+                  }
+                />
+                <Tooltip
+                  cursor={{ fill: 'var(--ink)', fillOpacity: 0.04 }}
+                  content={
+                    <ChartTooltip
+                      unit="Glasses"
+                      getTipMessage={(val) =>
+                        val >= (reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420)
+                          ? 'Goal Achieved'
+                          : 'Hydration Pending'
+                      }
+                    />
+                  }
+                />
+                <ReferenceLine
+                  y={reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420}
+                  stroke="var(--ink)"
+                  strokeOpacity={0.15}
+                  strokeDasharray="4 4"
+                  strokeWidth={1}
+                  label={{
+                    value: reportView === 'week' ? '14' : reportView === 'month' ? '98' : '420',
+                    position: 'insideTopRight',
+                    fill: 'var(--ink)',
+                    fontSize: 10,
+                    fontWeight: 900,
+                    opacity: 0.25,
+                    fontFamily: 'Geist Mono, monospace',
+                  }}
+                />
+                <Bar dataKey="glasses" maxBarSize={36} radius={[0, 0, 0, 0]}>
+                  {dynamicReports[reportView].map((_: any, i: number) => (
+                    <Cell
+                      key={i}
+                      fill="var(--sepia)"
+                      fillOpacity={0.9}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Stats Footer */}
+          <div className="flex items-center justify-between border-t border-ink/5 pt-5 mt-4">
+            <span className="font-mono-main text-[10px] uppercase tracking-widest text-ink/30 font-bold">
+              Daily Target: {goal} Glasses
+            </span>
+            <span className="font-mono-main text-[10px] uppercase tracking-widest text-ink/30 font-bold">
+              {reportView === 'week' ? 'This Week' : reportView === 'month' ? 'This Month' : 'This Year'}
+            </span>
+          </div>
+        </div>
+
+      </main>
     </div>
   );
 };

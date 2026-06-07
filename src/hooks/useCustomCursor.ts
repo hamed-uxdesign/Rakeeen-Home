@@ -1,49 +1,51 @@
 import React, { useEffect } from 'react';
-import gsap from 'gsap';
 
 export const useCustomCursor = (cursorRef: React.RefObject<HTMLDivElement>) => {
   useEffect(() => {
-    if (!cursorRef.current) return;
+    const el = cursorRef.current;
+    if (!el) return;
 
-    const xTo = gsap.quickTo(cursorRef.current, "x", { duration: 0.1, ease: "power2.out" });
-    const yTo = gsap.quickTo(cursorRef.current, "y", { duration: 0.1, ease: "power2.out" });
+    let mouseX = 0;
+    let mouseY = 0;
+    let currentX = 0;
+    let currentY = 0;
+    let isHovered = false;
+    let frameId: number;
 
     const onMouseMove = (e: MouseEvent) => {
-      xTo(e.clientX);
-      yTo(e.clientY);
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    };
+
+    const updatePosition = () => {
+      currentX = mouseX;
+      currentY = mouseY;
+      if (el) {
+        // Compute both scale and translation together to prevent rendering conflicts (jitters)
+        const scaleVal = isHovered ? 1.15 : 1;
+        el.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) scale(${scaleVal})`;
+      }
+      frameId = requestAnimationFrame(updatePosition);
     };
 
     window.addEventListener('mousemove', onMouseMove);
-
-    gsap.set(cursorRef.current, { 
-      xPercent: -50, 
-      yPercent: -50,
-      width: 24,
-      height: 24,
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      pointerEvents: 'none',
-      zIndex: 9999,
-      mixBlendMode: 'difference',
-      color: '#ffffff'
-    });
+    frameId = requestAnimationFrame(updatePosition);
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      if (!target) return;
+      
       const isInteractive = 
         target.tagName.toLowerCase() === 'a' || 
         target.tagName.toLowerCase() === 'button' || 
         target.tagName.toLowerCase() === 'input' || 
         target.tagName.toLowerCase() === 'textarea' || 
         target.closest('a') ||
-        target.closest('button');
+        target.closest('button') ||
+        target.classList.contains('cursor-pointer') ||
+        target.closest('.cursor-pointer');
 
-      if (isInteractive) {
-        gsap.to(cursorRef.current, { scale: 1.5, duration: 0.2, ease: "back.out(1.7)" });
-      } else {
-        gsap.to(cursorRef.current, { scale: 1, duration: 0.2, ease: "back.out(1.7)" });
-      }
+      isHovered = !!isInteractive;
     };
 
     window.addEventListener('mouseover', handleMouseOver);
@@ -51,6 +53,7 @@ export const useCustomCursor = (cursorRef: React.RefObject<HTMLDivElement>) => {
     return () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseover', handleMouseOver);
+      cancelAnimationFrame(frameId);
     };
   }, [cursorRef]);
 

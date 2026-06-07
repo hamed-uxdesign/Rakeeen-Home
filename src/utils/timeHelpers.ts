@@ -10,7 +10,34 @@ export function addMinutes(timeStr: string, mins: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
+export function getLogicalDate(): Date {
+  const now = new Date();
+  const nextSleepStr = localStorage.getItem('system_next_sleep_time');
+  if (nextSleepStr) {
+    try {
+      const nextSleep = new Date(nextSleepStr);
+      if (!isNaN(nextSleep.getTime())) {
+        const resetTime = new Date(nextSleep.getTime() - 3 * 60 * 60 * 1000);
+        if (now < resetTime) {
+          const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          return logical;
+        }
+        return now;
+      }
+    } catch (e) {
+      console.error('Error parsing next sleep time', e);
+    }
+  }
+
+  // Fallback to 2:00 AM reset
+  if (now.getHours() < 2) {
+    const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return logical;
+  }
+  return now;
+}
+
 export function getTodayIdx(): number {
-  const day = new Date().getDay();
+  const day = getLogicalDate().getDay();
   return day === 0 ? 6 : day - 1;
 }

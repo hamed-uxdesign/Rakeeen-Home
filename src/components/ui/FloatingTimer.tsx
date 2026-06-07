@@ -13,14 +13,10 @@ interface FloatingTimerProps {
 export const FloatingTimer: React.FC<FloatingTimerProps> = ({ onNavigate }) => {
   const { running, isOvertime, mode, timeLeft, overtime, focusDuration, breakDuration } = usePomodoro();
   const location = useLocation();
-  const isOnPomodoro = location.pathname.includes('pomodoro');
 
-  // Don't show if not running or if already on pomodoro page
-  if ((!running && !isOvertime) || isOnPomodoro) return null;
-
+  // ── All hooks MUST be called before any early returns (Rules of Hooks) ──
   const [phase, setPhase] = React.useState(0);
 
-  // Wave animation for the mini widget
   React.useEffect(() => {
     let animId: number;
     const animate = () => {
@@ -31,12 +27,21 @@ export const FloatingTimer: React.FC<FloatingTimerProps> = ({ onNavigate }) => {
     return () => cancelAnimationFrame(animId);
   }, [running, isOvertime]);
 
+  // Derived values (safe to compute before early return)
+  const isOnPomodoro = location.pathname.includes('pomodoro');
   const displayTime = isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft);
   const color = isOvertime ? 'text-rust' : (mode === 'focus' ? 'text-forest' : 'text-sepia');
-  
   const total = mode === 'focus' ? focusDuration * 60 : breakDuration * 60;
   const pct = isOvertime ? 100 : Math.max(0, ((total - timeLeft) / total) * 100);
   const waves = mode === 'focus' ? focusDuration : breakDuration;
+
+  const isOnHome = location.pathname === '/' || location.pathname === '' || location.pathname.endsWith('Rakeeen-Home') || location.pathname.endsWith('Rakeeen-Home/');
+  
+  // Don't render if timer not active or already on pomodoro page
+  if ((!running && !isOvertime) || isOnPomodoro) return null;
+
+  // If we are on the Home page, we also hide the bottom corner floating widget (as requested: "وتتحط شكل الدايره بتاعة البومدورو [جوة كارت الهوم] وبالتالي تتشال من الجمب من تحت [أثناء وجودنا في الهوم]")
+  if (isOnHome) return null;
 
   return (
     <button
@@ -54,8 +59,7 @@ export const FloatingTimer: React.FC<FloatingTimerProps> = ({ onNavigate }) => {
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <motion.span
             className={`text-2xl font-black transition-colors duration-500 tabular-nums leading-none ${color}`}
-            animate={{ scale: running ? [1, 1.05, 1] : 1 }}
-            transition={{ repeat: Infinity, duration: 3 }}
+            animate={{ scale: 1 }}
           >
             {displayTime}
           </motion.span>

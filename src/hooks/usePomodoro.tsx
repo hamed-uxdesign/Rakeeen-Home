@@ -31,10 +31,9 @@ interface PomodoroContextType {
 const PomodoroContext = createContext<PomodoroContextType | null>(null);
 
 export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [focusDuration, setFocusDurationState] = useState(25); // minutes
-  const [breakDuration, setBreakDurationState] = useState(5);  // minutes
+  const [focusDuration] = useState(25); // minutes (enforced 25m default)
+  const [breakDuration, setBreakDurationState] = useState(5);  // minutes (initially 5m)
   const FOCUS = focusDuration * 60;
-  const BREAK = breakDuration * 60;
   const [timeLeft, setTimeLeft] = useState(FOCUS);
   const [running, setRunning] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
@@ -49,16 +48,11 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const timerRef = useRef<any>(null);
 
   const setFocusDuration = useCallback((m: number) => {
-    setFocusDurationState(m);
-    setTimeLeft(m * 60);
-    setRunning(false);
-    setIsOvertime(false);
-    setOvertime(0);
-    setMode('focus');
+    // Hardcoded default 25 minutes, ignoring changes
   }, []);
 
   const setBreakDuration = useCallback((m: number) => {
-    setBreakDurationState(m);
+    // Dynamic calculations done automatically, ignoring manual set
   }, []);
 
 
@@ -183,6 +177,13 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const startBreak = useCallback(() => {
     const focusGained = focusDuration + Math.floor(overtime / 60);
+    
+    // Dynamic break calculation: exactly 20% of total focus session duration (focusDuration + overtime)
+    // 25 minutes => 5 minutes break
+    // 50 minutes => 10 minutes break
+    const calculatedBreakMins = Math.max(1, Math.round(focusGained * 0.2));
+    setBreakDurationState(calculatedBreakMins);
+
     setSessions(s => s + 1);
     const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     setLogs(l => [{ time: nowTime, duration: focusGained }, ...l]);
@@ -199,9 +200,9 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setMode('break');
     setIsOvertime(false);
     setOvertime(0);
-    setTimeLeft(BREAK);
+    setTimeLeft(calculatedBreakMins * 60);
     setRunning(true);
-  }, [overtime, weekStats, todayIdx, setWeekStats, BREAK, focusDuration, sendDiscordNotification]);
+  }, [overtime, weekStats, todayIdx, setWeekStats, focusDuration, sendDiscordNotification]);
 
   const startNewSession = useCallback(() => {
     setMode('focus');
@@ -222,24 +223,31 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const saveProgress = useCallback(() => {
     if (mode !== 'focus') return;
     
-    // Calculate spent minutes
-    const spentMins = Math.floor((focusDuration * 60 - timeLeft + overtime) / 60);
+    const focusGained = Math.max(1, Math.floor((focusDuration * 60 - timeLeft + overtime) / 60));
     
-    if (spentMins > 0) {
-      setSessions(s => s + 1);
-      const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-      setLogs(l => [{ time: now, duration: spentMins }, ...l]);
-      
-      const currentWeekStats = Array.isArray(weekStats) && weekStats.length === 7 ? weekStats : POMODORO_WEEKLY_MOCK;
-      const updated = currentWeekStats.map((d: any, i: number) => 
-        i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + spentMins } : d
-      );
-      setWeekStats(updated);
-      sendDiscordNotification('focus_complete', { duration: spentMins, overtime: 0 });
-    }
+    // Dynamic break calculation: exactly 20% of total focus session duration (focusDuration + overtime)
+    const calculatedBreakMins = Math.max(1, Math.round(focusGained * 0.2));
+    setBreakDurationState(calculatedBreakMins);
+
+    setSessions(s => s + 1);
+    const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    setLogs(l => [{ time: nowTime, duration: focusGained }, ...l]);
     
-    reset();
-  }, [mode, focusDuration, timeLeft, overtime, weekStats, todayIdx, setWeekStats, sendDiscordNotification, reset, setLogs]);
+    // Send Discord Report with full time (Base + Overtime)
+    sendDiscordNotification('focus_complete', { duration: focusDuration, overtime });
+
+    const currentWeekStats = Array.isArray(weekStats) && weekStats.length === 7 ? weekStats : POMODORO_WEEKLY_MOCK;
+    const updated = currentWeekStats.map((d: any, i: number) => 
+      i === todayIdx ? { ...d, sessions: d.sessions + 1, minutes: (d.minutes || 0) + focusGained } : d
+    );
+    setWeekStats(updated);
+
+    setMode('break');
+    setIsOvertime(false);
+    setOvertime(0);
+    setTimeLeft(calculatedBreakMins * 60);
+    setRunning(true);
+  }, [mode, focusDuration, timeLeft, overtime, weekStats, todayIdx, setWeekStats, sendDiscordNotification, setLogs]);
 
   return (
     <PomodoroContext.Provider value={{

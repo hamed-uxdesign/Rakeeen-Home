@@ -1,193 +1,276 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@200,300,400,500,600,700,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap');
 @import "tailwindcss";
 
+/* === خط ثمانية (Thmanyah Font) === */
+@font-face {
+  font-family: "Thmanyah";
+  src: url("https://framerusercontent.com/assets/x6EBzvXf1Fi35XhsRoHxePDVo.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah";
+  src: url("https://framerusercontent.com/assets/Lh8puxCFq405qBv7dKpg9NsHZNk.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah";
+  src: url("https://framerusercontent.com/assets/oE98mOPE28KTzUeptOLRIaqW1I.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah";
+  src: url("https://framerusercontent.com/assets/LZvgFRUsP7pGWYj3tKxMUrKuhSY.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Thmanyah";
+  src: url("https://framerusercontent.com/assets/ulQLGTktcl2Qq4AmD6RuVgELZKg.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-sketch: "Playfair Display", Georgia, serif;
-  --font-arabic: "SF Pro Arabic Rounded", "SF Pro Rounded", ui-rounded, system-ui, -apple-system, sans-serif;
+  --font-sans: "General Sans Variable", "Inter", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+  --font-arabic: "Thmanyah", "General Sans Variable", sans-serif;
 
-  /* Rakeeen Palette - Derived from original but structured like Hamid's system */
-  --paper: #0a0908;
-  --paper-dark: #0e0d0c;
-  --ink: #e9e2d2;
-  --ink-faded: #a59e92;
-  --ink-light: #7c7265;
-  --sepia: #d1b16c;
-  --rust: #d97858;
-  --forest: #7ca87c;
-  --cream: #12100e;
-  
-  --color-background: var(--paper);
-  --color-surface: var(--paper-dark);
-  --color-primary: var(--ink);
-  --color-gold: var(--sepia);
-
-  --radius-organic: 255px 15px 225px 15px / 15px 225px 15px 255px;
-  --radius-btn: 180px 8px 160px 8px / 8px 160px 8px 180px;
+  /* Signature Rakeeen Lime Palette */
+  --lime-bg: #E7E8E1;
+  --lime-50: #FBFDE8;
+  --lime-100: #F4F9CE;
+  --lime-200: #E9F4A2;
+  --lime-300: #D7EA6C;
+  --lime-400: #C2DC3F;
+  --lime-500: #A5C220;
+  --lime-600: #809B15;
+  --lime-700: #617615;
+  --lime-800: #4E5E16;
+  --lime-900: #425017;
+  --lime-950: #222C07;
 }
 
 @layer base {
   :root {
-    /* Legacy variables for compatibility with existing components */
-    --bg: var(--paper);
-    --surface: var(--paper-dark);
-    --surface2: var(--cream);
-    --border: rgba(195,163,112,0.18);
-    --border-mid: rgba(195,163,112,0.35);
-    --gold: var(--sepia);
-    --text: var(--ink);
-    --text-mid: var(--ink-faded);
-    --text-dim: var(--ink-light);
-    --serif: var(--font-sketch);
-    --sans: var(--font-sans);
+    --bg: #E7E8E1;
+    --paper: #E7E8E1;
+    --paper-dark: #ffffff;
+    --ink: #222C07;
+    --ink-faded: #4E5E16;
+    --sepia: #C2DC3F;
+    --rust: #809B15;
+    --forest: #617615;
+    --brand-green: #617615;
+    --ghorab-color: #617615;
+  }
+
+  body.dark-theme {
+    --bg: #0D0D0D;
+    --paper: #0D0D0D;
+    --paper-dark: #000000;
+    --ink: #E7E8E1;
+    --ink-faded: #A5C220;
+    --sepia: #C2DC3F;
+    --rust: #617615;
+    --forest: #D7EA6C;
+    --brand-green: #D7EA6C;
+    --ghorab-color: #617615;
   }
 
   body {
     background: var(--paper);
     color: var(--ink);
     font-family: var(--font-sans);
-    @apply antialiased;
-    background-image: radial-gradient(rgba(233, 226, 210, 0.03) 1.5px, transparent 1.5px);
-    background-size: 24px 24px;
     min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    cursor: none !important;
   }
 
-  @media (min-width: 769px) and (hover: hover) {
-    *, a, button, input, textarea, select {
-      cursor: none !important;
-    }
+  html, a, button, input, textarea, select, [role="button"], a *, button *, [role="button"] *, *:hover {
+    cursor: none !important;
   }
 
-  /* Hide Chrome, Safari, Edge, Opera number arrows */
-  input::-webkit-outer-spin-button,
-  input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-
-  /* Hide Firefox number arrows */
-  input[type=number] {
-    -moz-appearance: textfield;
-  }
-
-  select {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-  }
-
-  i, em, .italic {
-    font-family: var(--font-sketch);
-    font-style: italic;
-  }
-
+  /* === TEXT SELECTION (brand highlight) === */
   ::selection {
     background: var(--sepia);
-    color: var(--paper);
+    color: var(--ink);
+  }
+  ::-moz-selection {
+    background: var(--sepia);
+    color: var(--ink);
+  }
+
+  /* === REMOVE NUMBER INPUT SPINNERS === */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  /* === REMOVE NATIVE SELECT ARROW === */
+  select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+
+  /* === REMOVE NATIVE FOCUS OUTLINE === */
+  *:focus {
+    outline: none;
+  }
+  *:focus-visible {
+    outline: 1px solid var(--sepia);
+    outline-offset: 2px;
+  }
+
+  /* === REMOVE AUTOFILL BLUE BACKGROUND === */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0px 1000px var(--paper-dark) inset !important;
+    -webkit-text-fill-color: var(--ink) !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  /* === CUSTOM SCROLLBAR (branded) === */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--ink);
+    opacity: 0.3;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--sepia);
+  }
+
+  /* === REMOVE NATIVE CHECKBOX / RADIO === */
+  input[type="checkbox"],
+  input[type="radio"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+
+  /* === REMOVE SEARCH INPUT CLEAR BUTTON === */
+  input[type="search"]::-webkit-search-cancel-button,
+  input[type="search"]::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  /* === REMOVE DATE/TIME NATIVE PICKER ICONS === */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    display: none;
+    -webkit-appearance: none;
   }
 }
 
 @layer utilities {
-  .sketch-font { font-family: var(--font-sketch); }
-  .font-arabic { font-family: var(--font-arabic); }
+  .font-sans-main  { font-family: var(--font-sans), sans-serif; }
+  .font-mono-main  { font-family: var(--font-mono), monospace; }
+  .font-arabic-main { font-family: var(--font-arabic), sans-serif; }
 
-  .hand-card {
-    background: var(--paper-dark);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-organic);
-    position: relative;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  /* Auto-apply Thmanyah to any Arabic text */
+  :lang(ar), [dir="rtl"] {
+    font-family: var(--font-arabic), sans-serif;
   }
 
-  .sketchy-border {
-    border: 2px solid var(--ink);
-    border-radius: var(--radius-btn);
-    background: var(--paper-dark);
-    box-shadow: 2px 2px 0px 0px rgba(232, 224, 208, 0.1);
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  .sketchy-border:hover {
-    box-shadow: 6px 6px 0px 0px var(--ink);
-    transform: translate(-3px, -3px);
-  }
-
-  .animate-scale-in {
-    animation: scaleInWithShadow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  }
-
-  /* Core Design System Component for all boxes/containers */
-  .sys-card {
-    background-color: var(--paper-dark);
-    border-radius: var(--radius-organic); /* Keep the warped shape */
-    overflow: visible;
-    border: none; /* Remove the white border line */
-  }
-
-  @keyframes scaleInWithShadow {
-    from {
-      opacity: 0;
-      transform: scale(0.9) translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-      /* Removed thick shadow as requested */
-    }
-  }
-
-  /* Premium Buttons (Rakeeen specific style but with Hamid's tech) */
-  .btn-premium {
-    @apply inline-flex items-center justify-center gap-3 px-8 py-4;
-    border: 2px solid var(--ink);
-    border-radius: 0px; /* SHARP CORNERS */
-    background: var(--paper-dark);
+  /* Premium Brutalist Button */
+  .btn-brutalist {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono), monospace;
+    font-weight: 400;
+    text-transform: uppercase;
     transition: all 0.2s ease;
-    color: var(--ink);
-    font-size: 17px;
-    font-weight: 500;
+    background: var(--sepia);
+    color: #222C07 !important;
+    border: 1px solid var(--ink);
+    border-radius: 0px;
+    padding: 0.6rem 1.5rem;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
     cursor: pointer;
-    text-decoration: none;
     outline: none;
+  }
+  .btn-brutalist:hover {
+    background: var(--lime-300);
+    transform: none;
+    box-shadow: none;
+  }
+  .btn-brutalist:active {
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* Dark mode button override */
+  body.dark-theme .btn-brutalist {
+    background: #617615;
+    color: #E7E8E1 !important;
+    border-color: #617615;
+  }
+  body.dark-theme .btn-brutalist:hover {
+    background: #4E5E16;
+    border-color: #4E5E16;
+  }
+
+  /* Premium Flat Brutalist Card */
+  .brutalist-card {
+    background: var(--paper-dark);
+    border: 1px solid var(--ink);
+    border-radius: 0px;
+    padding: 2rem;
     position: relative;
-    z-index: 1;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .brutalist-card:hover:not(.no-lift) {
+    transform: translate(-4px, -4px);
+    box-shadow: 6px 6px 0px 0px var(--ink);
   }
 
-  .btn-premium:hover {
-    background: var(--forest);
-    border-color: var(--forest);
-    color: var(--paper);
+  .brutalist-dashed-card {
+    background: var(--paper-dark);
+    border: 1px dashed var(--ink);
+    border-radius: 0px;
+    padding: 2.5rem;
+    position: relative;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
   }
-
-  .btn-premium:active {
-    transform: translate(0, 0);
-    box-shadow: 2px 2px 0px 0px var(--ink);
-    transition: all 0.1s ease;
-  }
-
-  .sketchy-btn {
-    @apply inline-flex items-center justify-center px-6 py-2 transition-all duration-200;
-    font-weight: 700;
-    background: transparent;
-    border: 2px solid var(--ink);
-    border-radius: var(--radius-btn);
-    color: var(--ink);
-    cursor: pointer;
-  }
-
-  .sketchy-btn:hover {
-    background: var(--ink);
-    color: var(--paper);
-  }
-
-  .sketchy-btn.filled {
-    background: var(--forest);
-    color: var(--paper);
-    border-color: var(--forest);
-  }
-
-  .sketchy-btn.filled:hover {
-    background: var(--ink);
-    border-color: var(--ink);
+  .brutalist-dashed-card:hover:not(.no-lift) {
+    transform: translate(-3px, -3px);
+    box-shadow: 6px 6px 0px 0px var(--ink);
   }
 }
+
+@keyframes pulseWave {
+  0% {
+    height: 20%;
+  }
+  100% {
+    height: 100%;
+  }
+}
+
