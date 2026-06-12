@@ -1,6 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+
+const DotMatrixVector: React.FC<{ shapeIndex: number; isActive: boolean }> = ({ shapeIndex, isActive }) => {
+  const colorClass = isActive ? 'text-forest font-bold' : 'text-ink/20';
+  
+  if (shapeIndex === 0) {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" className={colorClass} fill="currentColor">
+        <circle cx="12" cy="4" r="1.2" />
+        <circle cx="9" cy="7" r="1.2" />
+        <circle cx="15" cy="7" r="1.2" />
+        <circle cx="6" cy="10" r="1.2" />
+        <circle cx="18" cy="10" r="1.2" />
+        <circle cx="3" cy="13" r="1.2" />
+        <circle cx="21" cy="13" r="1.2" />
+        <circle cx="6" cy="16" r="1.2" />
+        <circle cx="18" cy="16" r="1.2" />
+        <circle cx="9" cy="19" r="1.2" />
+        <circle cx="15" cy="19" r="1.2" />
+        <circle cx="12" cy="22" r="1.2" />
+        <circle cx="12" cy="13" r="1.5" />
+      </svg>
+    );
+  }
+  if (shapeIndex === 1) {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" className={colorClass} fill="currentColor">
+        <circle cx="6" cy="4" r="1.2" /><circle cx="9" cy="4" r="1.2" /><circle cx="12" cy="4" r="1.2" /><circle cx="15" cy="4" r="1.2" /><circle cx="18" cy="4" r="1.2" />
+        <circle cx="8" cy="7" r="1.2" /><circle cx="16" cy="7" r="1.2" />
+        <circle cx="10" cy="10" r="1.2" /><circle cx="14" cy="10" r="1.2" />
+        <circle cx="12" cy="12" r="1.5" />
+        <circle cx="10" cy="14" r="1.2" /><circle cx="14" cy="14" r="1.2" />
+        <circle cx="8" cy="17" r="1.2" /><circle cx="16" cy="17" r="1.2" />
+        <circle cx="6" cy="20" r="1.2" /><circle cx="9" cy="20" r="1.2" /><circle cx="12" cy="20" r="1.2" /><circle cx="15" cy="20" r="1.2" /><circle cx="18" cy="20" r="1.2" />
+      </svg>
+    );
+  }
+  if (shapeIndex === 2) {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" className={colorClass} fill="currentColor">
+        <circle cx="6" cy="6" r="1.2" /><circle cx="9" cy="6" r="1.2" /><circle cx="12" cy="6" r="1.2" /><circle cx="15" cy="6" r="1.2" /><circle cx="18" cy="6" r="1.2" />
+        <circle cx="6" cy="9" r="1.2" /><circle cx="18" cy="9" r="1.2" />
+        <circle cx="6" cy="12" r="1.2" /><circle cx="18" cy="12" r="1.2" />
+        <circle cx="6" cy="15" r="1.2" /><circle cx="18" cy="15" r="1.2" />
+        <circle cx="6" cy="18" r="1.2" /><circle cx="9" cy="18" r="1.2" /><circle cx="12" cy="18" r="1.2" /><circle cx="15" cy="18" r="1.2" /><circle cx="18" cy="18" r="1.2" />
+      </svg>
+    );
+  }
+  if (shapeIndex === 3) {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" className={colorClass} fill="currentColor">
+        <circle cx="12" cy="4" r="1.2" />
+        <circle cx="17.66" cy="6.34" r="1.2" />
+        <circle cx="20" cy="12" r="1.2" />
+        <circle cx="17.66" cy="17.66" r="1.2" />
+        <circle cx="12" cy="20" r="1.2" />
+        <circle cx="6.34" cy="17.66" r="1.2" />
+        <circle cx="4" cy="12" r="1.2" />
+        <circle cx="6.34" cy="6.34" r="1.2" />
+        <circle cx="12" cy="12" r="1.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" className={colorClass} fill="currentColor">
+      <circle cx="12" cy="4" r="1.2" /><circle cx="12" cy="8" r="1.2" /><circle cx="12" cy="16" r="1.2" /><circle cx="12" cy="20" r="1.2" />
+      <circle cx="4" cy="12" r="1.2" /><circle cx="8" cy="12" r="1.2" /><circle cx="16" cy="12" r="1.2" /><circle cx="20" cy="12" r="1.2" />
+      <circle cx="12" cy="12" r="1.5" />
+    </svg>
+  );
+};
 
 interface CalendarProps {
   navigate: (to: string) => void;
@@ -66,11 +136,12 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
     const fetchICS = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(ICAL_URL)}`);
+        const cacheBustedUrl = `${ICAL_URL}?t=${Date.now()}`;
+        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(cacheBustedUrl)}`);
         const text = await res.text();
         const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
         const lines = unfoldedText.split(/\r?\n/);
-        const tempEvents: CalEvent[] = [];
+        const tempEvents: (CalEvent & { uid?: string, recurrenceId?: string, isRecurringInstance?: boolean })[] = [];
         let curr: any = { rrule: '' };
         
         const now = new Date();
@@ -94,7 +165,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                 const durationMs = baseEnd.getTime() - baseStart.getTime();
                 const untilDate = curr.rrule && curr.rrule.includes('UNTIL=') ? parseICalDate(curr.rrule.match(/UNTIL=([^;]+)/)?.[1] || '') : null;
 
-                const checkAndAdd = (instStart: Date) => {
+                const checkAndAdd = (instStart: Date, isRecurringInstance?: boolean) => {
                   if (untilDate && instStart.getTime() > untilDate.getTime()) return;
                   const instEnd = new Date(instStart.getTime() + durationMs);
                   const durationMins = Math.floor(durationMs / 60000);
@@ -105,7 +176,10 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                     startDate: instStart, 
                     endDate: instEnd, 
                     durationMins, 
-                    timeStr 
+                    timeStr,
+                    uid: curr.uid,
+                    recurrenceId: curr.recurrenceId,
+                    isRecurringInstance
                   });
                 };
 
@@ -115,7 +189,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                   for (let d = new Date(startLimit); d <= endLimit; d.setDate(d.getDate() + 1)) {
                     const inst = new Date(d);
                     inst.setHours(baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds());
-                    checkAndAdd(inst);
+                    checkAndAdd(inst, true);
                   }
                 } else if (curr.rrule && curr.rrule.includes('FREQ=WEEKLY')) {
                   const startLimit = new Date(Math.max(baseStart.getTime(), startOfWindow.getTime()));
@@ -127,12 +201,12 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                     if (byDay.includes(days[d.getDay()])) {
                       const inst = new Date(d);
                       inst.setHours(baseStart.getHours(), baseStart.getMinutes(), baseStart.getSeconds());
-                      checkAndAdd(inst);
+                      checkAndAdd(inst, true);
                     }
                   }
                 } else {
                   if (baseStart.getTime() >= startOfWindow.getTime() && baseStart.getTime() <= endOfWindow.getTime()) {
-                    checkAndAdd(baseStart);
+                    checkAndAdd(baseStart, false);
                   }
                 }
               }
@@ -143,9 +217,29 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
           else if (line.startsWith('DTSTART')) curr.dtstart = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
           else if (line.startsWith('DTEND')) curr.dtend = line.split(':')[1] || line.split(';')[1]?.split(':')[1];
           else if (line.startsWith('RRULE:')) curr.rrule = line;
+          else if (line.startsWith('UID')) curr.uid = line.substring(line.indexOf(':') + 1).trim();
+          else if (line.startsWith('RECURRENCE-ID')) {
+            curr.recurrenceId = line.substring(line.indexOf(':') + 1).trim();
+          }
         }
 
-        const unique = tempEvents.filter((v, i, a) => a.findIndex(t => t.title === v.title && t.startDate.getTime() === v.startDate.getTime()) === i);
+        // Filter out overridden base recurring instances
+        const finalEvents: CalEvent[] = [];
+        for (const e of tempEvents) {
+          if (e.isRecurringInstance && e.uid) {
+            const isOverridden = tempEvents.some(other => {
+              if (other.uid !== e.uid || !other.recurrenceId) return false;
+              const overrideTime = parseICalDate(other.recurrenceId)?.getTime();
+              return overrideTime !== undefined && Math.abs(overrideTime - e.startDate.getTime()) < 60000;
+            });
+            if (isOverridden) {
+              continue; // Skip this recurring instance as it was overridden/modified
+            }
+          }
+          finalEvents.push(e);
+        }
+
+        const unique = finalEvents.filter((v, i, a) => a.findIndex(t => t.title === v.title && t.startDate.getTime() === v.startDate.getTime()) === i);
         unique.sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
         setEvents(unique);
       } catch (err) {
@@ -181,6 +275,15 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
     setSelectedDate(next);
   };
 
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (gridContainerRef.current) {
+      const currentHour = new Date().getHours();
+      gridContainerRef.current.scrollTop = Math.max(0, currentHour * 50 - 150);
+    }
+  }, [selectedDate]);
+
   const getDaysStrip = () => {
     const strip = [];
     for (let i = -3; i <= 3; i++) {
@@ -195,12 +298,19 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
   const todayStr = new Date().toDateString();
 
   const dayEvents = events.filter(e => {
-    const startsOnDay = e.startDate.toDateString() === selectedDateStr;
-    const endsOnDay = e.endDate.toDateString() === selectedDateStr;
-    const dayStart = new Date(selectedDate); dayStart.setHours(0,0,0,0);
-    const dayEnd = new Date(selectedDate); dayEnd.setHours(23,59,59,999);
-    const spansDay = e.startDate.getTime() < dayStart.getTime() && e.endDate.getTime() > dayEnd.getTime();
-    return startsOnDay || endsOnDay || spansDay;
+    const start = new Date(e.startDate);
+    const end = new Date(e.endDate);
+    
+    const dayStart = new Date(selectedDate);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(selectedDate);
+    dayEnd.setHours(23, 59, 59, 999);
+    
+    // For events ending at exactly 12:00 AM local time, treat end date as exclusive (subtract 1 second)
+    const endsAtMidnight = end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0 && end.getMilliseconds() === 0;
+    const adjEnd = endsAtMidnight ? new Date(end.getTime() - 1000) : end;
+    
+    return start.getTime() <= dayEnd.getTime() && adjEnd.getTime() >= dayStart.getTime();
   });
 
   return (
@@ -232,7 +342,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
       <main className="w-full max-w-[1000px] mx-auto flex flex-col gap-6">
 
         {/* DATE NAVIGATION STRIP */}
-        <div className="brutalist-card no-lift p-4 flex flex-col gap-4">
+        <div className="brutalist-card no-lift p-4">
           <div className="flex justify-between items-center">
             <button 
               onClick={() => adjustDate(-1)}
@@ -263,41 +373,8 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
               onClick={() => adjustDate(1)}
               className="w-10 h-10 border border-ink flex items-center justify-center hover:bg-ink/5 transition-colors cursor-pointer"
             >
-              <ChevronRight size={18} />
+              <ArrowRight size={18} />
             </button>
-          </div>
-
-          {/* 7-Day Quick Strip */}
-          <div className="grid grid-cols-7 gap-1 sm:gap-2 border-t border-ink/10 pt-4">
-            {getDaysStrip().map((date, idx) => {
-              const isSel = date.toDateString() === selectedDateStr;
-              const isToday = date.toDateString() === todayStr;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    const d = new Date(date);
-                    d.setHours(0,0,0,0);
-                    setSelectedDate(d);
-                  }}
-                  className={`py-3 flex flex-col items-center justify-center border transition-all cursor-pointer ${
-                    isSel 
-                      ? 'border-ink bg-[var(--ink)] text-[var(--paper)]' 
-                      : isToday 
-                        ? 'border-forest text-forest bg-forest/5' 
-                        : 'border-ink/15 hover:border-ink/50 bg-[var(--paper-dark)] text-ink/60'
-                  }`}
-                  style={{ borderRadius: 0 }}
-                >
-                  <span className="font-mono-main text-[9px] font-bold uppercase tracking-wider mb-1">
-                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                  </span>
-                  <span className="font-sans-main text-lg font-black leading-none">
-                    {date.getDate()}
-                  </span>
-                </button>
-              );
-            })}
           </div>
         </div>
 
@@ -329,44 +406,80 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
           </motion.div>
         )}
 
-        {/* AGENDA SECTION */}
+        {/* DAILY AGENDA LIST */}
         <div className="flex flex-col gap-4">
           <h2 className="font-mono-main text-[10px] uppercase font-black tracking-[0.3em] text-ink/20">
             {selectedDateStr === todayStr ? "Today's Agenda" : "Day's Agenda"}
           </h2>
           
-          <motion.div
-            key={selectedDateStr}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-            className="flex flex-col gap-4"
-          >
-            {loading ? (
-              <div className="py-12 text-center text-ink/20 font-black uppercase tracking-widest text-sm animate-pulse">Syncing Cloud Calendar...</div>
-            ) : dayEvents.length === 0 ? (
-              <div className="brutalist-dashed-card no-lift py-12 text-center text-ink/20 font-black uppercase tracking-widest text-sm">Not Busy</div>
-            ) : dayEvents.map((task) => {
-              const isActive = selectedDateStr === todayStr && activeEvent?.id === task.id;
-              return (
-                <div 
-                  key={task.id} 
-                  className={`p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${isActive ? 'border-l-4 border-l-forest bg-forest/5' : 'bg-paper-dark'}`}
-                >
-                   <div className="flex items-center gap-4">
-                     <div className="flex flex-col">
-                        <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isActive ? 'text-forest' : 'text-ink/30'}`}>{task.timeStr}</div>
-                        <div className="text-xl sm:text-2xl font-black text-ink tracking-tighter">{task.title}</div>
-                     </div>
-                   </div>
-                   <div className="text-left sm:text-right mt-3 sm:mt-0">
-                      <div className="text-[9px] font-black text-ink/20 uppercase tracking-widest mb-1">Duration</div>
-                      <div className="text-lg font-black text-ink/60 tabular-nums">{formatDuration(task.durationMins)}</div>
-                   </div>
-                </div>
-              );
-            })}
-          </motion.div>
+          {loading ? (
+            <div className="py-12 text-center text-ink/20 font-black uppercase tracking-widest text-sm animate-pulse brutalist-card no-lift bg-[var(--paper-dark)]">
+              Syncing Cloud Calendar...
+            </div>
+          ) : dayEvents.length === 0 ? (
+            <div className="brutalist-dashed-card no-lift py-12 text-center text-ink/20 font-black uppercase tracking-widest text-xs">
+              No events scheduled for this day
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {dayEvents.map((task, index) => {
+                const isActive = selectedDateStr === todayStr && activeEvent?.id === task.id;
+                const shapeIndex = index % 5;
+                
+                // Get clean time range string
+                const startStr = task.startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                const endStr = task.endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                const timeRange = `${startStr} – ${endStr}`;
+
+                return (
+                  <div key={task.id} className="flex items-center gap-4 w-full">
+                    {/* Outer Dot Matrix Vector shape on the left */}
+                    <div 
+                      className={`flex-shrink-0 flex items-center justify-center w-8 h-8 transition-all duration-500 ${
+                        isActive ? 'animate-spin' : ''
+                      }`}
+                      style={isActive ? { animationDuration: '6s' } : undefined}
+                    >
+                      <DotMatrixVector shapeIndex={shapeIndex} isActive={isActive} />
+                    </div>
+
+                    {/* Event Card */}
+                    <div 
+                      className={`flex-1 p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${
+                        isActive 
+                          ? 'bg-[var(--paper-dark)] border-ink text-ink' 
+                          : 'bg-paper-dark calendar-card-inactive text-ink'
+                      }`}
+                    >
+                      <div className="flex-1 w-full">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className={`font-mono-main text-[9px] font-bold uppercase tracking-wider ${isActive ? 'text-forest' : 'text-ink/40'}`}>
+                            {timeRange}
+                          </span>
+                          {isActive && (
+                            <span className="font-mono-main text-[8px] font-black bg-forest/10 text-forest px-1.5 py-0.5 uppercase tracking-wider">
+                              Active Now
+                            </span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <h3 className={`text-xl sm:text-2xl font-black tracking-tighter leading-tight text-ink`}>
+                            {task.title}
+                          </h3>
+                        </div>
+                      </div>
+                      
+                      <div className="text-left sm:text-right mt-3 sm:mt-0 flex-shrink-0">
+                        <div className="text-[9px] font-black uppercase tracking-widest mb-0.5 text-ink/20">Duration</div>
+                        <div className="text-sm font-mono-main font-bold text-ink/60">{formatDuration(task.durationMins)}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
       </main>

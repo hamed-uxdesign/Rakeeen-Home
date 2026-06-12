@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { WavyRing } from './Pomodoro';
 import { usePrayer } from '../../hooks/usePrayer';
 import { quranRadioManager } from '../../utils/quranRadioManager';
+import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 
 interface PrayerProps {
   navigate: (to: string) => void;
@@ -13,21 +14,57 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
   const [phase, setPhase] = useState(0);
   const [now, setNow] = useState(new Date());
   
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlaying] = useFirebaseSync<boolean>('quran_radio_playing', false);
   const [volume, setVolume] = useState(() => quranRadioManager.getVolume());
 
-  useEffect(() => {
-    const unsubscribe = quranRadioManager.subscribe((playing) => {
-      setIsPlaying(playing);
+  const getCurrentPrayerName = () => {
+    if (!times || Object.keys(times).length === 0) return '';
+    const prayerNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    
+    const prayerTimes = prayerNames.map(name => {
+      const timeStr = times[name];
+      if (!timeStr) return { name, date: new Date(0) };
+      const [h, m] = timeStr.split(':').map(Number);
+      const pDate = new Date(now);
+      pDate.setHours(h, m, 0, 0);
+      return { name, date: pDate };
     });
-    return () => unsubscribe();
+    
+    prayerTimes.sort((a, b) => a.date.getTime() - b.date.getTime());
+    
+    let current = 'Isha';
+    for (const p of prayerTimes) {
+      if (now >= p.date) {
+        current = p.name;
+      }
+    }
+    return current;
+  };
+
+  const currentPrayerName = getCurrentPrayerName();
+
+  // Listen to quranRadioManager events to update local volume
+  useEffect(() => {
+    // Volume initialized from manager
   }, []);
 
-  const togglePlay = () => {
-    if (isPlaying) {
-      quranRadioManager.pause();
-    } else {
+  // Sync actual HTMLAudioElement playback with Firebase isPlaying state
+  useEffect(() => {
+    const managerPlaying = quranRadioManager.isPlaying();
+    if (isPlaying && !managerPlaying) {
       quranRadioManager.play();
+    } else if (!isPlaying && managerPlaying) {
+      quranRadioManager.pause();
+    }
+  }, [isPlaying]);
+
+  const togglePlay = () => {
+    const nextState = !isPlaying;
+    setIsPlaying(nextState);
+    if (nextState) {
+      quranRadioManager.play();
+    } else {
+      quranRadioManager.pause();
     }
   };
 
@@ -134,15 +171,27 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                   const time = times[name];
                   if (!time) return null;
                   const status = getStatus(time);
-                  const isActive = status === 'active';
+                  
+                  // Active from 15 minutes before its Athan time until 15 minutes after its Athan time
+                  const isActive = (() => {
+                    const [h, m] = time.split(':').map(Number);
+                    const pDate = new Date(now);
+                    pDate.setHours(h, m, 0, 0);
+                    const diffMins = (now.getTime() - pDate.getTime()) / 60000;
+                    return diffMins >= -15 && diffMins <= 15;
+                  })();
                   
                   return (
                     <div 
                       key={name} 
-                      className={`p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${isActive ? 'border-l-4 border-l-forest bg-forest/5' : 'bg-paper-dark'}`}
+                      className={`p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${
+                        isActive 
+                          ? 'bg-[var(--paper-dark)] border-ink text-ink' 
+                          : 'bg-paper-dark prayer-card-inactive text-ink'
+                      }`}
                     >
                       <div className="flex-1">
-                         <div className={`text-3xl font-black tracking-tighter ${statusColors[status]}`}>
+                         <div className={`text-3xl font-black tracking-tighter ${isActive ? 'text-ink' : statusColors[status]}`}>
                             {name}
                          </div>
                          <div className={`text-[10px] font-black uppercase tracking-[0.2em] mt-1 ${isActive ? 'text-forest' : 'text-ink/20'}`}>
@@ -150,7 +199,7 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                          </div>
                       </div>
                       <div className="text-left sm:text-right flex-1 mt-3 sm:mt-0">
-                         <div className={`text-4xl font-black tracking-tighter ${statusColors[status]}`}>{formatTo12h(time)}</div>
+                         <div className={`text-4xl font-black tracking-tighter ${isActive ? 'text-forest' : statusColors[status]}`}>{formatTo12h(time)}</div>
                          {isActive && (
                             <div className="text-[10px] font-black text-forest uppercase tracking-widest mt-1">Active now</div>
                          )}
@@ -160,7 +209,11 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                 })}
 
                 {/* Quran Radio Card */}
-                <div className={`p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${isPlaying ? 'border-l-4 border-l-sepia bg-sepia/5' : 'bg-paper-dark'}`}>
+                <div className={`p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${
+                  isPlaying 
+                    ? 'bg-[var(--paper-dark)] border-ink text-ink' 
+                    : 'bg-paper-dark prayer-card-inactive text-ink'
+                }`}>
                   <div className="flex-1">
                      <div lang="ar" className="font-arabic-main text-3xl font-black tracking-tighter text-ink">
                         إذاعة القرآن الكريم
@@ -170,15 +223,15 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                      <div className="flex items-center gap-3 justify-between sm:justify-start">
                         {isPlaying && (
                            <div className="flex items-end gap-0.5 h-4 w-8 pr-2">
-                              <span className="w-0.5 bg-sepia animate-[pulseWave_0.8s_infinite_ease-in-out_alternate]" style={{ height: '30%' }} />
-                              <span className="w-0.5 bg-sepia animate-[pulseWave_1.2s_infinite_ease-in-out_alternate_0.2s]" style={{ height: '50%' }} />
-                              <span className="w-0.5 bg-sepia animate-[pulseWave_0.9s_infinite_ease-in-out_alternate_0.4s]" style={{ height: '70%' }} />
-                              <span className="w-0.5 bg-sepia animate-[pulseWave_1.1s_infinite_ease-in-out_alternate_0.1s]" style={{ height: '40%' }} />
+                              <span className="w-0.5 bg-[var(--sepia)] animate-[pulseWave_0.8s_infinite_ease-in-out_alternate]" style={{ height: '30%' }} />
+                              <span className="w-0.5 bg-[var(--sepia)] animate-[pulseWave_1.2s_infinite_ease-in-out_alternate_0.2s]" style={{ height: '50%' }} />
+                              <span className="w-0.5 bg-[var(--sepia)] animate-[pulseWave_0.9s_infinite_ease-in-out_alternate_0.4s]" style={{ height: '70%' }} />
+                              <span className="w-0.5 bg-[var(--sepia)] animate-[pulseWave_1.1s_infinite_ease-in-out_alternate_0.1s]" style={{ height: '40%' }} />
                            </div>
                         )}
                         {/* Volume Control */}
-                        <div className="flex items-center gap-2 border border-ink/20 px-3 py-1.5 bg-[var(--paper-dark)] flex-1 sm:flex-initial">
-                          <span className="font-mono-main text-[9px] font-bold text-ink/40 uppercase tracking-widest">Vol</span>
+                        <div className="flex items-center gap-2 border px-3 py-1.5 flex-1 sm:flex-initial bg-[var(--bg)] border-ink/20">
+                          <span className="font-mono-main text-[9px] font-bold uppercase tracking-widest text-ink/40">Vol</span>
                           <input 
                             type="range" 
                             min="0" 
@@ -192,12 +245,14 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                             }}
                             className="w-20 brutalist-slider cursor-pointer"
                           />
-                          <span className="font-mono-main text-[9px] font-bold text-ink/60 min-w-[24px] text-right">{Math.round(volume * 100)}%</span>
+                          <span className="font-mono-main text-[9px] font-bold min-w-[24px] text-right text-ink/60">{Math.round(volume * 100)}%</span>
                         </div>
                      </div>
                      <button
                         onClick={togglePlay}
-                        className="btn-brutalist px-6 py-2.5 text-xs font-mono-main cursor-pointer w-full sm:w-auto"
+                        className={`btn-brutalist px-6 py-2.5 text-xs font-mono-main cursor-pointer w-full sm:w-auto ${
+                          isPlaying ? 'bg-[var(--sepia)] text-black border-[var(--sepia)] hover:bg-[var(--sepia)]/90' : ''
+                        }`}
                      >
                         {isPlaying ? 'PAUSE' : 'PLAY LIVE'}
                        </button>

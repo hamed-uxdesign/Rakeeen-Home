@@ -29,18 +29,19 @@ export const WavyRing: React.FC<{
   isOvertime: boolean;
   size?: number;
   waves: number;
-}> = ({ pct, phase, mode, isOvertime, size = 300, waves }) => {
+  isFloating?: boolean;
+}> = ({ pct, phase, mode, isOvertime, size = 300, waves, isFloating = false }) => {
   const half = size / 2;
   const baseR = half * 0.82;
   const gapOffset = 0.08; // Small gap at top/bottom
 
   // Right path (wavy): -Math.PI/2 + gapOffset to Math.PI/2 - gapOffset
-  const generateWavyRightPath = (offset: number) => {
+  const generateWavyRightPath = (offset: number, limitPct: number = 100) => {
     const amplitude = size * (waves > 40 ? 0.015 : 0.02), points = 250;
     const pathPoints: string[] = [];
     const startAngle = -Math.PI / 2 + gapOffset;
     const endAngle = Math.PI / 2 - gapOffset;
-    const diff = endAngle - startAngle;
+    const diff = (endAngle - startAngle) * (limitPct / 100);
     for (let i = 0; i <= points; i++) {
       const angle = startAngle + (i / points) * diff;
       const wave = Math.sin(angle * waves + offset) * amplitude;
@@ -52,26 +53,13 @@ export const WavyRing: React.FC<{
     return pathPoints.join(' ');
   };
 
-  // Left path (smooth): sweeps from bottom (Math.PI/2 + gapOffset) to top (-Math.PI/2 - gapOffset) counter-clockwise
-  const generateSmoothLeftPath = () => {
+  // Left path (smooth): sweeps from bottom to top
+  const generateSmoothLeftPath = (limitPct: number = 100) => {
     const points = 250;
     const pathPoints: string[] = [];
-    const startAngle = Math.PI / 2 + gapOffset; // bottom left
-    const endAngle = -Math.PI / 2 - gapOffset; // top left
-    // We want a counter-clockwise sweep. Math.PI/2 is bottom, -Math.PI/2 is top.
-    // In standard SVG coordinate angles:
-    // Bottom = Math.PI / 2
-    // Left = Math.PI
-    // Top = 1.5 * Math.PI or -Math.PI / 2.
-    // To sweep counter-clockwise on the left side:
-    // angle goes from Math.PI / 2 to Math.PI / 2 + Math.PI (which is 1.5 * Math.PI) or goes from Math.PI / 2 towards -Math.PI/2 by adding.
-    // Let's sweep: start at Math.PI/2 + gapOffset, and go clockwise/counter-clockwise to -Math.PI/2 - gapOffset.
-    // Since we are moving along the left side, the angle goes: Math.PI / 2 -> Math.PI -> 1.5 * Math.PI (which is same as -Math.PI/2).
-    // So the difference is positive (1.5 * Math.PI - Math.PI / 2 = Math.PI).
-    // Specifically, let's go from startAngle = Math.PI/2 + gapOffset to endAngle = 1.5*Math.PI - gapOffset.
     const startLeftAngle = Math.PI / 2 + gapOffset;
     const endLeftAngle = Math.PI * 1.5 - gapOffset;
-    const diff = endLeftAngle - startLeftAngle;
+    const diff = (endLeftAngle - startLeftAngle) * (limitPct / 100);
     for (let i = 0; i <= points; i++) {
       const angle = startLeftAngle + (i / points) * diff;
       const x = half + baseR * Math.cos(angle);
@@ -81,60 +69,52 @@ export const WavyRing: React.FC<{
     return pathPoints.join(' ');
   };
 
-  const rightPath = generateWavyRightPath(phase);
-  const leftPath = generateSmoothLeftPath();
-
   // Right represents 0-50% progress, left represents 50-100% progress
   const rightPct = Math.min(100, (pct / 50) * 100);
   const leftPct = Math.max(0, ((pct - 50) / 50) * 100);
 
-  // Colors matching screenshot: right wavy is dark green, left smooth is light lime-green
-  const rightColor = 'var(--forest)'; // dark green (#4E5E16)
-  const leftColor = 'var(--sepia)'; // light lime-green (#C2DC3F)
+  const rightTrackPath = generateWavyRightPath(phase, 100);
+  const leftTrackPath = generateSmoothLeftPath(100);
+  const rightProgressPath = generateWavyRightPath(phase, rightPct);
+  const leftProgressPath = generateSmoothLeftPath(leftPct);
+
+  const strokeColor = isOvertime 
+    ? 'var(--pomo-overtime)' 
+    : (mode === 'break' ? 'var(--pomo-break)' : 'var(--pomo-focus)');
 
   return (
     <svg viewBox={`0 0 ${size} ${size}`}
-      className="block overflow-visible w-full h-auto max-w-full"
-      style={{ maxWidth: size, maxHeight: size }}
+      className="block overflow-visible w-full h-full"
+      style={{ maxWidth: '100%', maxHeight: '100%' }}
       shapeRendering="geometricPrecision"
     >
       {/* Background Tracks */}
-      <path d={rightPath} fill="none" stroke="var(--ink)" strokeWidth={size * 0.015} className="opacity-[0.04]" vectorEffect="non-scaling-stroke" />
-      <path d={leftPath} fill="none" stroke="var(--ink)" strokeWidth={size * 0.015} className="opacity-[0.04]" vectorEffect="non-scaling-stroke" />
+      <path d={rightTrackPath} fill="none" stroke="var(--ink)" strokeWidth={size * 0.015} className="opacity-[0.04]" vectorEffect="non-scaling-stroke" />
+      <path d={leftTrackPath} fill="none" stroke="var(--ink)" strokeWidth={size * 0.015} className="opacity-[0.04]" vectorEffect="non-scaling-stroke" />
 
       {/* Right Progress Ring (Wavy, Dark Green) */}
-      <path
-        d={rightPath}
-        fill="none"
-        stroke={rightColor}
-        strokeWidth={size * 0.024}
-        strokeLinecap="round"
-        pathLength="1"
-        strokeDasharray="1"
-        style={{
-          strokeDashoffset: 1 - (rightPct / 100),
-          transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-          vectorEffect: 'non-scaling-stroke',
-          opacity: rightPct > 0 ? 1 : 0
-        }}
-      />
+      {rightPct > 0 && (
+        <path
+          d={rightProgressPath}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={size * 0.024}
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
 
       {/* Left Progress Ring (Smooth, Light Green) */}
-      <path
-        d={leftPath}
-        fill="none"
-        stroke={leftColor}
-        strokeWidth={size * 0.024}
-        strokeLinecap="round"
-        pathLength="1"
-        strokeDasharray="1"
-        style={{
-          strokeDashoffset: 1 - (leftPct / 100),
-          transition: 'stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-          vectorEffect: 'non-scaling-stroke',
-          opacity: leftPct > 0 ? 1 : 0
-        }}
-      />
+      {leftPct > 0 && (
+        <path
+          d={leftProgressPath}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={size * 0.024}
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
     </svg>
   );
 };
@@ -188,7 +168,11 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
     : ((BREAK_S - timeLeft) / BREAK_S) * 100
   );
 
-  const activeColor = isOvertime ? 'text-rust' : (mode === 'focus' ? 'text-forest' : 'text-sepia');
+  const getTimerColor = () => {
+    if (isOvertime) return 'var(--pomo-overtime)';
+    if (mode === 'break') return 'var(--pomo-break)';
+    return 'var(--ink)';
+  };
 
   const getDynamicReports = () => {
     const now = new Date();
@@ -326,27 +310,26 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
           >
             <button
               onClick={() => setIsFullscreen(false)}
-              className="absolute top-6 right-6 w-10 h-10 border border-ink/15 flex items-center justify-center text-ink/30 hover:border-ink/40 hover:text-ink/60 transition-all cursor-pointer"
+              className="absolute top-6 right-6 w-10 h-10 border border-ink/15 flex items-center justify-center text-ink/30 hover:border-ink/60 hover:text-ink/60 transition-all cursor-pointer"
             >
-              <X size={18} />
+              <X size={20} />
             </button>
 
-            <div className={`text-[10px] uppercase tracking-[0.5em] font-black mb-8 ${isOvertime ? 'text-rust' : activeColor}`}>
+            <div className="text-[10px] uppercase tracking-[0.5em] font-black mb-8" style={{ color: getTimerColor() }}>
               {isOvertime ? 'Over-focusing' : (mode === 'focus' ? 'Focus' : 'Break')}
             </div>
 
             <div className="relative flex items-center justify-center w-[320px] h-[320px] sm:w-[600px] sm:h-[600px]">
-              <div className={`absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-80 h-80 sm:w-[600px] sm:h-[600px] transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <motion.div layoutId="pomodoroWavyRing" className="absolute inset-0 flex items-center justify-center">
-                <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={isFullscreen && typeof window !== 'undefined' && window.innerWidth < 640 ? 320 : 600} waves={mode === 'focus' ? focusDuration : breakDuration} />
-              </motion.div>
+              <div className="absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-80 h-80 sm:w-[600px] sm:h-[600px] transition-colors duration-1000" style={{ backgroundColor: getTimerColor() }} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={600} waves={mode === 'focus' ? focusDuration : breakDuration} />
+              </div>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <motion.span 
-                  layoutId="pomodoroTimerText"
-                  className={`text-5xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums ${isOvertime ? 'text-rust' : 'text-ink'}`}
+                <span 
+                  className="text-5xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums text-ink"
                 >
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
-                </motion.span>
+                </span>
                 <span className="text-[9px] sm:text-[10px] tracking-[0.5em] font-bold text-ink/30 uppercase">
                   {isOvertime ? 'Overtime' : mode}
                 </span>
@@ -373,7 +356,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
       </AnimatePresence>
 
       {/* Normal View */}
-      <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300">
+      <div className={`min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300 ${isFullscreen ? 'hidden' : ''}`}>
         
         {/* HEADER */}
         <header className="w-full max-w-[1000px] mx-auto mb-12">
@@ -412,28 +395,25 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               <Maximize2 size={14} />
             </button>
 
-            <div className={`text-[10px] uppercase tracking-[0.3em] font-black mb-8 ${isOvertime ? 'animate-pulse' : ''}`}>
-              <span className={isOvertime ? 'text-rust' : (mode === 'focus' ? 'text-forest' : 'text-sepia')}>
+            <div className="text-[10px] uppercase tracking-[0.3em] font-black mb-8">
+              <span style={{ color: getTimerColor() }}>
                 {isOvertime ? 'Over-focusing' : (mode === 'focus' ? 'Focus session' : 'Break time')}
               </span>
             </div>
 
             {/* Timer Circle */}
             <div className="relative w-full max-w-[280px] aspect-square mx-auto flex items-center justify-center">
-              <div className={`absolute inset-6 rounded-full blur-[40px] opacity-20 -z-10 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-              <motion.div layoutId="pomodoroWavyRing" className="absolute inset-0 flex items-center justify-center">
+              <div className="absolute inset-6 rounded-full blur-[40px] opacity-20 -z-10 transition-colors duration-1000" style={{ backgroundColor: getTimerColor() }} />
+              <div className="absolute inset-0 flex items-center justify-center">
                 <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={280} waves={mode === 'focus' ? focusDuration : breakDuration} />
-              </motion.div>
+              </div>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <motion.span
-                  layoutId="pomodoroTimerText"
-                  className={`text-4xl sm:text-5xl font-black mb-1 transition-colors duration-500 ${isOvertime ? 'text-rust' : 'text-ink'}`}
-                  animate={{ scale: (running && !isOvertime) ? [1, 1.02, 1] : 1 }}
-                  transition={{ repeat: Infinity, duration: 3 }}
+                <span
+                  className="text-4xl sm:text-5xl font-black mb-1 transition-colors duration-500 text-ink"
                 >
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
-                </motion.span>
+                </span>
                 <span className="text-[10px] tracking-[0.3em] font-bold text-ink/40 uppercase">
                   {isOvertime ? 'Overtime' : mode}
                 </span>

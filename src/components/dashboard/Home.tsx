@@ -10,6 +10,8 @@ import { usePomodoro } from '../../hooks/usePomodoro';
 import { CustomModal } from '../ui/CustomModal';
 import { WavyRing } from './Pomodoro';
 import { getLogicalDate } from '../../utils/timeHelpers';
+import { usePrayer } from '../../hooks/usePrayer';
+import { DotMatrixText } from '../ui/DotMatrixText';
 
 interface HomeProps {
   navigate: (to: string) => void;
@@ -132,6 +134,58 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const [timeOnly, amPm] = timeString.split(' ');
   
+  const { times, nextPrayer, loading: prayerLoading } = usePrayer();
+
+  const getCardPrayerInfo = () => {
+    if (prayerLoading || !times || Object.keys(times).length === 0) {
+      return { name: 'PRAYER', info: 'LOADING...' };
+    }
+    
+    const prayerNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    let activePrayer = null;
+    
+    for (const name of prayerNames) {
+      const timeStr = times[name];
+      if (!timeStr) continue;
+      const [h, m] = timeStr.split(':').map(Number);
+      const pDate = new Date(now);
+      pDate.setHours(h, m, 0, 0);
+      const diffMins = (now.getTime() - pDate.getTime()) / 60000;
+      if (diffMins >= 0 && diffMins <= 15) {
+        activePrayer = name;
+        break;
+      }
+    }
+    
+    if (activePrayer) {
+      return {
+        name: activePrayer,
+        info: 'ACTIVE NOW'
+      };
+    }
+    
+    if (nextPrayer) {
+      const timeStr = nextPrayer.time;
+      let infoStr = '';
+      if (timeStr) {
+        let [h, m] = timeStr.split(':').map(Number);
+        const suffix = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        infoStr = `ATHAN AT ${h}:${String(m).padStart(2, '0')} ${suffix}`;
+      } else {
+        infoStr = 'UPCOMING';
+      }
+      return {
+        name: nextPrayer.name,
+        info: infoStr
+      };
+    }
+    
+    return { name: 'PRAYER', info: 'NO DATA' };
+  };
+
+  const cardPrayer = getCardPrayerInfo();
+  
   // Format English Date
   const dateStringEn = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   
@@ -246,10 +300,12 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-8 mt-4">
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono-main text-7xl sm:text-8xl font-black tracking-tighter text-ink leading-none">
-                {glasses}
-              </span>
+            <div className="flex items-center gap-4">
+              <DotMatrixText 
+                text={String(glasses)} 
+                dotSizeClassName="w-[9px] h-[9px] sm:w-[13px] sm:h-[13px]" 
+                gapClassName="gap-[3px] sm:gap-[4px]" 
+              />
               <span className="font-mono-main text-2xl sm:text-3xl font-bold text-ink/40">
                 / 14
               </span>
@@ -372,12 +428,12 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
           </div>
 
           <div className="my-4">
-            <span className="font-sans-main text-4xl sm:text-5xl font-black text-ink uppercase tracking-tight">ASR</span>
+            <span className="font-sans-main text-4xl sm:text-5xl font-black text-ink uppercase tracking-tight">{cardPrayer.name}</span>
           </div>
 
           <div className="flex items-center justify-between border-t border-ink/5 pt-4">
             <span className="font-mono-main text-xs font-bold uppercase tracking-widest text-ink/50">
-              ATHAN AT 3:45 PM
+              {cardPrayer.info}
             </span>
             <ChevronRight size={18} className="text-ink/40 group-hover:translate-x-1 transition-transform" />
           </div>

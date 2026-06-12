@@ -68,29 +68,7 @@ export const FastingManager: React.FC = () => {
       // Eating Window logic moved to Discord Bot scheduler.
       // Removed Arabic notifications as per user request.
 
-      // --- Phase 4: Workout Guilt-trip ---
-      const WORKOUT_DAYS = [0, 3]; // Sun, Wed
-      const isWorkoutDay = WORKOUT_DAYS.includes(now.getDay());
-      const isEvening = now.getHours() >= 20; // 8 PM
-      
-      if (isWorkoutDay && isEvening) {
-        const lastWorkoutNag = localStorage.getItem('workout_last_nag');
-        if (lastWorkoutNag !== today) {
-           // Check if workout was logged in localStorage
-           try {
-             const workoutsStr = localStorage.getItem('fitness_workouts');
-             const workouts = workoutsStr ? JSON.parse(workoutsStr) : [];
-             const loggedToday = workouts.some((w: any) => w.date === now.toLocaleDateString());
-             
-             if (!loggedToday) {
-               sendDiscord('يوم التمرين أوشك على الانتهاء ولم تسجل تمرينك بعد. هل ستستسلم للكسل أم ستنهض الآن؟ 🦾', '⚠️ WORKOUT PROTOCOL VIOLATION', 0xe63946);
-               localStorage.setItem('workout_last_nag', today);
-             }
-           } catch (e) {
-             console.error('Workout Check Failed', e);
-           }
-        }
-      }
+
 
       // --- Phase 5: Friday Sugar Reward ---
       const isFriday = now.getDay() === 5;
@@ -102,7 +80,7 @@ export const FastingManager: React.FC = () => {
             const sugar = sugarStr ? JSON.parse(sugarStr) : { completedDays: 0 };
             
             if (sugar.completedDays >= 21) {
-              sendDiscord('يوم السكر المفتوح! 🎉 لقد التزمت طوال الأسبوع، استمتع بمكافأة سكر معتدلة اليوم كجزء من نظامك المتوازن.', '🍬 WEEKLY SUGAR REWARD UNLOCKED', 0xffb703);
+              sendDiscord("Weekly Sugar Reward Unlocked! 🎉 You've stayed disciplined all week, enjoy a moderate sweet treat today as part of your balanced routine.", '🍬 WEEKLY SUGAR REWARD UNLOCKED', 0xffb703);
               localStorage.setItem('sugar_last_reward', today);
             }
           } catch (e) {

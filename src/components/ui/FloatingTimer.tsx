@@ -46,23 +46,22 @@ export const FloatingTimer: React.FC<FloatingTimerProps> = ({ onNavigate }) => {
   return (
     <button
       onClick={onNavigate}
-      className="fixed bottom-8 right-8 z-50 flex items-center justify-center transition-transform duration-300 hover:scale-105 hover:-translate-y-1 outline-none group"
+      className="fixed bottom-8 right-8 z-50 flex items-center justify-center transition-transform duration-300 hover:scale-105 hover:-translate-y-1 outline-none group bg-transparent rounded-full w-[170px] h-[170px] cursor-pointer shadow-none border-none"
       title="Return to Pomodoro"
     >
-      <div className="relative flex items-center justify-center">
-        {/* Glow effect behind the ring */}
-        <div className={`absolute inset-4 rounded-full blur-[20px] opacity-20 transition-colors duration-1000 ${isOvertime ? 'bg-rust' : (mode === 'focus' ? 'bg-forest' : 'bg-sepia')}`} />
-        
-        <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={140} waves={waves} />
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center p-2">
+          <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={150} waves={waves} isFloating={true} />
+        </div>
         
         {/* Center content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <motion.span
-            className={`text-2xl font-black transition-colors duration-500 tabular-nums leading-none ${color}`}
-            animate={{ scale: 1 }}
-          >
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none translate-y-0.5">
+          <span className="text-3xl font-black transition-colors duration-500 tabular-nums leading-none text-ink">
             {displayTime}
-          </motion.span>
+          </span>
+          <span className="text-[10px] tracking-[0.2em] font-black text-ink/30 uppercase mt-2">
+            {isOvertime ? 'Overtime' : mode}
+          </span>
         </div>
       </div>
     </button>

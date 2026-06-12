@@ -71,6 +71,9 @@
     --forest: #617615;
     --brand-green: #617615;
     --ghorab-color: #617615;
+    --pomo-focus: var(--forest);
+    --pomo-break: #809B15;
+    --pomo-overtime: #425017;
   }
 
   body.dark-theme {
@@ -84,6 +87,9 @@
     --forest: #D7EA6C;
     --brand-green: #D7EA6C;
     --ghorab-color: #617615;
+    --pomo-focus: var(--forest);
+    --pomo-break: #A5C220;
+    --pomo-overtime: #617615;
   }
 
   body {
@@ -106,6 +112,14 @@
   }
   ::-moz-selection {
     background: var(--sepia);
+    color: var(--ink);
+  }
+  body.dark-theme ::selection {
+    background: var(--rust);
+    color: var(--ink);
+  }
+  body.dark-theme ::-moz-selection {
+    background: var(--rust);
     color: var(--ink);
   }
 
@@ -309,5 +323,10 @@ html {
   100% {
     height: 100%;
   }
+}
+
+body.dark-theme .prayer-card-inactive,
+body.dark-theme .calendar-card-inactive {
+  background-color: var(--bg) !important;
 }
 

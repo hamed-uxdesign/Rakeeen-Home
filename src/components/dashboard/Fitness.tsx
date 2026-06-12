@@ -255,38 +255,7 @@ export const Fitness: React.FC<FitnessProps> = ({ navigate: propsNavigate }) => 
 
         {tab === 'workout' && (
           <div className="space-y-6">
-             <div className={`brutalist-card no-lift p-6 sm:p-12 text-center transition-all duration-500 ${isMissed ? 'bg-rust/10 border-rust border-l-4' : isWorkoutDay && workoutLoggedToday ? 'bg-forest/10 border-forest border-l-4' : 'bg-paper-dark border-ink/5'}`}>
-                {isMissed ? (
-                  <Zap size={48} className="text-rust mx-auto mb-6 animate-bounce" />
-                ) : (
-                  <Dumbbell size={48} className={`mx-auto mb-6 ${isWorkoutDay && workoutLoggedToday ? 'text-forest' : 'text-ink/20'}`} />
-                )}
-                
-                <h3 className="text-2xl sm:text-4xl font-black text-ink mb-4 tracking-tighter">
-                  {isMissed ? 'ACTION REQUIRED' : isWorkoutDay ? (workoutLoggedToday ? 'PROTOCOL SECURED' : 'TRAINING DAY') : 'RECOVERY PHASE'}
-                </h3>
-                
-                <div className="flex flex-wrap justify-center gap-2 mb-8">
-                   {days.map((d, i) => {
-                     const isW = WORKOUT_DAYS.includes(i);
-                     return (
-                       <div key={d} className={`text-[10px] font-black px-3 py-1 border border-ink ${isW ? (i === todayIdx ? 'bg-forest text-paper border-forest' : 'border-forest text-forest') : 'opacity-20 border-transparent'}`}>
-                          {d.toUpperCase()}
-                       </div>
-                     );
-                   })}
-                </div>
 
-                {isMissed ? (
-                  <p className="text-xs sm:text-sm text-rust font-black uppercase tracking-widest px-4">Excuses don't burn calories. Log it now.</p>
-                ) : isWorkoutDay && workoutLoggedToday ? (
-                  <p className="text-xs sm:text-sm text-forest font-black uppercase tracking-widest px-4">Performance optimized for today.</p>
-                ) : (
-                  <p className="text-xs sm:text-sm text-ink/40 font-bold max-w-xs mx-auto leading-relaxed px-4">
-                    Next session in <span className="text-ink font-black">{diffDays} {diffDays === 1 ? 'day' : 'days'}</span> ({nextWorkout.toLocaleDateString('en-US', { weekday: 'long' })})
-                  </p>
-                )}
-             </div>
 
              <div className="brutalist-card no-lift p-6 sm:p-10">
                 <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-stretch sm:items-end">
