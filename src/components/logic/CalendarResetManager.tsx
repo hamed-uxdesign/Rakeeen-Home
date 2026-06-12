@@ -18,6 +18,7 @@ export const CalendarResetManager: React.FC = () => {
   const [pomoHistory, setPomoHistory, pomoHistoryReady] = useFirebaseSync<Record<string, { sessions: number, minutes: number }>>('pomodoro_history', {});
 
   const [lastResetDate, setLastResetDate, lastResetDateReady] = useFirebaseSync<string>('system_last_reset_date', '');
+  const [lastPomoResetDate, setLastPomoResetDate, lastPomoResetDateReady] = useFirebaseSync<string>('system_last_pomo_reset_date', '');
 
   useEffect(() => {
     // Wait until ALL Firebase sync hooks are ready before we check the calendar and potentially run reset
@@ -30,14 +31,14 @@ export const CalendarResetManager: React.FC = () => {
       !pomoReady ||
       !pomoWeekReady ||
       !pomoHistoryReady ||
-      !lastResetDateReady
+      !lastResetDateReady ||
+      !lastPomoResetDateReady
     ) {
       console.log('[CalendarResetManager] Waiting for Firebase sync to be ready...');
       return;
     }
 
     const performReset = async (sleepDate: Date) => {
-      const now = new Date();
       // We calculate the logical "yesterday" relative to the sleep date
       const lastDateStr = new Date(sleepDate.getTime() - 12 * 60 * 60 * 1000).toDateString(); 
 
@@ -58,21 +59,46 @@ export const CalendarResetManager: React.FC = () => {
         setFitHistory(newFitHistory);
       }
       setMeals({ Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
+    };
 
-      // 3. Pomodoro History
-      const todayIdx = (new Date(lastDateStr).getDay() + 6) % 7; // Mon-Sun
-      const currentPomoWeek = Array.isArray(pomoWeek) && pomoWeek.length === 7 ? pomoWeek : POMODORO_WEEKLY_MOCK;
-      const todayPomo = currentPomoWeek[todayIdx] || { sessions: 0, minutes: 0 };
-      if (todayPomo.sessions > 0) {
-        const newPomoHistory = { ...pomoHistory, [lastDateStr]: { sessions: todayPomo.sessions, minutes: todayPomo.minutes } };
-        setPomoHistory(newPomoHistory);
+    const checkPomoReset = () => {
+      const now = new Date();
+      // Pomodoro resets at 4:00 AM.
+      // So the logical yesterday for Pomodoro is "now - 4 hours" to see what day it is,
+      // and we check if we've already done the reset for that logical yesterday.
+      const pomoLogicalToday = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+      const pomoLogicalYesterdayDate = new Date(pomoLogicalToday.getTime() - 24 * 60 * 60 * 1000);
+      const resetMarker = pomoLogicalYesterdayDate.toDateString(); // The day we need to reset/save to history
+
+      if (lastPomoResetDate !== resetMarker) {
+        console.log(`[CalendarResetManager] Triggering Pomodoro reset for logical day: ${resetMarker}`);
+        
+        // Save to history
+        const yesterdayIdx = (pomoLogicalYesterdayDate.getDay() + 6) % 7; // Mon-Sun
+        const currentPomoWeek = Array.isArray(pomoWeek) && pomoWeek.length === 7 ? pomoWeek : POMODORO_WEEKLY_MOCK;
+        const yesterdayPomo = currentPomoWeek[yesterdayIdx] || { sessions: 0, minutes: 0 };
+        
+        if (yesterdayPomo.sessions > 0) {
+          const newPomoHistory = { ...pomoHistory, [resetMarker]: { sessions: yesterdayPomo.sessions, minutes: yesterdayPomo.minutes } };
+          setPomoHistory(newPomoHistory);
+        }
+        
+        setPomoSessions(0);
+        
+        // Reset the week stats if the day that just ended was Friday (idx 4) and now we are starting Saturday (idx 5)
+        const currentLogicalDayIdx = (pomoLogicalToday.getDay() + 6) % 7; // Monday = 0, Saturday = 5, Sunday = 6
+        if (currentLogicalDayIdx === 5) {
+          setPomoWeek(POMODORO_WEEKLY_MOCK); // Reset all Mon-Sun to 0
+        } else {
+          // Just clear the new logical day's stats in case they had leftover data from the previous week:
+          const updatedWeek = currentPomoWeek.map((d: any, i: number) => 
+            i === currentLogicalDayIdx ? { ...d, sessions: 0, minutes: 0 } : d
+          );
+          setPomoWeek(updatedWeek);
+        }
+
+        setLastPomoResetDate(resetMarker);
       }
-      setPomoSessions(0);
-      // Reset whole week if it's Saturday
-      if (now.getDay() === 6) { // Saturday
-        setPomoWeek(pomoWeek.map(d => ({ ...d, sessions: 0, minutes: 0 })));
-      }
-      // Note: We don't setLastResetDate here anymore, to avoid race conditions with the caller.
     };
 
     const checkCalendar = async () => {
@@ -201,12 +227,17 @@ export const CalendarResetManager: React.FC = () => {
       }
     };
 
-    const interval = setInterval(checkCalendar, 2 * 60 * 1000); // Check every 2 minutes
-    checkCalendar();
+    const runChecks = () => {
+      checkCalendar();
+      checkPomoReset();
+    };
+
+    const interval = setInterval(runChecks, 2 * 60 * 1000); // Check every 2 minutes
+    runChecks();
     return () => clearInterval(interval);
   }, [
-    lastResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory,
-    glassesReady, logReady, historyReady, mealsReady, fitHistoryReady, pomoReady, pomoWeekReady, pomoHistoryReady, lastResetDateReady
+    lastResetDate, lastPomoResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setLastPomoResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory,
+    glassesReady, logReady, historyReady, mealsReady, fitHistoryReady, pomoReady, pomoWeekReady, pomoHistoryReady, lastResetDateReady, lastPomoResetDateReady
   ]);
 
   return null;

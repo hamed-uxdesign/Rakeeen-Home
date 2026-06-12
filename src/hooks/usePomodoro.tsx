@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useFirebaseSync } from './useFirebaseSync';
 import { POMODORO_WEEKLY_MOCK } from '../constants/mockData';
-import { getTodayIdx } from '../utils/timeHelpers';
+import { getPomoTodayIdx } from '../utils/timeHelpers';
 
 interface PomodoroContextType {
   timeLeft: number;
@@ -44,7 +44,7 @@ export const PomodoroProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const weekStats = Array.isArray(rawWeekStats) && rawWeekStats.length === 7 ? rawWeekStats : POMODORO_WEEKLY_MOCK;
   const [logs, setLogs] = useFirebaseSync<any[]>('pomodoro_logs', []);
   const [history] = useFirebaseSync<Record<string, { sessions: number, minutes: number, logs?: any[] }>>('pomodoro_history', {});
-  const todayIdx = getTodayIdx();
+  const todayIdx = getPomoTodayIdx();
   const timerRef = useRef<any>(null);
 
   const setFocusDuration = useCallback((m: number) => {

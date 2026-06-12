@@ -43,3 +43,17 @@ export function getTodayIdx(): number {
   const day = getLogicalDate().getDay();
   return day === 0 ? 6 : day - 1;
 }
+
+export function getPomoLogicalDate(): Date {
+  const now = new Date();
+  if (now.getHours() < 4) {
+    const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return logical;
+  }
+  return now;
+}
+
+export function getPomoTodayIdx(): number {
+  const day = getPomoLogicalDate().getDay();
+  return day === 0 ? 6 : day - 1;
+}
