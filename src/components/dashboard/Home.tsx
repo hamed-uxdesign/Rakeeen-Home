@@ -300,16 +300,16 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-8 mt-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-end gap-4">
               <DotMatrixText 
                 text={String(glasses)} 
                 dotSizeClassName="w-[9px] h-[9px] sm:w-[13px] sm:h-[13px]" 
                 gapClassName="gap-[3px] sm:gap-[4px]" 
               />
-              <span className="font-mono-main text-2xl sm:text-3xl font-bold text-ink/40">
+              <span className="font-mono-main text-2xl sm:text-3xl font-bold text-ink/40 leading-none">
                 / 14
               </span>
-              <span className="font-sans-main text-sm font-bold uppercase tracking-wider text-ink/60 ml-2">glasses today</span>
+              <span className="font-sans-main text-sm font-bold uppercase tracking-wider text-ink/60 ml-2 leading-none">glasses today</span>
             </div>
 
             <button 
