@@ -1,6 +1,8 @@
 import { Client, GatewayIntentBits } from 'discord.js';
 import cron from 'node-cron';
 import dotenv from 'dotenv';
+import express from 'express';
+import { parseSMS } from './smsParser.js';
 
 dotenv.config();
 
@@ -8,6 +10,24 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 const CHANNEL_ID = '1501292671753523371';
 const BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || 'PUT_YOUR_BOT_TOKEN_HERE';
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || '';
+
+async function sendWebhookMessage(content) {
+  if (!DISCORD_WEBHOOK_URL) {
+    console.log('⚠️ No DISCORD_WEBHOOK_URL configured. Skipping Discord alert.');
+    return;
+  }
+  try {
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (e) {
+    console.error('❌ Failed to send Discord webhook message:', e.message);
+  }
+}
 
 // Mocking Calendar Data (This will be replaced by your actual database/calendar integration later)
 // Assume we fetch this daily to know when to stop and start
@@ -47,6 +67,9 @@ function isDoNotDisturb(currentTime) {
 client.once('ready', async () => {
   console.log(`🤖 Discord Water Bot is online as ${client.user.tag}`);
   
+  // Seed subscriptions on startup
+  await seedSubscriptions();
+
   // --- TEST MESSAGE (Runs immediately upon starting) ---
   try {
     console.log("⏳ Sending test message to verify connection...");
@@ -54,9 +77,12 @@ client.once('ready', async () => {
     if (channel) {
       await channel.send('✅ **Test Message:** Water Tracker Bot is successfully connected and the 2-hour timer has started!');
       console.log("✅ Test message sent successfully!");
+    } else {
+      await sendWebhookMessage('✅ **Test Message (Webhook Fallback):** Webhook is successfully connected!');
     }
   } catch (error) {
-    console.error("❌ Failed to send test message. Check Channel ID and Permissions:", error);
+    console.log("Bot channel fetch failed, falling back to webhook for test message...");
+    await sendWebhookMessage('✅ **Test Message (Webhook Fallback):** Webhook is successfully connected!');
   }
   // -----------------------------------------------------
 
@@ -74,10 +100,14 @@ client.once('ready', async () => {
       const channel = await client.channels.fetch(CHANNEL_ID);
       if (channel) {
         await channel.send('💧 **حان وقت شرب الماء!**\nحافظ على رطوبة جسمك ولا تنسَ إضافة الكوب في لوحة التحكم (Rakeeen Dashboard).');
-        console.log(`[${now.toLocaleTimeString()}] Notification sent!`);
+        console.log(`[${now.toLocaleTimeString()}] Notification sent via Bot Client!`);
+      } else {
+        await sendWebhookMessage('💧 **حان وقت شرب الماء!**\nحافظ على رطوبة جسمك ولا تنسَ إضافة الكوب في لوحة التحكم (Rakeeen Dashboard).');
+        console.log(`[${now.toLocaleTimeString()}] Notification sent via Webhook!`);
       }
     } catch (error) {
-      console.error("Failed to send Discord message:", error);
+      await sendWebhookMessage('💧 **حان وقت شرب الماء!**\nحافظ على رطوبة جسمك ولا تنسَ إضافة الكوب في لوحة التحكم (Rakeeen Dashboard).');
+      console.log(`[${now.toLocaleTimeString()}] Notification sent via Webhook!`);
     }
   });
   
@@ -126,8 +156,331 @@ client.once('ready', async () => {
   });
   
   console.log('🧹 Channel Cleanup Cron Job Scheduled (Runs daily at 02:00 AM)!');
+
+  // Daily subscriptions reminder cron job at 9:00 AM
+  cron.schedule('0 9 * * *', async () => {
+    try {
+      const today = new Date();
+      const currentDay = today.getDate();
+      console.log(`[${today.toLocaleTimeString()}] Running daily subscription renewal check for day: ${currentDay}...`);
+      
+      // Refresh subscriptions list from Firebase
+      await seedSubscriptions();
+
+      const renewing = localSubscriptions.filter(sub => parseInt(sub.renewalDay) === currentDay);
+      console.log(`Found ${renewing.length} subscriptions renewing today`);
+      for (const sub of renewing) {
+        await sendSubscriptionAlert(sub);
+      }
+    } catch (error) {
+      console.error("Failed to run daily subscriptions cron:", error);
+    }
+  });
+
+  console.log('⏰ Subscriptions Renewal Cron Scheduled (Runs daily at 09:00 AM Egypt / Local)!');
 });
 
 client.login(BOT_TOKEN).catch(err => {
   console.error("❌ Failed to login. Please make sure you put a valid BOT_TOKEN in the .env file.");
+});
+
+// ============================================================
+// EMBED ALERTS HELPERS
+// ============================================================
+async function sendDiscordEmbed(embed, alternativeText) {
+  if (!DISCORD_WEBHOOK_URL) {
+    console.log('⚠️ No DISCORD_WEBHOOK_URL configured. Skipping Discord embed alert.');
+    return;
+  }
+  try {
+    const payload = {
+      embeds: [{
+        ...embed,
+        timestamp: new Date().toISOString()
+      }]
+    };
+    
+    // Attempt sending via client fetch channel first
+    try {
+      const channel = await client.channels.fetch(CHANNEL_ID);
+      if (channel) {
+        await channel.send({ embeds: [payload.embeds[0]] });
+        console.log(`[${new Date().toLocaleTimeString()}] Sent Discord Embed via Client!`);
+        return;
+      }
+    } catch (err) {
+      // Fallback
+    }
+
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    console.log(`[${new Date().toLocaleTimeString()}] Sent Discord Embed via Webhook!`);
+  } catch (e) {
+    console.error('❌ Failed to send Discord embed:', e.message);
+    await sendWebhookMessage(alternativeText);
+  }
+}
+
+async function sendDepositAlert(item) {
+  const embed = {
+    title: '📥 Income Deposit Received',
+    color: 3066993, // Green
+    fields: [
+      { name: 'Amount', value: `**${item.amount.toLocaleString('en-EG')} EGP**`, inline: true },
+      { name: 'Bank', value: item.bank, inline: true },
+      { name: 'Source', value: item.source, inline: true },
+      { name: 'Status', value: '⏳ Pending Classification in Dashboard', inline: false }
+    ]
+  };
+  const altText = `📥 **Deposit Alert**\n**${item.amount.toLocaleString('en-EG')} EGP** — ${item.bank} (${item.source})`;
+  await sendDiscordEmbed(embed, altText);
+}
+
+async function sendDebitAlert(parsed) {
+  const embed = {
+    title: '💸 Account Debited',
+    color: 15158332, // Red
+    fields: [
+      { name: 'Amount', value: `**${parsed.amount.toLocaleString('en-EG')} EGP**`, inline: true },
+      { name: 'Bank', value: parsed.bank, inline: true }
+    ]
+  };
+  if (parsed.recipient) {
+    embed.fields.push({ name: 'Recipient', value: parsed.recipient, inline: true });
+  }
+  const altText = `💸 **Debit Alert**\n**${parsed.amount.toLocaleString('en-EG')} EGP** — ${parsed.bank}`;
+  await sendDiscordEmbed(embed, altText);
+}
+
+async function sendSubscriptionAlert(sub) {
+  const embed = {
+    title: '🔁 Subscription Renewal Reminder',
+    color: 3447003, // Blue
+    fields: [
+      { name: 'Subscription', value: `**${sub.name}**`, inline: true },
+      { name: 'Cost', value: `**${sub.cost.toLocaleString('en-EG')} EGP**`, inline: true },
+      { name: 'Payment Method', value: sub.bank || 'Unknown', inline: true }
+    ],
+    description: `This subscription is scheduled for renewal today (Day ${sub.renewalDay} of the month).`
+  };
+  const altText = `🔁 **Subscription Reminder**\nYour subscription **${sub.name}** (${sub.cost} EGP) is due today.`;
+  await sendDiscordEmbed(embed, altText);
+}
+
+// ============================================================
+// GOLD PRICE SCRAPER & CACHE
+// ============================================================
+let cachedGoldPrices = {
+  price24: 3800,
+  price21: 3325,
+  lastUpdated: null
+};
+
+function parsePrice(html, carat) {
+  const regexDetails = new RegExp(`&quot;label&quot;\\s*:\\s*&quot;عيار\\s*${carat}&quot;\\s*,\\s*&quot;value&quot;\\s*:\\s*&quot;([\\d,]+)\\s*جنيه&quot;`);
+  const matchDetails = html.match(regexDetails);
+  if (matchDetails) {
+    return parseFloat(matchDetails[1].replace(/,/g, ''));
+  }
+
+  const regexTable = new RegExp(`عيار\\s*${carat}[^<]*<\\/td>\\s*<td>\\s*([\\d,]+)\\s*جنيه`, 'i');
+  const matchTable = html.match(regexTable);
+  if (matchTable) {
+    return parseFloat(matchTable[1].replace(/,/g, ''));
+  }
+
+  const regexNear = new RegExp(`عيار\\s*${carat}[^]{1,100}?([\\d,]{4,6})\\s*(?:جنيه|EGP)`, 'i');
+  const matchNear = html.match(regexNear);
+  if (matchNear) {
+    return parseFloat(matchNear[1].replace(/,/g, ''));
+  }
+
+  return null;
+}
+
+async function getGoldPrices() {
+  const now = Date.now();
+  if (cachedGoldPrices.lastUpdated && (now - cachedGoldPrices.lastUpdated < 30000)) {
+    return cachedGoldPrices;
+  }
+  try {
+    const res = await fetch('https://egypt.gold-price-today.com/', {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (res.ok) {
+      const html = await res.text();
+      let p24 = null;
+      let p21 = null;
+
+      // Primary strategy: parse today's prices from the data-is-today attribute
+      const match = html.match(/data-details="([^"]+)"[^>]*data-is-today="1"/);
+      if (match) {
+        try {
+          const jsonStr = match[1].replace(/&quot;/g, '"');
+          const data = JSON.parse(jsonStr);
+          if (data && data.items) {
+            for (const item of data.items) {
+              if (item.label.includes('24')) {
+                p24 = parseFloat(item.value.replace(/,/g, '').replace(/[^0-9.]/g, ''));
+              } else if (item.label.includes('21')) {
+                p21 = parseFloat(item.value.replace(/,/g, '').replace(/[^0-9.]/g, ''));
+              }
+            }
+          }
+        } catch (err) {
+          console.error('⚠️ Failed to parse data-is-today JSON:', err.message);
+        }
+      }
+
+      // Fallback to old regex parsing if today's price extraction failed
+      if (!p24) p24 = parsePrice(html, 24);
+      if (!p21) p21 = parsePrice(html, 21);
+
+      if (p24 && p21) {
+        cachedGoldPrices = {
+          price24: p24,
+          price21: p21,
+          lastUpdated: now
+        };
+        console.log(`✨ Gold prices updated: 24K=${p24} EGP, 21K=${p21} EGP`);
+      }
+    }
+  } catch (e) {
+    console.error('⚠️ Failed to scrape gold prices, using default/cached values:', e.message);
+  }
+  return cachedGoldPrices;
+}
+
+// ============================================================
+// FIREBASE SUBSCRIPTION SYNC & SEEDING
+// ============================================================
+let localSubscriptions = [];
+
+async function getFirebaseSubscriptions() {
+  try {
+    const url = 'https://firestore.googleapis.com/v1/projects/rakeeen-home/databases/(default)/documents/dashboard/finance_subscriptions';
+    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) {
+      console.warn(`Firestore REST API returned status ${res.status}`);
+      return [];
+    }
+    const data = await res.json();
+    if (data.fields && data.fields.value) {
+      const val = data.fields.value;
+      if (val.arrayValue && val.arrayValue.values) {
+        return val.arrayValue.values.map(item => {
+          const mapVal = item.mapValue?.fields || {};
+          return {
+            id: mapVal.id?.stringValue || '',
+            name: mapVal.name?.stringValue || '',
+            cost: parseFloat(mapVal.cost?.doubleValue || mapVal.cost?.integerValue || mapVal.cost?.stringValue || '0'),
+            renewalDay: parseInt(mapVal.renewalDay?.integerValue || mapVal.renewalDay?.stringValue || '1'),
+            bank: mapVal.bank?.stringValue || ''
+          };
+        });
+      }
+    }
+  } catch (err) {
+    console.error('❌ Failed to fetch subscriptions from Firebase REST API:', err.message);
+  }
+  return [];
+}
+
+async function seedSubscriptions() {
+  const subs = await getFirebaseSubscriptions();
+  if (subs && subs.length > 0) {
+    localSubscriptions = subs;
+    console.log(`🌱 Seeded ${localSubscriptions.length} subscriptions from Firestore`);
+  }
+}
+
+// ============================================================
+// FINANCE WEBHOOK SERVER
+// ============================================================
+const app = express();
+const WEBHOOK_PORT = parseInt(process.env.WEBHOOK_PORT || '3001');
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+
+app.use(express.json());
+app.use((_req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, X-Webhook-Secret');
+  if (_req.method === 'OPTIONS') return res.sendStatus(200);
+  next();
+});
+
+let pendingItems = [];
+
+app.post('/webhook/sms', async (req, res) => {
+  const secret = req.headers['x-webhook-secret'];
+  if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { text, sender } = req.body;
+  console.log(`📥 Received SMS Webhook: Sender="${sender}", Text="${text}"`);
+  if (!text) return res.status(400).json({ error: 'Missing text' });
+
+  const parsed = parseSMS(text, sender || '');
+  console.log('🔍 Parsed SMS Result:', parsed);
+
+  if (parsed.type === 'internal' || parsed.type === 'unknown') {
+    return res.json({ status: 'ignored', type: parsed.type });
+  }
+
+  if (parsed.type === 'deposit') {
+    const item = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      bank: parsed.bank,
+      amount: parsed.amount,
+      source: parsed.source || 'Unknown',
+      raw: text,
+      receivedAt: new Date().toISOString(),
+    };
+    pendingItems.push(item);
+
+    await sendDepositAlert(item);
+
+    return res.json({ status: 'pending', item });
+  }
+
+  if (parsed.type === 'debit') {
+    await sendDebitAlert(parsed);
+
+    return res.json({ status: 'debit_noted', parsed });
+  }
+
+  return res.json({ status: 'ok', parsed });
+});
+
+app.get('/api/pending', (_req, res) => {
+  res.json(pendingItems);
+});
+
+app.delete('/api/pending/:id', (req, res) => {
+  pendingItems = pendingItems.filter(p => p.id !== req.params.id);
+  res.json({ status: 'deleted' });
+});
+
+app.get('/api/gold-prices', async (_req, res) => {
+  const prices = await getGoldPrices();
+  res.json(prices);
+});
+
+app.post('/api/subscriptions/sync', (req, res) => {
+  if (Array.isArray(req.body)) {
+    localSubscriptions = req.body;
+    console.log(`🔄 Synced ${localSubscriptions.length} subscriptions from client`);
+  }
+  res.json({ status: 'ok', count: localSubscriptions.length });
+});
+
+app.listen(WEBHOOK_PORT, () => {
+  console.log(`🌐 Finance webhook server running on port ${WEBHOOK_PORT}`);
 });

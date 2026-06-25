@@ -18,7 +18,6 @@ export const CustomCursor = () => {
         width: '28px',
         height: '28px',
         willChange: 'transform',
-        transition: 'transform 0.08s ease-out' // Smooth transitions when resizing/moving
       }}
     >
       {/* Dynamic vector pointer: fill matches ink (dark in light theme, paper in dark theme), stroke matches background container */}

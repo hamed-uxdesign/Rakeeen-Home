@@ -40,9 +40,9 @@
 }
 
 @theme {
-  --font-sans: "General Sans Variable", "Inter", sans-serif;
+  --font-sans: "General Sans", "Inter", sans-serif;
   --font-mono: "Geist Mono", monospace;
-  --font-arabic: "Thmanyah", "General Sans Variable", sans-serif;
+  --font-arabic: "Thmanyah", sans-serif;
 
   /* Signature Rakeeen Lime Palette */
   --lime-bg: #E7E8E1;
@@ -92,16 +92,16 @@
     --pomo-overtime: #617615;
   }
 
+  html, * {
+    cursor: none !important;
+  }
+
   body {
     background: var(--paper);
     color: var(--ink);
     font-family: var(--font-sans);
     min-height: 100vh;
     transition: background-color 0.3s ease, color 0.3s ease;
-    cursor: none !important;
-  }
-
-  html, a, button, input, textarea, select, [role="button"], a *, button *, [role="button"] *, *:hover {
     cursor: none !important;
   }
 

@@ -2,25 +2,48 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { uploadImage } from '../../utils/cloudinary';
-import { Droplet, Calendar as CalIcon, Timer, Moon, Sun, Activity, ChevronRight, Plus, Clock, Camera, MoreVertical, LogOut } from 'lucide-react';
+import { Droplet, Calendar as CalIcon, Timer, Moon, Sun, Activity, Plus, Camera, MoreVertical, LogOut } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { Label } from '../ui/UIComponents';
 import { usePomodoro } from '../../hooks/usePomodoro';
 import { CustomModal } from '../ui/CustomModal';
 import { WavyRing } from './Pomodoro';
 import { getLogicalDate } from '../../utils/timeHelpers';
 import { usePrayer } from '../../hooks/usePrayer';
 import { DotMatrixText } from '../ui/DotMatrixText';
+// FINANCE MODULE — disabled
+// import { useFinance } from '../../hooks/useFinance';
 
 interface HomeProps {
   navigate: (to: string) => void;
 }
 
+// Spinning dot-matrix vector shown on system-auto-activated cards
+const SidebarActiveVector: React.FC = () => (
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" className="text-ink/60">
+    <circle cx="12" cy="4" r="1.3" />
+    <circle cx="17.66" cy="6.34" r="1.3" />
+    <circle cx="20" cy="12" r="1.3" />
+    <circle cx="17.66" cy="17.66" r="1.3" />
+    <circle cx="12" cy="20" r="1.3" />
+    <circle cx="6.34" cy="17.66" r="1.3" />
+    <circle cx="4" cy="12" r="1.3" />
+    <circle cx="6.34" cy="6.34" r="1.3" />
+    <circle cx="12" cy="12" r="1.5" />
+  </svg>
+);
+
 export const Home: React.FC<HomeProps> = ({ navigate }) => {
+  const [activeCardId, setActiveCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar'>('water');
+  const [isSystemActive, setIsSystemActive] = useState(false);
+  const [lastManualClickTime, setLastManualClickTime] = useState<number>(0);
   const [avatarUrl, setAvatarUrl] = useFirebaseSync<string | null>('avatar_url', null);
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
   const [workouts] = useFirebaseSync<any[]>('fitness_workouts', []);
+  // FINANCE MODULE — disabled
+  // const [financeBanks] = useFirebaseSync<Record<string, number>>('finance_banks', {});
+  // const { pendingItems } = useFinance();
+  // const totalPhysical = Object.values(financeBanks).reduce((a, b) => a + (Number(b) || 0), 0);
   
   const workoutMinsToday = workouts
     .filter(w => w.date === getLogicalDate().toDateString())
@@ -188,9 +211,49 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   
   // Format English Date
   const dateStringEn = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  
-  // Format Arabic Date for Thmanyah display fallback
-  const dateStringAr = now.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  // Smart active card prioritizing logic based on real-time activity
+  useEffect(() => {
+    // Override auto-priority for 3 minutes (180,000 ms) after manual selection
+    if (Date.now() - lastManualClickTime < 180000) {
+      return;
+    }
+
+    const getNextPrayerCloseness = () => {
+      if (!nextPrayer || !nextPrayer.time) return false;
+      const [h, m] = nextPrayer.time.split(':').map(Number);
+      const pDate = new Date(now);
+      pDate.setHours(h, m, 0, 0);
+      if (pDate.getTime() < now.getTime()) {
+        pDate.setDate(pDate.getDate() + 1);
+      }
+      const diffMins = (pDate.getTime() - now.getTime()) / 60000;
+      return diffMins > 0 && diffMins <= 15;
+    };
+
+    const isPrayerActiveOrClose = cardPrayer.info === 'ACTIVE NOW' || getNextPrayerCloseness();
+
+    let targetCardId: 'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' = 'water';
+
+    if (pomodoroRunning || pomodoroOvertime) {
+      targetCardId = 'pomodoro';
+    } else if (isPrayerActiveOrClose) {
+      targetCardId = 'prayer';
+    }
+
+    if (activeCardId !== targetCardId) {
+      setActiveCardId(targetCardId);
+      setIsSystemActive(true);
+    }
+  }, [
+    pomodoroRunning,
+    pomodoroOvertime,
+    cardPrayer.info,
+    nextPrayer?.time,
+    now,
+    lastManualClickTime,
+    activeCardId
+  ]);
 
   // Quick action function to increment water glasses
   const addWaterCup = (e: React.MouseEvent) => {
@@ -282,192 +345,281 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         </div>
       </header>
 
-      {/* 2. MAIN EXPANSIVE GRID SECTION */}
-      <main className="w-full max-w-[1400px] mx-auto flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16 items-stretch">
+      {/* 2. STAGE MANAGER TWO-COLUMN LAYOUT */}
+      <main className="w-full max-w-[1400px] mx-auto flex-1 flex flex-col lg:flex-row gap-8 mb-16 items-stretch">
         
-        {/* HERO CARD 1: WATER (Spans 2 columns on Large screens) */}
-        <div 
-          onClick={() => navigate('water')}
-          className="brutalist-dashed-card lg:col-span-2 cursor-pointer flex flex-col justify-between group"
-        >
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-3xl font-black tracking-tight">WATER INTAKE</h2>
-            </div>
-            <div className="w-12 h-12 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-110 transition-transform" style={{ borderRadius: 0 }}>
-              <Droplet size={22} className="fill-current" />
-            </div>
-          </div>
+        {/* Left stack (Stage Manager dock) */}
+        <div className="flex lg:flex-col gap-4 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 shrink-0 lg:w-[230px] scrollbar-none px-2 lg:px-0">
+          {([
+            {
+              id: 'water',
+              title: 'Water Intake',
+              icon: Droplet,
+              route: 'water',
+              metric: `${glasses} / 14`,
+              subText: 'GLASSES TODAY',
+            },
+            {
+              id: 'pomodoro',
+              title: 'Focus Time',
+              icon: Timer,
+              route: 'pomodoro',
+              metric: pomodoroRunning || pomodoroOvertime 
+                ? (pomodoroOvertime ? `+${Math.floor(overtime / 60)}m` : `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`)
+                : `${focusMinutes > 0 ? focusHours : '0'}h`,
+              subText: pomodoroRunning || pomodoroOvertime ? (pomodoroOvertime ? 'OVERTIME' : mode.toUpperCase()) : 'FOCUSED TODAY',
+            },
+            {
+              id: 'calendar',
+              title: 'Calendar',
+              icon: CalIcon,
+              route: 'calendar',
+              metric: `${now.getDate()} ${now.toLocaleDateString('en-US', { month: 'short' })}`,
+              subText: now.toLocaleDateString('en-US', { weekday: 'long' }),
+            },
+            {
+              id: 'prayer',
+              title: 'Prayer',
+              icon: Moon,
+              route: 'prayer',
+              metric: cardPrayer.name,
+              subText: cardPrayer.info,
+            },
+            {
+              id: 'fitness',
+              title: 'Training',
+              icon: Activity,
+              route: 'fitness',
+              metric: `${workoutMinsToday}m`,
+              subText: 'LOGGED TODAY',
+            }
+          ] as const).map(card => {
+            const isActive = activeCardId === card.id;
+            const Icon = card.icon;
+            return (
+              <div
+                key={card.id}
+                onClick={() => {
+                  setActiveCardId(card.id as any);
+                  setLastManualClickTime(Date.now());
+                  setIsSystemActive(false);
+                }}
+                onDoubleClick={() => navigate(card.route)}
+                className={`cursor-pointer transform-gpu transition-all duration-200 relative select-none flex flex-col justify-between p-4 border ${
+                  isActive 
+                    ? 'border-ink text-ink opacity-100' 
+                    : 'border-dashed border-ink/30 bg-paper/60 text-ink opacity-65 hover:opacity-100 hover:border-ink/60'
+                } w-[160px] lg:w-[230px] h-[100px] lg:h-[110px] shrink-0`}
+                style={isActive ? { backgroundColor: 'var(--paper-dark)' } : undefined}
+              >
+                {/* Absolutely positioned spinning vector to the left of the card on desktop */}
+                {isActive && isSystemActive && (
+                  <div className="hidden lg:block absolute -left-12 top-1/2 -translate-y-1/2 animate-spin z-10" style={{ animationDuration: '6s' }}>
+                    <SidebarActiveVector />
+                  </div>
+                )}
 
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-8 mt-4">
-            <div className="flex items-end gap-4">
-              <DotMatrixText 
-                text={String(glasses)} 
-                dotSizeClassName="w-[9px] h-[9px] sm:w-[13px] sm:h-[13px]" 
-                gapClassName="gap-[3px] sm:gap-[4px]" 
-              />
-              <span className="font-mono-main text-2xl sm:text-3xl font-bold text-ink/40 leading-none">
-                / 14
-              </span>
-              <span className="font-sans-main text-sm font-bold uppercase tracking-wider text-ink/60 ml-2 leading-none">glasses today</span>
-            </div>
+                <div className="flex justify-between items-start pointer-events-none">
+                  <span className="font-sans-main text-xs font-black tracking-tight uppercase truncate mr-2">
+                    {card.title}
+                  </span>
+                  <div className={`p-1.5 border flex items-center justify-center shrink-0 ${
+                    isActive 
+                      ? 'bg-ink/10 border-ink/25 text-ink' 
+                      : 'bg-sepia/10 border-ink/20 text-ink'
+                  }`}>
+                    <Icon size={14} className={card.id === 'water' ? 'fill-current' : ''} />
+                  </div>
+                </div>
+                <div className="mt-1 pointer-events-none">
+                  <span className="font-mono-main text-[16px] lg:text-[18px] font-black block truncate">
+                    {card.metric}
+                  </span>
+                  <span className={`font-mono-main text-[8px] lg:text-[9px] tracking-wider font-bold uppercase block truncate ${
+                    isActive ? 'text-ink/50' : 'text-ink/40'
+                  }`}>
+                    {card.subText}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
-            <button 
-              onClick={addWaterCup}
-              className="btn-brutalist flex items-center gap-2 font-mono-main"
+        {/* Active Stage (Center/Right) */}
+        <div className="flex-1 flex flex-col items-stretch lg:max-h-[614px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeCardId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              onClick={() => {
+                const found = [
+                  { id: 'pomodoro', route: 'pomodoro' },
+                  { id: 'water', route: 'water' },
+                  { id: 'fitness', route: 'fitness' },
+                  { id: 'prayer', route: 'prayer' },
+                  { id: 'calendar', route: 'calendar' }
+                ].find(c => c.id === activeCardId);
+                if (found) navigate(found.route);
+              }}
+              className="flex-1 flex flex-col justify-between brutalist-card bg-paper p-8 lg:p-10 relative group cursor-pointer"
             >
-              <Plus size={16} strokeWidth={3} />
-              Add Glass
-            </button>
-          </div>
-        </div>
 
-        {/* CARD 2: FOCUS TIMER (POMODORO) */}
-        <div 
-          onClick={() => navigate('pomodoro')}
-          className="brutalist-card cursor-pointer flex flex-col justify-between group overflow-hidden relative"
-          style={{ padding: (pomodoroRunning || pomodoroOvertime) ? '0' : '2rem' }}
-        >
-          {(pomodoroRunning || pomodoroOvertime) ? (
-            <div className="absolute inset-0 flex items-center justify-center p-6 bg-paper-dark">
-              {/* Embedded Wavy Timer Ring taking full card bounds */}
-              <div className="relative w-full aspect-square max-w-[240px] flex items-center justify-center">
-                <div className={`absolute inset-6 rounded-full blur-[48px] opacity-20 transition-colors duration-1000 ${pomodoroOvertime ? 'bg-rust' : (mode === 'break' ? 'bg-sepia' : 'bg-forest')}`} />
-                <WavyRing 
-                  pct={pomodoroOvertime ? 100 : Math.max(0, (((mode === 'focus' ? focusDuration : breakDuration) * 60 - timeLeft) / ((mode === 'focus' ? focusDuration : breakDuration) * 60)) * 100)} 
-                  phase={phase} 
-                  mode={mode} 
-                  isOvertime={pomodoroOvertime} 
-                  size={240} 
-                  waves={mode === 'break' ? breakDuration || 5 : focusDuration || 25} 
-                />
-                
-                {/* Giant countdown timer value in center */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className={`text-3xl sm:text-4xl font-black tracking-tight mb-1 tabular-nums leading-none ${pomodoroOvertime ? 'text-rust' : 'text-ink'}`}>
-                    {pomodoroOvertime ? `+${Math.floor(overtime / 60)}m` : `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`}
+              {/* Active Card Body Renderer */}
+              {activeCardId === 'water' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">WATER INTAKE</h2>
+                    </div>
+                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
+                      <Droplet size={28} className="fill-current" />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-8 mt-6">
+                    <div className="flex items-end gap-4">
+                      <DotMatrixText 
+                        text={String(glasses)} 
+                        dotSizeClassName="w-[12px] h-[12px] sm:w-[15px] sm:h-[15px]" 
+                        gapClassName="gap-[4px] sm:gap-[5px]" 
+                      />
+                      <span className="font-mono-main text-3xl sm:text-4xl font-bold text-ink/40 leading-none">
+                        / 14
+                      </span>
+                      <span className="font-sans-main text-sm font-bold uppercase tracking-wider text-ink/60 ml-2 leading-none">glasses today</span>
+                    </div>
+
+                    <button 
+                      onClick={addWaterCup}
+                      className="btn-brutalist flex items-center gap-2 font-mono-main py-3 px-6 text-sm"
+                    >
+                      <Plus size={18} strokeWidth={3} />
+                      Add Glass
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {activeCardId === 'pomodoro' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  {(pomodoroRunning || pomodoroOvertime) ? (
+                    <div className="flex-1 flex flex-col items-center justify-center py-4">
+                      <div className="relative w-full aspect-square max-w-[300px] flex items-center justify-center">
+                        <div className={`absolute inset-6 rounded-full blur-[48px] opacity-25 transition-colors duration-1000 ${pomodoroOvertime ? 'bg-rust' : (mode === 'break' ? 'bg-sepia' : 'bg-forest')}`} />
+                        <WavyRing 
+                          pct={pomodoroOvertime ? 100 : Math.max(0, (((mode === 'focus' ? focusDuration : breakDuration) * 60 - timeLeft) / ((mode === 'focus' ? focusDuration : breakDuration) * 60)) * 100)} 
+                          phase={phase} 
+                          mode={mode} 
+                          isOvertime={pomodoroOvertime} 
+                          size={300} 
+                          waves={mode === 'break' ? breakDuration || 5 : focusDuration || 25} 
+                        />
+                        
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                          <span className={`text-6xl font-black tracking-tight mb-2 tabular-nums leading-none ${pomodoroOvertime ? 'text-rust' : 'text-ink'}`}>
+                            {pomodoroOvertime ? `+${Math.floor(overtime / 60)}m` : `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`}
+                          </span>
+                          <span className="text-xs tracking-[0.25em] font-bold text-ink/30 uppercase">
+                            {pomodoroOvertime ? 'OVERTIME' : mode}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
+                          <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">FOCUS TIME</h2>
+                        </div>
+                        <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
+                          <Timer size={28} />
+                        </div>
+                      </div>
+
+                      <div className="flex items-baseline gap-2">
+                        <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                          {focusMinutes > 0 ? focusHours : '0'}
+                        </span>
+                        <span className="font-mono-main text-3xl font-bold text-ink/40">h</span>
+                        <span className="font-sans-main text-xs font-bold uppercase tracking-wider text-ink/60 ml-1">focused today</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {activeCardId === 'fitness' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">TRAINING</h2>
+                    </div>
+                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
+                      <Activity size={28} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                      {workoutMinsToday}
+                    </span>
+                    <span className="font-mono-main text-3xl font-bold text-ink/40">m</span>
+                    <span className="font-sans-main text-xs font-bold uppercase tracking-wider text-ink/60 ml-1">logged today</span>
+                  </div>
+                </div>
+              )}
+
+              {activeCardId === 'prayer' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">PRAYER</h2>
+                    </div>
+                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
+                      <Moon size={28} />
+                    </div>
+                  </div>
+
+                  <span className="font-sans-main text-5xl sm:text-6xl font-black text-ink uppercase tracking-tight">
+                    {cardPrayer.name}
                   </span>
-                  <span className="text-[9px] tracking-[0.25em] font-bold text-ink/30 uppercase">
-                    {pomodoroOvertime ? 'OVERTIME' : mode}
-                  </span>
                 </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-3xl font-black tracking-tight">FOCUS TIME</h2>
+              )}
+
+              {activeCardId === 'calendar' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">CALENDAR</h2>
+                    </div>
+                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
+                      <CalIcon size={28} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                      {now.getDate()}
+                    </span>
+                    <span className="font-sans-main text-3xl font-bold text-ink/50 uppercase tracking-widest">
+                      {now.toLocaleDateString('en-US', { month: 'short' })}
+                    </span>
+                  </div>
                 </div>
-                <div className="w-12 h-12 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-110 transition-transform" style={{ borderRadius: 0 }}>
-                  <Timer size={22} />
-                </div>
-              </div>
+              )}
 
-              <div className="flex items-baseline gap-2 my-4">
-                <span className="font-mono-main text-6xl sm:text-7xl font-black text-ink leading-none">
-                  {focusMinutes > 0 ? focusHours : '0'}
-                </span>
-                <span className="font-mono-main text-2xl font-bold text-ink/40">h</span>
-                <span className="font-sans-main text-xs font-bold uppercase tracking-wider text-ink/60 ml-1">focused today</span>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-ink/5 pt-4">
-                <span className="font-mono-main text-xs font-bold uppercase tracking-widest text-ink/50 flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${pomodoroRunning ? 'bg-green-500 animate-pulse' : 'bg-ink/20'}`}></span>
-                  {pomodoroRunning ? 'TIMER RUNNING' : 'STATUS: IDLE'}
-                </span>
-                <ChevronRight size={18} className="text-ink/40 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </>
-          )}
-        </div>
-
-        {/* CARD 3: FITNESS */}
-        <div 
-          onClick={() => navigate('fitness')}
-          className="brutalist-card cursor-pointer flex flex-col justify-between group"
-        >
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-3xl font-black tracking-tight">TRAINING</h2>
-            </div>
-            <div className="w-12 h-12 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-110 transition-transform" style={{ borderRadius: 0 }}>
-              <Activity size={22} />
-            </div>
-          </div>
-
-          <div className="flex items-baseline gap-2 my-4">
-            <span className="font-mono-main text-6xl sm:text-7xl font-black text-ink leading-none">
-              {workoutMinsToday}
-            </span>
-            <span className="font-mono-main text-2xl font-bold text-ink/40">m</span>
-            <span className="font-sans-main text-xs font-bold uppercase tracking-wider text-ink/60 ml-1">logged today</span>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-ink/5 pt-4">
-            <span className="font-mono-main text-xs font-bold uppercase tracking-widest text-ink/50">
-              KEEP IT GOING
-            </span>
-            <ChevronRight size={18} className="text-ink/40 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </div>
-
-        {/* CARD 4: PRAYER TIMES */}
-        <div 
-          onClick={() => navigate('prayer')}
-          className="brutalist-card cursor-pointer flex flex-col justify-between group"
-        >
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-3xl font-black tracking-tight">PRAYER</h2>
-            </div>
-            <div className="w-12 h-12 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-110 transition-transform" style={{ borderRadius: 0 }}>
-              <Moon size={22} />
-            </div>
-          </div>
-
-          <div className="my-4">
-            <span className="font-sans-main text-4xl sm:text-5xl font-black text-ink uppercase tracking-tight">{cardPrayer.name}</span>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-ink/5 pt-4">
-            <span className="font-mono-main text-xs font-bold uppercase tracking-widest text-ink/50">
-              {cardPrayer.info}
-            </span>
-            <ChevronRight size={18} className="text-ink/40 group-hover:translate-x-1 transition-transform" />
-          </div>
-        </div>
-
-        {/* CARD 5: CALENDAR */}
-        <div 
-          onClick={() => navigate('calendar')}
-          className="brutalist-card cursor-pointer flex flex-col justify-between group"
-        >
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-3xl font-black tracking-tight">CALENDAR</h2>
-            </div>
-            <div className="w-12 h-12 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-110 transition-transform" style={{ borderRadius: 0 }}>
-              <CalIcon size={22} />
-            </div>
-          </div>
-
-          <div className="flex items-baseline gap-2 my-4">
-            <span className="font-mono-main text-6xl sm:text-7xl font-black text-ink leading-none">
-              {now.getDate()}
-            </span>
-            <span className="font-sans-main text-xl font-bold text-ink/50 uppercase tracking-widest">
-              {now.toLocaleDateString('en-US', { month: 'short' })}
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-ink/5 pt-4">
-            <span className="font-mono-main text-xs font-bold uppercase tracking-widest text-ink/50">
-              {now.toLocaleDateString('en-US', { weekday: 'long' })}
-            </span>
-            <ChevronRight size={18} className="text-ink/40 group-hover:translate-x-1 transition-transform" />
-          </div>
+              {/* FINANCE CARD — disabled */}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
       </main>

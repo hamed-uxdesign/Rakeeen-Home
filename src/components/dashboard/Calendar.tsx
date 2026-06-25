@@ -432,10 +432,10 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
                 const timeRange = `${startStr} – ${endStr}`;
 
                 return (
-                  <div key={task.id} className="flex items-center gap-4 w-full">
-                    {/* Outer Dot Matrix Vector shape on the left */}
+                  <div key={task.id} className="flex items-center gap-4 w-full relative">
+                    {/* Dot Matrix Vector shape (inline on mobile, absolute on desktop) */}
                     <div 
-                      className={`flex-shrink-0 flex items-center justify-center w-8 h-8 transition-all duration-500 ${
+                      className={`flex-shrink-0 flex items-center justify-center w-8 h-8 transition-all duration-500 lg:absolute lg:-left-12 lg:top-1/2 lg:-translate-y-1/2 ${
                         isActive ? 'animate-spin' : ''
                       }`}
                       style={isActive ? { animationDuration: '6s' } : undefined}
