@@ -5,6 +5,7 @@ import { usePrayer } from '../../hooks/usePrayer';
 import { quranRadioManager } from '../../utils/quranRadioManager';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 
+
 interface PrayerProps {
   navigate: (to: string) => void;
 }

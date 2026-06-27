@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronRight, Dumbbell, Trash2, Check, Zap } from 'lucide-re
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
+
 interface FitnessProps {
   navigate?: (to: string) => void;
 }

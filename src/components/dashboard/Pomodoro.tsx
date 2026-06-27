@@ -6,6 +6,7 @@ import { ChartTooltip } from '../ui/UIComponents';
 import { Play, Pause, RotateCcw, Maximize2, X, ArrowLeft, ChevronRight } from 'lucide-react';
 import { usePomodoro } from '../../hooks/usePomodoro';
 
+
 interface PomodoroProps {
   navigate: (to: string) => void;
 }

@@ -72,6 +72,7 @@ const DotMatrixVector: React.FC<{ shapeIndex: number; isActive: boolean }> = ({ 
   );
 };
 
+
 interface CalendarProps {
   navigate: (to: string) => void;
 }

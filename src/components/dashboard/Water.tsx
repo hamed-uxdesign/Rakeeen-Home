@@ -6,6 +6,7 @@ import { RotateCcw, Undo2, Plus, ArrowLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { DotMatrixText } from '../ui/DotMatrixText';
 
+
 interface WaterProps {
   navigate: (to: string) => void;
 }

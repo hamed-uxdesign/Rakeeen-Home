@@ -2,12 +2,11 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { uploadImage } from '../../utils/cloudinary';
-import { Droplet, Calendar as CalIcon, Timer, Moon, Sun, Activity, Plus, Camera, MoreVertical, LogOut } from 'lucide-react';
+import { Sun, Plus, Camera, MoreVertical, LogOut, Moon } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { usePomodoro } from '../../hooks/usePomodoro';
 import { CustomModal } from '../ui/CustomModal';
-import { WavyRing } from './Pomodoro';
 import { getLogicalDate } from '../../utils/timeHelpers';
 import { usePrayer } from '../../hooks/usePrayer';
 import { DotMatrixText } from '../ui/DotMatrixText';
@@ -18,25 +17,275 @@ interface HomeProps {
   navigate: (to: string) => void;
 }
 
-// Spinning dot-matrix vector shown on system-auto-activated cards
-const SidebarActiveVector: React.FC = () => (
-  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" className="text-ink/60">
-    <circle cx="12" cy="4" r="1.3" />
-    <circle cx="17.66" cy="6.34" r="1.3" />
-    <circle cx="20" cy="12" r="1.3" />
-    <circle cx="17.66" cy="17.66" r="1.3" />
-    <circle cx="12" cy="20" r="1.3" />
-    <circle cx="6.34" cy="17.66" r="1.3" />
-    <circle cx="4" cy="12" r="1.3" />
-    <circle cx="6.34" cy="6.34" r="1.3" />
-    <circle cx="12" cy="12" r="1.5" />
-  </svg>
-);
+// Priority indicator — 6 dots orbiting a right-pointing triangle outline.
+// The bright point chases the triangle clockwise: tip → upper → left → lower → tip.
+// Reads as "active / locked-on" without being a circle, chevron, or spinner.
+const SidebarActiveVector: React.FC = () => {
+  // Triangle pointing right: tip, upper-right, upper-left, left-mid, lower-left, lower-right
+  const pts: [number,number][] = [
+    [18,12],  // 0 — tip (right)
+    [11,4],   // 1 — upper corner
+    [4,4],    // 2 — upper-left
+    [4,12],   // 3 — left mid
+    [4,20],   // 4 — lower-left
+    [11,20],  // 5 — lower corner
+  ];
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 24" fill="currentColor" className="text-ink/80">
+      {pts.map(([cx,cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="1.4"
+          style={{ animation: 'vectorFade 1.5s ease-in-out infinite', animationDelay: `${i * 0.25}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// RUNNING SIGNAL — broadcasting dot arcs; center always on, rings ripple outward.
+
+// ─── Dot-matrix digit data (5 rows × 4 cols) ──────────────────────────────
+const DM: Record<string, number[][]> = {
+  '0':[[1,1,1,1],[1,0,0,1],[1,0,0,1],[1,0,0,1],[1,1,1,1]],
+  '1':[[0,0,1,0],[0,1,1,0],[0,0,1,0],[0,0,1,0],[0,1,1,1]],
+  '2':[[1,1,1,1],[0,0,0,1],[1,1,1,1],[1,0,0,0],[1,1,1,1]],
+  '3':[[1,1,1,1],[0,0,0,1],[0,1,1,1],[0,0,0,1],[1,1,1,1]],
+  '4':[[1,0,0,1],[1,0,0,1],[1,1,1,1],[0,0,0,1],[0,0,0,1]],
+  '5':[[1,1,1,1],[1,0,0,0],[1,1,1,1],[0,0,0,1],[1,1,1,1]],
+  '6':[[1,1,1,1],[1,0,0,0],[1,1,1,1],[1,0,0,1],[1,1,1,1]],
+  '7':[[1,1,1,1],[0,0,0,1],[0,0,1,0],[0,1,0,0],[0,1,0,0]],
+  '8':[[1,1,1,1],[1,0,0,1],[1,1,1,1],[1,0,0,1],[1,1,1,1]],
+  '9':[[1,1,1,1],[1,0,0,1],[1,1,1,1],[0,0,0,1],[0,0,0,1]],
+};
+
+// Wavy progress bar — same logic as WavyRing but unrolled flat.
+// phase animates via RAF exactly like the Pomodoro page, progress limits the drawn path length.
+const WavyProgressBar: React.FC<{ pct: number; isOvertime: boolean; mode: string }> = ({ pct, isOvertime, mode }) => {
+  const [phase, setPhase] = useState(0);
+  const rafRef = useRef<number>(0);
+  useEffect(() => {
+    const tick = () => { setPhase(p => (p + 0.05) % (Math.PI * 2)); rafRef.current = requestAnimationFrame(tick); };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const W = 500; const H = 36; const midY = H / 2;
+  const amplitude = 9; const waves = 5; const pts = 220;
+
+  // Build a wavy path from x=0 to x = W*(limitPct/100), animated by phase
+  const genPath = (limitPct: number) => {
+    const endX = W * (limitPct / 100);
+    const out: string[] = [];
+    for (let i = 0; i <= pts; i++) {
+      const x = (i / pts) * endX;
+      const y = midY + Math.sin((x / W) * waves * Math.PI * 2 + phase) * amplitude;
+      out.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`);
+    }
+    return out.join(' ');
+  };
+
+  const strokeColor = isOvertime ? 'var(--rust)' : mode === 'break' ? 'var(--sepia)' : 'var(--forest)';
+
+  return (
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none" shapeRendering="geometricPrecision" overflow="visible">
+      {/* Full-length dim track */}
+      <path d={genPath(100)} fill="none" stroke="var(--ink)"
+        strokeWidth={3} strokeOpacity={0.07} strokeLinecap="round"
+        vectorEffect="non-scaling-stroke" />
+      {/* Progress path — grows from left as pct increases */}
+      {pct > 0 && (
+        <path d={genPath(pct)} fill="none" stroke={strokeColor}
+          strokeWidth={4} strokeLinecap="round"
+          vectorEffect="non-scaling-stroke" />
+      )}
+    </svg>
+  );
+};
+
+// ─── Section Vectors ────────────────────────────────────────────────────────
+// Style matches Calendar DotMatrixVector: dot-matrix shapes, viewBox 0 0 24 24
+// Each shape + animation expresses the section concept.
+// size=20 → small card   size=36 → big card corner
+
+// WATER — teardrop outline; animation fills bottom→top like water rising inside the drop
+const WaterVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
+  // [cx, cy, delayOrder] — order 0 = bottom (first to light), 6 = tip (last to light)
+  const dots: [number, number, number][] = [
+    [12,22,0],
+    [9,21,1], [15,21,1],
+    [7,18,2], [17,18,2],
+    [5,14,3], [19,14,3],
+    [7,9,4],  [17,9,4],
+    [9,5,5],  [15,5,5],
+    [12,2,6],
+  ];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {dots.map(([cx, cy, order], i) => (
+        <circle key={i} cx={cx} cy={cy} r="1.2"
+          style={{ animation: 'vectorFade 2.5s ease-in-out infinite', animationDelay: `${order * 0.28}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// FOCUS — hourglass; sand flows top→bottom, like time running out
+const FocusVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
+  const dots: [number, number, number][] = [
+    // top row
+    [4,3,0], [8,3,0.1], [12,3,0.2], [16,3,0.1], [20,3,0],
+    // mid-top (converging to waist)
+    [8,8,0.55], [12,8,0.65], [16,8,0.55],
+    // waist
+    [12,12,1.0],
+    // mid-bot (spreading from waist)
+    [8,16,1.35], [12,16,1.45], [16,16,1.35],
+    // bottom row
+    [4,21,1.8], [8,21,1.9], [12,21,2.0], [16,21,1.9], [20,21,1.8],
+  ];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {dots.map(([cx, cy, delay], i) => (
+        <circle key={i} cx={cx} cy={cy} r={i === 8 ? 1.5 : 1.2}
+          style={{ animation: 'vectorFade 3s ease-in-out infinite', animationDelay: `${delay}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+
+// CALENDAR — 7 dots arc over a base line (week fan view).
+// The arc represents the days of a week curving overhead; today's dot (top of arc) pulses bright.
+// Base line = the "table" the calendar sits on. Clean, readable as "time/dates".
+const CalendarVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
+  // Arc: 7 day-dots arranged in a semicircle, center at (12,18), radius~14
+  const arc: [number, number, number][] = [
+    [1,  17, 0.55],  // Mon — far left
+    [4,  10, 0.35],  // Tue
+    [8,   4, 0.15],  // Wed
+    [12,  2, 0],     // Thu — today (top of arc) — delay=0, first to glow
+    [16,  4, 0.15],  // Fri
+    [20, 10, 0.35],  // Sat
+    [23, 17, 0.55],  // Sun — far right
+  ];
+  const todayIdx = 3;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {/* Base line — the calendar "desk" */}
+      {([3, 8, 12, 16, 21] as const).map((cx) => (
+        <circle key={`b${cx}`} cx={cx} cy={22} r="0.9" opacity={0.2} />
+      ))}
+      {/* Arc of week-days */}
+      {arc.map(([cx, cy, delay], i) => (
+        <circle key={i} cx={cx} cy={cy}
+          r={i === todayIdx ? 1.7 : 1.1}
+          opacity={i === todayIdx ? 1 : 0.3}
+          style={i === todayIdx ? { animation: 'vectorFade 2s ease-in-out infinite', animationDelay: '0s' } : { animation: 'vectorFade 2s ease-in-out infinite', animationDelay: `${delay}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// PRAYER — crescent C-arc of dots; cascade lights like stars appearing at dusk
+const PrayerVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
+  const crescent: [number,number][] = [
+    [12,2],[17,4],[20,8],[21,12],[20,16],[17,20],[12,22],[8,20],[7,16],[8,8],
+  ];
+  const stars: [number,number][] = [[3,6],[3,18],[4,12]];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {crescent.map(([cx,cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="1.2"
+          style={{ animation: 'vectorFade 2.4s ease-in-out infinite', animationDelay: `${i * 0.24}s` }} />
+      ))}
+      {stars.map(([cx,cy], i) => (
+        <circle key={`s${i}`} cx={cx} cy={cy} r="0.9"
+          style={{ animation: 'vectorFade 3s ease-in-out infinite', animationDelay: `${i * 0.9}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// FITNESS — dumbbell/barbell; energy pulse travels left plate → bar → right plate.
+// The shape is unmistakably "gym/strength". Animation = energy flowing through the lift.
+const FitnessVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
+  // [cx, cy, delay]
+  const dots: [number, number, number][] = [
+    // Left weight plate (3 stacked dots)
+    [3, 8,  0],
+    [3, 12, 0.06],
+    [3, 16, 0.12],
+    // Bar (4 dots crossing mid)
+    [7,  12, 0.22],
+    [10, 12, 0.34],
+    [14, 12, 0.46],
+    [17, 12, 0.58],
+    // Right weight plate (3 stacked dots)
+    [21, 8,  0.68],
+    [21, 12, 0.74],
+    [21, 16, 0.80],
+  ];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {dots.map(([cx, cy, delay], i) => (
+        <circle key={i} cx={cx} cy={cy} r="1.3"
+          style={{ animation: 'vectorFade 1.4s ease-in-out infinite', animationDelay: `${delay}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Single responsive SVG that renders MM:SS in dot-matrix, scales via viewBox.
+// Used in both the big card (maxWidth="100%") and the fullscreen overlay.
+const DMTimer: React.FC<{ mm: string; ss: string; color: string; maxWidth?: string }> = ({ mm, ss, color, maxWidth = 'min(88vw, 540px)' }) => {
+  // MM: step=28, r=10  |  SS: step=17, r=6
+  const mS = 28; const mR = 10;
+  const sS = 17; const sR = 6;
+  const mH = 4 * mS; // 112 — span between outermost dot centers
+  const sH = 4 * sS; // 68
+  const sOffY = (mH - sH) / 2; // 22 — vertical centering of SS relative to MM
+
+  // x positions of each digit's first dot column
+  const xMM0 = 0;
+  const xMM1 = xMM0 + 3 * mS + mR * 2 + 18; // 84+20+18 = 122
+  const xCol  = xMM1 + 3 * mS + mR * 2 + 10; // 122+104+10 = 236
+  const colCX = xCol + mR * 1.5;              // colon center x
+  const xSS0  = xCol + mR * 3 + 14;           // after colon
+  const xSS1  = xSS0 + 3 * sS + sR * 2 + 14;
+  const totalW = xSS1 + 3 * sS;
+  const pad = mR + 4;
+
+  const renderDigit = (digit: string, tx: number, ty: number, step: number, r: number) =>
+    (DM[digit] ?? DM['0']).flatMap((row, ri) =>
+      row.map((val, ci) => (
+        <circle key={`${tx}-${ri}-${ci}`}
+          cx={tx + ci * step} cy={ty + ri * step} r={r}
+          fill={color} opacity={val ? 1 : 0.07}
+          style={val ? { animation: 'dotPulse 2.4s ease-in-out infinite', animationDelay: `${(ri * 4 + ci) * 0.06}s` } : undefined} />
+      ))
+    );
+
+  return (
+    <svg
+      viewBox={`${-pad} ${-pad} ${totalW + pad * 2} ${mH + pad * 2}`}
+      style={{ width: maxWidth, height: 'auto' }}
+      overflow="visible"
+    >
+      {renderDigit(mm[0], xMM0, 0, mS, mR)}
+      {renderDigit(mm[1], xMM1, 0, mS, mR)}
+      {/* Colon — two dots */}
+      <circle cx={colCX} cy={mH * 0.3} r={mR} fill={color} opacity={0.4} />
+      <circle cx={colCX} cy={mH * 0.7} r={mR} fill={color} opacity={0.4} />
+      {renderDigit(ss[0], xSS0, sOffY, sS, sR)}
+      {renderDigit(ss[1], xSS1, sOffY, sS, sR)}
+    </svg>
+  );
+};
 
 export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [activeCardId, setActiveCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar'>('water');
-  const [isSystemActive, setIsSystemActive] = useState(false);
   const [lastManualClickTime, setLastManualClickTime] = useState<number>(0);
+  // systemCardId tracks which card has system priority — independent of what user is viewing
+  const [systemCardId, setSystemCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | null>(null);
   const [avatarUrl, setAvatarUrl] = useFirebaseSync<string | null>('avatar_url', null);
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
   const [workouts] = useFirebaseSync<any[]>('fitness_workouts', []);
@@ -49,16 +298,17 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     .filter(w => w.date === getLogicalDate().toDateString())
     .reduce((a, b) => a + (Number(b.duration) || 0), 0);
     
-  const { 
-    weekStats, 
-    todayIdx, 
-    running: pomodoroRunning, 
-    isOvertime: pomodoroOvertime, 
-    timeLeft, 
-    overtime, 
-    mode, 
-    focusDuration, 
-    breakDuration 
+  const {
+    weekStats,
+    todayIdx,
+    running: pomodoroRunning,
+    isOvertime: pomodoroOvertime,
+    timeLeft,
+    overtime,
+    mode,
+    focusDuration,
+    breakDuration,
+    start: pomodoroStart,
   } = usePomodoro();
   const focusMinutes = weekStats?.[todayIdx]?.minutes || 0;
   const focusHours = (focusMinutes / 60).toFixed(1).replace('.0', '');
@@ -133,26 +383,13 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   };
 
   const [now, setNow] = useState(new Date());
-  const [phase, setPhase] = useState(0);
-
-  // Animate WavyRing phase when timer is running on home dashboard
-  useEffect(() => {
-    let animId: number;
-    const animate = () => {
-      setPhase(p => (p + 0.05) % (Math.PI * 2));
-      animId = requestAnimationFrame(animate);
-    };
-    if (pomodoroRunning || pomodoroOvertime) {
-      animId = requestAnimationFrame(animate);
-    }
-    return () => cancelAnimationFrame(animId);
-  }, [pomodoroRunning, pomodoroOvertime]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     document.title = 'Rakeeen Home';
     return () => clearInterval(timer);
   }, []);
+
 
   const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const [timeOnly, amPm] = timeString.split(' ');
@@ -214,11 +451,6 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
   // Smart active card prioritizing logic based on real-time activity
   useEffect(() => {
-    // Override auto-priority for 3 minutes (180,000 ms) after manual selection
-    if (Date.now() - lastManualClickTime < 180000) {
-      return;
-    }
-
     const getNextPrayerCloseness = () => {
       if (!nextPrayer || !nextPrayer.time) return false;
       const [h, m] = nextPrayer.time.split(':').map(Number);
@@ -233,17 +465,23 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
     const isPrayerActiveOrClose = cardPrayer.info === 'ACTIVE NOW' || getNextPrayerCloseness();
 
-    let targetCardId: 'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' = 'water';
-
+    // Determine which card has real system priority (not just default)
+    let priorityCardId: 'pomodoro' | 'prayer' | null = null;
     if (pomodoroRunning || pomodoroOvertime) {
-      targetCardId = 'pomodoro';
+      priorityCardId = 'pomodoro';
     } else if (isPrayerActiveOrClose) {
-      targetCardId = 'prayer';
+      priorityCardId = 'prayer';
     }
 
+    // systemCardId tracks the priority card — always updated, user interaction doesn't clear it
+    setSystemCardId(priorityCardId ?? 'water');
+
+    // Navigate the big card to the priority — but only if user hasn't manually clicked in 3 min
+    if (Date.now() - lastManualClickTime < 180000) return;
+
+    const targetCardId = priorityCardId ?? 'water';
     if (activeCardId !== targetCardId) {
       setActiveCardId(targetCardId);
-      setIsSystemActive(true);
     }
   }, [
     pomodoroRunning,
@@ -354,17 +592,19 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
             {
               id: 'water',
               title: 'Water Intake',
-              icon: Droplet,
+              Vector: WaterVector,
               route: 'water',
+              isRunning: false,
               metric: `${glasses} / 14`,
               subText: 'GLASSES TODAY',
             },
             {
               id: 'pomodoro',
               title: 'Focus Time',
-              icon: Timer,
+              Vector: FocusVector,
               route: 'pomodoro',
-              metric: pomodoroRunning || pomodoroOvertime 
+              isRunning: false,
+              metric: pomodoroRunning || pomodoroOvertime
                 ? (pomodoroOvertime ? `+${Math.floor(overtime / 60)}m` : `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`)
                 : `${focusMinutes > 0 ? focusHours : '0'}h`,
               subText: pomodoroRunning || pomodoroOvertime ? (pomodoroOvertime ? 'OVERTIME' : mode.toUpperCase()) : 'FOCUSED TODAY',
@@ -372,37 +612,39 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
             {
               id: 'calendar',
               title: 'Calendar',
-              icon: CalIcon,
+              Vector: CalendarVector,
               route: 'calendar',
+              isRunning: false,
               metric: `${now.getDate()} ${now.toLocaleDateString('en-US', { month: 'short' })}`,
               subText: now.toLocaleDateString('en-US', { weekday: 'long' }),
             },
             {
               id: 'prayer',
               title: 'Prayer',
-              icon: Moon,
+              Vector: PrayerVector,
               route: 'prayer',
+              isRunning: cardPrayer.info === 'ACTIVE NOW',
               metric: cardPrayer.name,
               subText: cardPrayer.info,
             },
             {
               id: 'fitness',
               title: 'Training',
-              icon: Activity,
+              Vector: FitnessVector,
               route: 'fitness',
+              isRunning: workoutMinsToday > 0,
               metric: `${workoutMinsToday}m`,
               subText: 'LOGGED TODAY',
             }
           ] as const).map(card => {
             const isActive = activeCardId === card.id;
-            const Icon = card.icon;
+            const { Vector } = card;
             return (
               <div
                 key={card.id}
                 onClick={() => {
                   setActiveCardId(card.id as any);
                   setLastManualClickTime(Date.now());
-                  setIsSystemActive(false);
                 }}
                 onDoubleClick={() => navigate(card.route)}
                 className={`cursor-pointer transform-gpu transition-all duration-200 relative select-none flex flex-col justify-between p-4 border ${
@@ -412,24 +654,23 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 } w-[160px] lg:w-[230px] h-[100px] lg:h-[110px] shrink-0`}
                 style={isActive ? { backgroundColor: 'var(--paper-dark)' } : undefined}
               >
-                {/* Absolutely positioned spinning vector to the left of the card on desktop */}
-                {isActive && isSystemActive && (
-                  <div className="hidden lg:block absolute -left-12 top-1/2 -translate-y-1/2 animate-spin z-10" style={{ animationDuration: '6s' }}>
+                {/* Spinning vector shown left of card when system-auto-selected */}
+                {systemCardId === card.id && (
+                  <div className="hidden lg:block absolute -left-10 top-1/2 -translate-y-1/2 z-10">
                     <SidebarActiveVector />
                   </div>
                 )}
+
 
                 <div className="flex justify-between items-start pointer-events-none">
                   <span className="font-sans-main text-xs font-black tracking-tight uppercase truncate mr-2">
                     {card.title}
                   </span>
-                  <div className={`p-1.5 border flex items-center justify-center shrink-0 ${
-                    isActive 
-                      ? 'bg-ink/10 border-ink/25 text-ink' 
-                      : 'bg-sepia/10 border-ink/20 text-ink'
-                  }`}>
-                    <Icon size={14} className={card.id === 'water' ? 'fill-current' : ''} />
-                  </div>
+                  {Vector && (
+                    <div className="shrink-0 text-ink">
+                      <Vector />
+                    </div>
+                  )}
                 </div>
                 <div className="mt-1 pointer-events-none">
                   <span className="font-mono-main text-[16px] lg:text-[18px] font-black block truncate">
@@ -448,25 +689,19 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
         {/* Active Stage (Center/Right) */}
         <div className="flex-1 flex flex-col items-stretch lg:max-h-[614px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeCardId}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              onClick={() => {
-                const found = [
-                  { id: 'pomodoro', route: 'pomodoro' },
-                  { id: 'water', route: 'water' },
-                  { id: 'fitness', route: 'fitness' },
-                  { id: 'prayer', route: 'prayer' },
-                  { id: 'calendar', route: 'calendar' }
-                ].find(c => c.id === activeCardId);
-                if (found) navigate(found.route);
-              }}
-              className="flex-1 flex flex-col justify-between brutalist-card bg-paper p-8 lg:p-10 relative group cursor-pointer"
-            >
+          <div
+            onClick={() => {
+              const found = [
+                { id: 'pomodoro', route: 'pomodoro' },
+                { id: 'water', route: 'water' },
+                { id: 'fitness', route: 'fitness' },
+                { id: 'prayer', route: 'prayer' },
+                { id: 'calendar', route: 'calendar' }
+              ].find(c => c.id === activeCardId);
+              if (found) navigate(found.route);
+            }}
+            className="flex-1 flex flex-col justify-between brutalist-card bg-paper p-8 lg:p-10 relative group cursor-pointer"
+          >
 
               {/* Active Card Body Renderer */}
               {activeCardId === 'water' && (
@@ -476,8 +711,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
                       <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">WATER INTAKE</h2>
                     </div>
-                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
-                      <Droplet size={28} className="fill-current" />
+                    <div className="text-ink opacity-60">
+                      <WaterVector size={36} />
                     </div>
                   </div>
 
@@ -508,28 +743,35 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               {activeCardId === 'pomodoro' && (
                 <div className="flex-1 flex flex-col justify-between">
                   {(pomodoroRunning || pomodoroOvertime) ? (
-                    <div className="flex-1 flex flex-col items-center justify-center py-4">
-                      <div className="relative w-full aspect-square max-w-[300px] flex items-center justify-center">
-                        <div className={`absolute inset-6 rounded-full blur-[48px] opacity-25 transition-colors duration-1000 ${pomodoroOvertime ? 'bg-rust' : (mode === 'break' ? 'bg-sepia' : 'bg-forest')}`} />
-                        <WavyRing 
-                          pct={pomodoroOvertime ? 100 : Math.max(0, (((mode === 'focus' ? focusDuration : breakDuration) * 60 - timeLeft) / ((mode === 'focus' ? focusDuration : breakDuration) * 60)) * 100)} 
-                          phase={phase} 
-                          mode={mode} 
-                          isOvertime={pomodoroOvertime} 
-                          size={300} 
-                          waves={mode === 'break' ? breakDuration || 5 : focusDuration || 25} 
-                        />
-                        
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                          <span className={`text-6xl font-black tracking-tight mb-2 tabular-nums leading-none ${pomodoroOvertime ? 'text-rust' : 'text-ink'}`}>
-                            {pomodoroOvertime ? `+${Math.floor(overtime / 60)}m` : `${Math.floor(timeLeft / 60)}:${String(timeLeft % 60).padStart(2, '0')}`}
-                          </span>
-                          <span className="text-xs tracking-[0.25em] font-bold text-ink/30 uppercase">
-                            {pomodoroOvertime ? 'OVERTIME' : mode}
-                          </span>
-                        </div>
+                    <>
+                      {/* Top — status strip, mirrors idle header */}
+                      <div className="flex justify-between items-start">
+                        <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] uppercase"
+                          style={{ color: pomodoroOvertime ? 'var(--rust)' : 'var(--forest)' }}>
+                          {pomodoroOvertime ? '● OVERTIME' : `● ${mode.toUpperCase()}`}
+                        </span>
                       </div>
-                    </div>
+
+                      {/* Middle — dot-matrix countdown */}
+                      {(() => {
+                        const secs = pomodoroOvertime ? overtime : timeLeft;
+                        const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+                        const ss = String(secs % 60).padStart(2, '0');
+                        const col = pomodoroOvertime ? 'var(--rust)' : 'var(--ink)';
+                        return (
+                          <div className="flex-1 flex items-center justify-center w-full">
+                            <DMTimer mm={mm} ss={ss} color={col} maxWidth="min(100%, 340px)" />
+                          </div>
+                        );
+                      })()}
+
+                      {/* Bottom — wavy dot-matrix progress bar */}
+                      <WavyProgressBar
+                        pct={pomodoroOvertime ? 100 : Math.max(0, (((mode === 'focus' ? focusDuration : breakDuration) * 60 - timeLeft) / ((mode === 'focus' ? focusDuration : breakDuration) * 60)) * 100)}
+                        isOvertime={pomodoroOvertime}
+                        mode={mode}
+                      />
+                    </>
                   ) : (
                     <>
                       <div className="flex justify-between items-start">
@@ -537,17 +779,29 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                           <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
                           <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">FOCUS TIME</h2>
                         </div>
-                        <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
-                          <Timer size={28} />
+                        <div className="text-ink opacity-60">
+                          <FocusVector size={36} />
                         </div>
                       </div>
 
-                      <div className="flex items-baseline gap-2">
-                        <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
-                          {focusMinutes > 0 ? focusHours : '0'}
-                        </span>
-                        <span className="font-mono-main text-3xl font-bold text-ink/40">h</span>
-                        <span className="font-sans-main text-xs font-bold uppercase tracking-wider text-ink/60 ml-1">focused today</span>
+                      <div className="flex items-end justify-between gap-4">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                            {focusMinutes > 0 ? focusHours : '0'}
+                          </span>
+                          <span className="font-mono-main text-3xl font-bold text-ink/40">h</span>
+                          <span className="font-sans-main text-xs font-bold uppercase tracking-wider text-ink/60 ml-1">focused today</span>
+                        </div>
+
+                        <button
+                          onClick={(e) => { e.stopPropagation(); pomodoroStart(); }}
+                          className="btn-brutalist shrink-0 flex items-center gap-2 px-5 py-3 text-sm"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
+                            <polygon points="2,1 9,5 2,9" />
+                          </svg>
+                          START FOCUS
+                        </button>
                       </div>
                     </>
                   )}
@@ -561,8 +815,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
                       <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">TRAINING</h2>
                     </div>
-                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
-                      <Activity size={28} />
+                    <div className="text-ink">
+                      <FitnessVector size={36} />
                     </div>
                   </div>
 
@@ -583,8 +837,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
                       <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">PRAYER</h2>
                     </div>
-                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
-                      <Moon size={28} />
+                    <div className="text-ink">
+                      <PrayerVector size={36} />
                     </div>
                   </div>
 
@@ -601,8 +855,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
                       <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">CALENDAR</h2>
                     </div>
-                    <div className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink group-hover:scale-105 transition-transform">
-                      <CalIcon size={28} />
+                    <div className="text-ink">
+                      <CalendarVector size={36} />
                     </div>
                   </div>
 
@@ -618,8 +872,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               )}
 
               {/* FINANCE CARD — disabled */}
-            </motion.div>
-          </AnimatePresence>
+          </div>
         </div>
 
       </main>
@@ -656,6 +909,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         onCancel={() => setLogoutModal(false)}
         variant="warning"
       />
+
     </div>
   );
 };
