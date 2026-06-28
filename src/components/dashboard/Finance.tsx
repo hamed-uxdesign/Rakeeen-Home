@@ -89,6 +89,48 @@ const BanqueMisrVector: React.FC = () => (
 );
 
 // Animated price number — flashes green/red on change
+// Spinning vector that hides the value until hover
+const MaskedValue: React.FC<{ children: React.ReactNode; className?: string; disabled?: boolean }> = ({ children, className = '', disabled = false }) => {
+  const [revealed, setRevealed] = useState(false);
+  if (disabled) return <span className={className}>{children}</span>;
+  return (
+    <span
+      className={`relative inline-block cursor-pointer select-none ${className}`}
+      onMouseEnter={() => setRevealed(true)}
+      onMouseLeave={() => setRevealed(false)}
+    >
+      {/* Spinning asterisk mask — positioned absolute so container = value width */}
+      <span
+        className="absolute inset-0 flex items-center justify-start transition-opacity duration-200"
+        style={{ opacity: revealed ? 0 : 1, pointerEvents: 'none' }}
+        aria-hidden
+      >
+        <svg width="2.2em" height="0.8em" viewBox="0 0 44 14" fill="none">
+          <style>{`@keyframes mvr{to{transform:rotate(360deg)}}@keyframes mvrr{to{transform:rotate(-360deg)}}`}</style>
+          {[0,1,2].map(i => {
+            const cx = 7 + i * 15;
+            const cy = 7;
+            const r = 4;
+            const anim = i === 1 ? 'mvrr' : 'mvr';
+            const dur = 2 + i * 0.5;
+            return (
+              <g key={i} style={{ animation: `${anim} ${dur}s linear infinite`, transformOrigin: `${cx}px ${cy}px`, opacity: 0.25 + i * 0.2 }}>
+                <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+                <line x1={cx - r * 0.5} y1={cy - r * 0.866} x2={cx + r * 0.5} y2={cy + r * 0.866} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+                <line x1={cx + r * 0.5} y1={cy - r * 0.866} x2={cx - r * 0.5} y2={cy + r * 0.866} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+              </g>
+            );
+          })}
+        </svg>
+      </span>
+      {/* Value — invisible but holds layout width */}
+      <span className="transition-opacity duration-200" style={{ opacity: revealed ? 1 : 0 }}>
+        {children}
+      </span>
+    </span>
+  );
+};
+
 const AnimatedValue: React.FC<{ value: number; className?: string }> = ({ value, className = '' }) => {
   const prevRef = useRef(value);
   const [flash, setFlash] = useState<'up' | 'down' | null>(null);
@@ -193,6 +235,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts'>('overview');
   const [classifyState, setClassifyState] = useState<ClassifyState | null>(null);
+  const [privacyMode, setPrivacyMode] = useState(true);
 
 
   const [confirming, setConfirming] = useState(false);
@@ -531,15 +574,36 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
           onClick={() => navigate('home')}
           className="w-10 h-10 border border-ink flex items-center justify-center text-ink hover:bg-ink/5 transition-colors cursor-pointer"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft />
         </button>
         <h1 className="font-sans-main text-3xl md:text-4xl font-black uppercase tracking-tight text-ink">
           FINANCES
         </h1>
+        <button
+          onClick={() => setPrivacyMode(p => !p)}
+          className="ml-auto flex items-center gap-2 cursor-pointer select-none group"
+          title={privacyMode ? 'Privacy on' : 'Privacy off'}
+        >
+          <span className="font-mono-main text-[9px] uppercase tracking-widest text-ink/40 group-hover:text-ink/70 transition-colors">
+            {privacyMode ? 'PRIVATE' : 'VISIBLE'}
+          </span>
+          <div
+            className="relative w-9 h-5 border transition-colors duration-200"
+            style={{ borderColor: privacyMode ? 'var(--ink)' : 'color-mix(in srgb, var(--ink) 25%, transparent)', background: 'transparent' }}
+          >
+            <div
+              className="absolute top-0.5 w-3.5 h-3.5 transition-all duration-200"
+              style={{
+                left: privacyMode ? 'calc(100% - 0.875rem - 2px)' : '2px',
+                background: privacyMode ? 'var(--ink)' : 'color-mix(in srgb, var(--ink) 25%, transparent)',
+              }}
+            />
+          </div>
+        </button>
       </header>
 
-      {/* TABS SWITCHER (Matched with training / Fitness.tsx component style) */}
-      <div className="w-full max-w-[1400px] mx-auto mb-8">
+      {/* TABS SWITCHER + ACTION BUTTONS in one row */}
+      <div className="w-full max-w-[1400px] mx-auto mb-8 flex items-center justify-between">
         <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)] w-fit">
           {(['overview', 'buckets', 'gold', 'subscriptions', 'debts'] as const).map(tab => (
             <button
@@ -562,6 +626,20 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
             </button>
           ))}
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowWithdrawModal(true)}
+            className="flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer border border-ink/30 text-ink/60 hover:text-ink hover:border-ink transition-colors bg-transparent"
+          >
+            <Minus size={11} /> Withdraw
+          </button>
+          <button
+            onClick={() => setShowAddDepositModal(true)}
+            className="btn-brutalist flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer"
+          >
+            <Plus size={11} /> Add Deposit
+          </button>
+        </div>
       </div>
 
       <div className="w-full max-w-[1400px] mx-auto space-y-12">
@@ -569,21 +647,6 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
-            {/* ADD / WITHDRAW BUTTONS */}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowWithdrawModal(true)}
-                className="flex items-center gap-2 font-mono-main text-xs uppercase py-2.5 px-5 cursor-pointer border border-ink/30 text-ink/60 hover:text-ink hover:border-ink transition-colors bg-transparent"
-              >
-                <Minus size={13} /> Withdraw
-              </button>
-              <button
-                onClick={() => setShowAddDepositModal(true)}
-                className="btn-brutalist flex items-center gap-2 font-mono-main text-xs uppercase py-2.5 px-5 cursor-pointer"
-              >
-                <Plus size={13} /> Add Deposit
-              </button>
-            </div>
 
             {/* INLINE PENDING INBOX */}
             <AnimatePresence>
@@ -596,7 +659,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 >
                   <div className="absolute top-0 left-0 right-0 h-[3px] bg-rust animate-pulse" />
                   <div className="flex items-center gap-3 mb-4">
-                    <Inbox size={16} className="text-rust" />
+                    <Inbox className="text-rust" />
                     <span className="font-mono-main text-xs font-bold tracking-[0.25em] uppercase text-rust">
                       INLINE PENDING INBOX
                     </span>
@@ -747,9 +810,9 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                         <span className="font-mono-main text-[9px] font-bold uppercase tracking-[0.2em] text-ink/40 block mb-1">
                           Available Balance
                         </span>
-                        <p className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">
+                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">
                           {formatEGP(banks[key] || 0)}
-                        </p>
+                        </MaskedValue>
                       </div>
                     </div>
                   );
@@ -761,21 +824,21 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="brutalist-card no-lift">
                 <div className="flex items-center gap-2 mb-3">
-                  <Banknote size={15} className="text-ink/40" />
+                  <Banknote className="text-ink/40" />
                   <p className="font-mono-main text-[10px] font-bold tracking-[0.2em] uppercase text-ink/40">
                     TOTAL PHYSICAL BALANCE
                   </p>
                 </div>
-                <p className="font-mono-main text-3xl md:text-4xl font-black text-ink">{formatEGP(totalPhysical)}</p>
+                <MaskedValue disabled={!privacyMode} className="font-mono-main text-3xl md:text-4xl font-black text-ink">{formatEGP(totalPhysical)}</MaskedValue>
               </div>
               <div className="brutalist-card no-lift">
                 <div className="flex items-center gap-2 mb-3">
-                  <Wallet size={15} className="text-ink/40" />
+                  <Wallet className="text-ink/40" />
                   <p className="font-mono-main text-[10px] font-bold tracking-[0.2em] uppercase text-ink/40">
                     TOTAL VIRTUAL BALANCE
                   </p>
                 </div>
-                <p className="font-mono-main text-3xl md:text-4xl font-black text-ink">{formatEGP(totalVirtual)}</p>
+                <MaskedValue disabled={!privacyMode} className="font-mono-main text-3xl md:text-4xl font-black text-ink">{formatEGP(totalVirtual)}</MaskedValue>
               </div>
             </div>
           </div>
@@ -807,9 +870,9 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
                     <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-6">
                       <div>
-                        <p className="font-mono-main text-2xl sm:text-3xl font-black text-ink">
+                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink">
                           {formatEGP(value)}
-                        </p>
+                        </MaskedValue>
                       </div>
                       
                       {/* 10-Dot Matrix Loader */}
@@ -851,9 +914,9 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                       </div>
 
                       <div className="flex items-end justify-between mt-6">
-                        <p className="font-mono-main text-xl font-black text-ink">
+                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-xl font-black text-ink">
                           {formatEGP(value)}
-                        </p>
+                        </MaskedValue>
                         
                         {/* 10-Dot Matrix Loader */}
                         <div className="flex gap-1">
@@ -915,7 +978,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-4">Portfolio Value</p>
                 <div>
                   {goldPrices ? (
-                    <p className="font-mono-main text-3xl font-black text-ink">{formatEGP(totalGoldValuation)}</p>
+                    <MaskedValue disabled={!privacyMode} className="font-mono-main text-3xl font-black text-ink">{formatEGP(totalGoldValuation)}</MaskedValue>
                   ) : (
                     <>
                       <p className="font-mono-main text-3xl font-black text-ink/30">—</p>
@@ -938,7 +1001,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 onClick={() => setShowAddGoldModal(true)}
                 className="btn-brutalist flex items-center gap-2 font-mono-main text-xs uppercase py-2 px-4 cursor-pointer"
               >
-                <Plus size={13} /> Add Asset
+                <Plus /> Add Asset
               </button>
             </div>
 
@@ -955,8 +1018,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   return (
                     <div key={g.id} className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark">
                       <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => openEditGold(g)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil size={12} /></button>
-                        <button onClick={() => handleRemoveGold(g.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 size={12} /></button>
+                        <button onClick={() => openEditGold(g)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
+                        <button onClick={() => handleRemoveGold(g.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
                       </div>
 
                       {/* Left: weight + carat + notes */}
@@ -970,13 +1033,13 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                       <div className="text-right space-y-0.5 pr-6">
                         {purchasedTotal !== null && (
                           <p className="font-mono-main text-[10px] text-ink/35">
-                            Paid {formatEGP(purchasedTotal)}
+                            Paid <MaskedValue disabled={!privacyMode}>{formatEGP(purchasedTotal)}</MaskedValue>
                           </p>
                         )}
-                        <p className="font-mono-main text-sm font-black text-ink">{formatEGP(currentVal)}</p>
+                        <p className="font-mono-main text-sm font-black text-ink"><MaskedValue disabled={!privacyMode}>{formatEGP(currentVal)}</MaskedValue></p>
                         {pnl !== null && (
                           <p className="font-mono-main text-[10px] font-bold" style={{ color: pnl >= 0 ? 'var(--forest)' : 'var(--rust)' }}>
-                            {pnl >= 0 ? '+' : ''}{formatEGP(pnl)}
+                            {pnl >= 0 ? '+' : ''}<MaskedValue disabled={!privacyMode}>{formatEGP(pnl)}</MaskedValue>
                           </p>
                         )}
                       </div>
@@ -997,7 +1060,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 <div>
                   <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Monthly Total</p>
                   <p className="font-mono-main text-2xl font-black text-rust">
-                    -{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost, 0))}
+                    -<MaskedValue disabled={!privacyMode}>{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost, 0))}</MaskedValue>
                   </p>
                 </div>
                 <p className="font-mono-main text-xs text-ink/30">{subscriptions.length} subscriptions</p>
@@ -1010,7 +1073,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 onClick={() => setShowAddSubModal(true)}
                 className="btn-brutalist flex items-center gap-2 font-mono-main text-xs uppercase py-2 px-4 cursor-pointer"
               >
-                <Plus size={13} /> Add
+                <Plus /> Add
               </button>
             </div>
 
@@ -1027,8 +1090,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   return (
                     <div key={sub.id} className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark">
                       <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => openEditSub(sub)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil size={12} /></button>
-                        <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 size={12} /></button>
+                        <button onClick={() => openEditSub(sub)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
+                        <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
                       </div>
 
                       <div className="flex items-center gap-4">
@@ -1039,7 +1102,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                       </div>
 
                       <div className="text-right pr-6">
-                        <p className="font-mono-main text-base font-black text-rust">-{formatEGP(sub.cost)}</p>
+                        <p className="font-mono-main text-base font-black text-rust">-<MaskedValue disabled={!privacyMode}>{formatEGP(sub.cost)}</MaskedValue></p>
                         <p className="font-mono-main text-[10px] mt-0.5" style={{ color: soon ? 'var(--rust)' : 'var(--ink)', opacity: soon ? 1 : 0.3 }}>
                           {daysLeft === 0 ? 'Today' : `in ${daysLeft}d`}
                         </p>
@@ -1060,12 +1123,12 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               <div>
                 <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Net Balance</p>
                 <p className="font-mono-main text-2xl font-black" style={{ color: netDebts > 0 ? 'var(--forest)' : netDebts < 0 ? 'var(--rust)' : 'var(--ink)' }}>
-                  {netDebts >= 0 ? '+' : ''}{formatEGP(netDebts)}
+                  {netDebts >= 0 ? '+' : ''}<MaskedValue disabled={!privacyMode}>{formatEGP(netDebts)}</MaskedValue>
                 </p>
               </div>
               <div className="text-right space-y-1">
-                <p className="font-mono-main text-xs text-ink/60 font-bold">↑ {formatEGP(totalDebtsOwedToMe)}</p>
-                <p className="font-mono-main text-xs text-ink/40 font-bold">↓ {formatEGP(totalDebtsOwedByMe)}</p>
+                <p className="font-mono-main text-xs text-ink/60 font-bold">↑ <MaskedValue disabled={!privacyMode}>{formatEGP(totalDebtsOwedToMe)}</MaskedValue></p>
+                <p className="font-mono-main text-xs text-ink/40 font-bold">↓ <MaskedValue disabled={!privacyMode}>{formatEGP(totalDebtsOwedByMe)}</MaskedValue></p>
               </div>
             </div>
 
@@ -1075,7 +1138,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 onClick={() => setShowAddDebtModal(true)}
                 className="btn-brutalist flex items-center gap-2 font-mono-main text-xs uppercase py-2 px-4 cursor-pointer"
               >
-                <Plus size={13} /> Add
+                <Plus /> Add
               </button>
             </div>
 
@@ -1092,8 +1155,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     style={{ borderLeft: `3px solid var(--ink)`, opacity: debt.type === 'owed_by_me' ? 0.6 : 1 }}
                   >
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => openEditDebt(debt)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil size={12} /></button>
-                      <button onClick={() => handleRemoveDebt(debt.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 size={12} /></button>
+                      <button onClick={() => openEditDebt(debt)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
+                      <button onClick={() => handleRemoveDebt(debt.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
                     </div>
 
                     <div>
@@ -1103,7 +1166,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
                     <div className="text-right pr-6">
                       <p className="font-mono-main text-base font-black text-ink">
-                        {debt.type === 'owed_to_me' ? '+' : '−'}{formatEGP(debt.amount)}
+                        {debt.type === 'owed_to_me' ? '+' : '−'}<MaskedValue disabled={!privacyMode}>{formatEGP(debt.amount)}</MaskedValue>
                       </p>
                       <p className="font-mono-main text-[9px] text-ink/25 mt-0.5 uppercase tracking-widest">
                         {debt.type === 'owed_to_me' ? 'Receivable' : 'Payable'}
@@ -1140,7 +1203,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Add Gold Asset</h3>
                 <button onClick={() => setShowAddGoldModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X size={16} strokeWidth={2} />
+                  <X strokeWidth={2} />
                 </button>
               </div>
 
@@ -1225,7 +1288,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Add Subscription</h3>
                 <button onClick={() => setShowAddSubModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X size={16} strokeWidth={2} />
+                  <X strokeWidth={2} />
                 </button>
               </div>
 
@@ -1330,7 +1393,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Log Debt</h3>
                 <button onClick={() => setShowAddDebtModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X size={16} strokeWidth={2} />
+                  <X strokeWidth={2} />
                 </button>
               </div>
 
@@ -1422,7 +1485,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
                     onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}
                   >
-                    <X size={16} strokeWidth={2} />
+                    <X strokeWidth={2} />
                   </button>
                 </div>
 
@@ -1591,7 +1654,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Withdraw</h3>
                 <button onClick={() => setShowWithdrawModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X size={16} strokeWidth={2} />
+                  <X strokeWidth={2} />
                 </button>
               </div>
 
@@ -1667,7 +1730,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Gold</h3>
-                <button onClick={() => setEditingGold(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X size={16} strokeWidth={2} /></button>
+                <button onClick={() => setEditingGold(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X strokeWidth={2} /></button>
               </div>
               <form onSubmit={handleSaveGold}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -1710,7 +1773,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Subscription</h3>
-                <button onClick={() => setEditingSub(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X size={16} strokeWidth={2} /></button>
+                <button onClick={() => setEditingSub(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X strokeWidth={2} /></button>
               </div>
               <form onSubmit={handleSaveSub}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -1759,7 +1822,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
               <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                 <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Debt</h3>
-                <button onClick={() => setEditingDebt(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X size={16} strokeWidth={2} /></button>
+                <button onClick={() => setEditingDebt(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X strokeWidth={2} /></button>
               </div>
               <form onSubmit={handleSaveDebt}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>

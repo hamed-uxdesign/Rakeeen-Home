@@ -17,6 +17,38 @@ interface HomeProps {
   navigate: (to: string) => void;
 }
 
+const MaskedValue: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span className={`relative inline-block cursor-pointer select-none ${className}`}
+      onMouseEnter={() => setRevealed(true)}
+      onMouseLeave={() => setRevealed(false)}
+    >
+      <span className="absolute inset-0 flex items-center justify-start transition-opacity duration-200"
+        style={{ opacity: revealed ? 0 : 1, pointerEvents: 'none' }}
+        aria-hidden>
+        <svg width="2.2em" height="0.8em" viewBox="0 0 44 14" fill="none">
+          <style>{`@keyframes mvr{to{transform:rotate(360deg)}}@keyframes mvrr{to{transform:rotate(-360deg)}}`}</style>
+          {[0,1,2].map(i => {
+            const cx = 7 + i * 15, cy = 7, r = 4;
+            const anim = i === 1 ? 'mvrr' : 'mvr';
+            return (
+              <g key={i} style={{ animation: `${anim} ${2 + i * 0.5}s linear infinite`, transformOrigin: `${cx}px ${cy}px`, opacity: 0.25 + i * 0.2 }}>
+                <line x1={cx - r} y1={cy} x2={cx + r} y2={cy} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+                <line x1={cx - r * 0.5} y1={cy - r * 0.866} x2={cx + r * 0.5} y2={cy + r * 0.866} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+                <line x1={cx + r * 0.5} y1={cy - r * 0.866} x2={cx - r * 0.5} y2={cy + r * 0.866} stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+              </g>
+            );
+          })}
+        </svg>
+      </span>
+      <span className="transition-opacity duration-200" style={{ opacity: revealed ? 1 : 0 }}>
+        {children}
+      </span>
+    </span>
+  );
+};
+
 // Priority indicator — 6 dots orbiting a right-pointing triangle outline.
 // The bright point chases the triangle clockwise: tip → upper → left → lower → tip.
 // Reads as "active / locked-on" without being a circle, chevron, or spinner.
@@ -618,7 +650,9 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 </div>
                 <div className="mt-1 pointer-events-none">
                   <span className="font-mono-main text-[16px] lg:text-[18px] font-black block truncate">
-                    {card.metric}
+                    {card.id === 'finance' && totalPhysical > 0
+                      ? <MaskedValue>{card.metric}</MaskedValue>
+                      : card.metric}
                   </span>
                   <span className={`font-mono-main text-[8px] lg:text-[9px] tracking-wider font-bold uppercase block truncate ${
                     isActive ? 'text-ink/50' : 'text-ink/40'
@@ -834,7 +868,9 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                   <div className="flex items-end gap-4">
                     <div className="flex items-baseline gap-2">
                       <span className="font-mono-main text-5xl sm:text-6xl font-black text-ink leading-none">
-                        {totalPhysical > 0 ? Math.round(totalPhysical).toLocaleString() : '—'}
+                        {totalPhysical > 0
+                          ? <MaskedValue>{Math.round(totalPhysical).toLocaleString()}</MaskedValue>
+                          : '—'}
                       </span>
                       {totalPhysical > 0 && (
                         <span className="font-mono-main text-2xl font-bold text-ink/40">EGP</span>
