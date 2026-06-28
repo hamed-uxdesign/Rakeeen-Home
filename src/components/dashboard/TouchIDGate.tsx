@@ -1,0 +1,210 @@
+import React, { useEffect, useState } from 'react';
+import { User } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
+import {
+  getStoredCredentialIds,
+  registerTouchID,
+  verifyTouchID,
+  isBiometricSupported,
+} from '../../lib/webauthn';
+
+interface Props {
+  user: User;
+  onCleared: () => void;
+}
+
+type Stage = 'checking' | 'register' | 'verify' | 'error';
+
+const FingerprintVector: React.FC<{ scanning?: boolean }> = ({ scanning = false }) => {
+  const cx = 30;
+  const cy = 38;
+  const radii = [5, 10, 15, 20, 25];
+  return (
+    <svg width="56" height="56" viewBox="0 0 60 56" fill="none">
+      <style>{`
+        @keyframes fpDraw {
+          0%   { stroke-dashoffset: var(--len); opacity: 0.15; }
+          35%  { stroke-dashoffset: 0;          opacity: 1; }
+          70%  { stroke-dashoffset: 0;          opacity: 1; }
+          100% { stroke-dashoffset: var(--len); opacity: 0.15; }
+        }
+        @keyframes fpDot {
+          0%, 100% { opacity: 0.2; transform: scale(0.6); }
+          35%, 70% { opacity: 1;   transform: scale(1); }
+        }
+      `}</style>
+
+      {/* Center dot */}
+      <circle
+        cx={cx} cy={cy} r={2}
+        fill="currentColor"
+        style={{
+          animation: scanning ? 'fpDot 2.8s ease-in-out infinite' : undefined,
+          transformOrigin: `${cx}px ${cy}px`,
+          opacity: scanning ? undefined : 0.5,
+        }}
+      />
+
+      {/* Concentric arcs */}
+      {radii.map((r, i) => {
+        const len = Math.PI * r;
+        const delay = i * 0.18;
+        return (
+          <path
+            key={r}
+            d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
+            stroke="currentColor"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+            fill="none"
+            style={{
+              ['--len' as any]: len,
+              strokeDasharray: `${len} ${len}`,
+              strokeDashoffset: scanning ? len : 0,
+              opacity: scanning ? 0.15 : 0.5 - i * 0.06,
+              animation: scanning
+                ? `fpDraw 2.8s ease-in-out ${delay}s infinite`
+                : undefined,
+            }}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+export const TouchIDGate: React.FC<Props> = ({ user, onCleared }) => {
+  const [stage, setStage] = useState<Stage>('checking');
+  const [credentialIds, setCredentialIds] = useState<string[]>([]);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    async function init() {
+      if (!isBiometricSupported()) {
+        setErrorMsg('This browser does not support Touch ID.');
+        setStage('error');
+        return;
+      }
+      try {
+        const ids = await getStoredCredentialIds(user.uid);
+        setCredentialIds(ids);
+        setStage(ids.length === 0 ? 'register' : 'verify');
+      } catch {
+        setErrorMsg('Failed to connect. Check your connection.');
+        setStage('error');
+      }
+    }
+    init();
+  }, [user.uid]);
+
+  const handleRegister = async () => {
+    setBusy(true);
+    setErrorMsg('');
+    try {
+      await registerTouchID(user.uid, user.email ?? user.uid);
+      onCleared();
+    } catch (e: any) {
+      setErrorMsg(
+        e?.name === 'NotAllowedError'
+          ? 'Cancelled. Try again.'
+          : 'Registration failed. Make sure Touch ID is enabled.'
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    setBusy(true);
+    setErrorMsg('');
+    try {
+      const ok = await verifyTouchID(credentialIds);
+      if (ok) {
+        onCleared();
+      } else {
+        setErrorMsg('Verification failed. Try again.');
+      }
+    } catch (e: any) {
+      setErrorMsg(
+        e?.name === 'NotAllowedError' ? 'Cancelled. Try again.' : 'Verification failed.'
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-bg p-6 relative overflow-hidden transition-colors duration-300">
+      <div
+        className="absolute inset-0 opacity-5 pointer-events-none"
+        style={{ backgroundImage: 'radial-gradient(var(--ink) 1px, transparent 1px)', backgroundSize: '24px 24px' }}
+      />
+
+      <div className="w-full max-w-md brutalist-card no-lift p-10 md:p-12 relative z-10 text-center">
+
+        {/* Animated fingerprint icon */}
+        <div className="flex justify-center mb-8">
+          <div
+            className="w-14 h-14 bg-sepia/20 flex items-center justify-center border border-ink text-ink"
+            style={{ borderRadius: 0 }}
+          >
+            <FingerprintVector scanning={stage === 'verify' || stage === 'register' || busy} />
+          </div>
+        </div>
+
+        {/* Title */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-black uppercase tracking-tight">
+            {stage === 'checking' && 'CHECKING…'}
+            {stage === 'register' && 'REGISTER TOUCH ID'}
+            {stage === 'verify'   && 'TOUCH ID REQUIRED'}
+            {stage === 'error'    && 'ACCESS DENIED'}
+          </h1>
+        </div>
+
+        {/* Error */}
+        {errorMsg && (
+          <div className="bg-rust/10 border-2 border-rust text-rust text-[11px] font-black px-4 py-3 mb-8" style={{ borderRadius: 0 }}>
+            {errorMsg}
+          </div>
+        )}
+
+        {/* CTA */}
+        {stage === 'checking' && (
+          <div className="flex justify-center py-2">
+            <div className="w-5 h-5 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />
+          </div>
+        )}
+
+        {(stage === 'register' || stage === 'verify') && (
+          <button
+            onClick={stage === 'register' ? handleRegister : handleVerify}
+            disabled={busy}
+            className="btn-brutalist w-full flex items-center justify-center gap-3 py-4 text-base font-mono-main cursor-pointer"
+            style={{ background: 'var(--sepia)', color: 'var(--ink)' }}
+          >
+            {busy
+              ? <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+              : stage === 'register' ? 'REGISTER TOUCH ID' : 'AUTHENTICATE'
+            }
+          </button>
+        )}
+
+        {stage !== 'checking' && (
+          <button
+            onClick={handleLogout}
+            className="mt-6 font-mono-main text-[10px] uppercase tracking-widest text-ink/25 hover:text-ink/50 transition-colors cursor-pointer"
+          >
+            Sign out
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};

@@ -8,6 +8,7 @@ import { Prayer } from './components/dashboard/Prayer';
 import { Fitness } from './components/dashboard/Fitness';
 import { Finance } from './components/dashboard/Finance';
 import { Login } from './components/dashboard/Login';
+import { TouchIDGate } from './components/dashboard/TouchIDGate';
 import { CustomCursor } from './components/ui/CustomCursor';
 import { FloatingTimer } from './components/ui/FloatingTimer';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -31,7 +32,7 @@ const AnimatedPage: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, biometricCleared, setBiometricCleared } = useAuth();
 
   const nav = (to: string) => {
     const path = to === 'home' ? '/' : `/${to}`;
@@ -55,6 +56,15 @@ const AppRoutes: React.FC = () => {
       <div className="min-h-screen">
         <CustomCursor />
         <Login />
+      </div>
+    );
+  }
+
+  if (!biometricCleared) {
+    return (
+      <div className="min-h-screen">
+        <CustomCursor />
+        <TouchIDGate user={user} onCleared={() => setBiometricCleared(true)} />
       </div>
     );
   }
