@@ -128,16 +128,16 @@ export const TouchIDGate: React.FC<Props> = ({ user, onCleared }) => {
     setBusy(true);
     setErrorMsg('');
     try {
-      const ok = await verifyTouchID(credentialIds);
-      if (ok) {
+      const result = await verifyTouchID(credentialIds);
+      if (result === 'ok') {
         onCleared();
+      } else if (result === 'not_registered') {
+        // No credential for this domain — switch to register mode
+        setCredentialIds([]);
+        setStage('register');
       } else {
-        setErrorMsg('Verification failed. Try again.');
+        setErrorMsg('Wrong fingerprint. Try again.');
       }
-    } catch (e: any) {
-      setErrorMsg(
-        e?.name === 'NotAllowedError' ? 'Cancelled. Try again.' : 'Verification failed.'
-      );
     } finally {
       setBusy(false);
     }
