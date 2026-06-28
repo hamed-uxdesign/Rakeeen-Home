@@ -1,0 +1,57 @@
+import { doc, setDoc, updateDoc, onSnapshot, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
+
+const COL = 'device_auth_codes';
+const TTL = 5 * 60 * 1000; // 5 minutes
+
+export interface DeviceAuthDoc {
+  pending: boolean;
+  code: string | null;
+  requestedAt: number;
+  expiresAt: number;
+  used: boolean;
+}
+
+/** Mobile calls this — signals the Mac to generate a code */
+export async function requestDeviceCode(userId: string): Promise<void> {
+  await setDoc(doc(db, COL, userId), {
+    pending: true,
+    code: null,
+    requestedAt: Date.now(),
+    expiresAt: Date.now() + TTL,
+    used: false,
+  });
+}
+
+/** Mac calls this — generates the code and writes it so mobile can verify */
+export async function generateAndStoreCode(userId: string): Promise<string> {
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  await updateDoc(doc(db, COL, userId), { code });
+  return code;
+}
+
+/** Mobile calls this to verify what the user typed */
+export async function verifyDeviceCode(userId: string, input: string): Promise<boolean> {
+  const snap = await getDoc(doc(db, COL, userId));
+  if (!snap.exists()) return false;
+  const data = snap.data() as DeviceAuthDoc;
+  if (data.used) return false;
+  if (Date.now() > data.expiresAt) return false;
+  if (data.code !== input.trim()) return false;
+  await updateDoc(doc(db, COL, userId), { used: true });
+  return true;
+}
+
+/** Mac subscribes to this — fires when mobile requests a code */
+export function onDeviceCodeRequest(
+  userId: string,
+  callback: (data: DeviceAuthDoc | null) => void
+): () => void {
+  return onSnapshot(doc(db, COL, userId), (snap) => {
+    if (!snap.exists()) { callback(null); return; }
+    const data = snap.data() as DeviceAuthDoc;
+    // Ignore expired or already-used docs
+    if (data.used || Date.now() > data.expiresAt) { callback(null); return; }
+    callback(data);
+  });
+}

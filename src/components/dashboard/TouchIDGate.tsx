@@ -8,13 +8,14 @@ import {
   verifyTouchID,
   isBiometricSupported,
 } from '../../lib/webauthn';
+import { requestDeviceCode, verifyDeviceCode } from '../../lib/deviceAuth';
 
 interface Props {
   user: User;
   onCleared: () => void;
 }
 
-type Stage = 'checking' | 'register' | 'verify' | 'error';
+type Stage = 'checking' | 'register' | 'verify' | 'get_code' | 'enter_code' | 'error';
 
 const FingerprintVector: React.FC<{ scanning?: boolean }> = ({ scanning = false }) => {
   const cx = 30;
@@ -79,6 +80,7 @@ export const TouchIDGate: React.FC<Props> = ({ user, onCleared }) => {
   const [credentialIds, setCredentialIds] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
   const [isDark, setIsDark] = useState(() => document.body.classList.contains('dark-theme'));
 
   const toggleTheme = () => {
@@ -143,6 +145,36 @@ export const TouchIDGate: React.FC<Props> = ({ user, onCleared }) => {
     }
   };
 
+  const handleGetCode = async () => {
+    setBusy(true);
+    setErrorMsg('');
+    try {
+      await requestDeviceCode(user.uid);
+      setStage('enter_code');
+    } catch {
+      setErrorMsg('Failed to request code. Check your connection.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (!codeInput.trim()) return;
+    setBusy(true);
+    setErrorMsg('');
+    try {
+      const valid = await verifyDeviceCode(user.uid, codeInput);
+      if (valid) {
+        setStage('register');
+        setCodeInput('');
+      } else {
+        setErrorMsg('Wrong or expired code. Try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
   };
@@ -181,10 +213,12 @@ export const TouchIDGate: React.FC<Props> = ({ user, onCleared }) => {
         {/* Title */}
         <div className="mb-10">
           <h1 className="text-3xl font-black uppercase tracking-tight">
-            {stage === 'checking' && 'CHECKING…'}
-            {stage === 'register' && 'REGISTER TOUCH ID'}
-            {stage === 'verify'   && 'TOUCH ID REQUIRED'}
-            {stage === 'error'    && 'ACCESS DENIED'}
+            {stage === 'checking'   && 'CHECKING…'}
+            {stage === 'register'   && 'REGISTER TOUCH ID'}
+            {stage === 'verify'     && 'TOUCH ID REQUIRED'}
+            {stage === 'get_code'   && 'GET ACCESS CODE'}
+            {stage === 'enter_code' && 'ENTER CODE'}
+            {stage === 'error'      && 'ACCESS DENIED'}
           </h1>
         </div>
 
@@ -210,9 +244,64 @@ export const TouchIDGate: React.FC<Props> = ({ user, onCleared }) => {
           >
             {busy
               ? <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
-              : stage === 'register' ? 'REGISTER TOUCH ID' : 'AUTHENTICATE'
+              : stage === 'register' ? 'REGISTER ON THIS DEVICE' : 'AUTHENTICATE'
             }
           </button>
+        )}
+
+        {stage === 'verify' && !busy && (
+          <button
+            onClick={() => { setStage('get_code'); setErrorMsg(''); }}
+            className="mt-4 font-mono-main text-[10px] uppercase tracking-widest text-ink/25 hover:text-ink/50 transition-colors cursor-pointer"
+          >
+            No passkey on this device? Get a code
+          </button>
+        )}
+
+        {stage === 'get_code' && (
+          <>
+            <p className="text-[11px] font-mono-main text-ink/50 mb-6 leading-relaxed">
+              Open your trusted device (Mac), then click the button below. A 6-digit code will appear there.
+            </p>
+            <button
+              onClick={handleGetCode}
+              disabled={busy}
+              className="btn-brutalist w-full flex items-center justify-center gap-3 py-4 text-base font-mono-main cursor-pointer"
+            >
+              {busy
+                ? <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+                : 'SEND CODE TO MY MAC'
+              }
+            </button>
+          </>
+        )}
+
+        {stage === 'enter_code' && (
+          <>
+            <p className="text-[11px] font-mono-main text-ink/50 mb-4 leading-relaxed">
+              Enter the 6-digit code shown on your Mac.
+            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={codeInput}
+              onChange={e => setCodeInput(e.target.value.replace(/\D/g, ''))}
+              placeholder="000000"
+              className="w-full border border-ink bg-transparent text-center text-3xl font-black font-mono-main tracking-[0.3em] py-3 mb-4 outline-none"
+              style={{ borderRadius: 0 }}
+            />
+            <button
+              onClick={handleVerifyCode}
+              disabled={busy || codeInput.length < 6}
+              className="btn-brutalist w-full flex items-center justify-center gap-3 py-4 text-base font-mono-main cursor-pointer"
+            >
+              {busy
+                ? <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+                : 'VERIFY CODE'
+              }
+            </button>
+          </>
         )}
 
         {stage !== 'checking' && (

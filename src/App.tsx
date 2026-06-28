@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { PomodoroProvider } from './hooks/usePomodoro';
 import { FastingManager } from './components/logic/FastingManager';
 import { CalendarResetManager } from './components/logic/CalendarResetManager';
+import { DeviceCodeBanner } from './components/ui/DeviceCodeBanner';
 import { motion, AnimatePresence } from 'framer-motion';
 import './styles/global.css';
 
@@ -89,6 +90,7 @@ const AppRoutes: React.FC = () => {
       </AnimatePresence>
       
       <FloatingTimer currentPage={currentPage} onNavigate={() => nav('pomodoro')} />
+      <DeviceCodeBanner user={user} />
     </div>
   );
 };
