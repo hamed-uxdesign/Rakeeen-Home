@@ -345,8 +345,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       id: `${Date.now()}`,
       quantity: parseFloat(newGoldQty),
       carat: newGoldCarat,
-      notes: newGoldNotes.trim() || undefined,
-      purchasePrice,
+      ...(newGoldNotes.trim() ? { notes: newGoldNotes.trim() } : {}),
+      ...(purchasePrice !== undefined ? { purchasePrice } : {}),
     };
     await setGold([...(gold || []), asset]);
     setNewGoldQty('');
@@ -369,7 +369,14 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const handleSaveGold = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingGold) return;
-    const updated: GoldAsset = { ...editingGold, quantity: parseFloat(editingGoldQty), carat: editingGoldCarat, notes: editingGoldNotes, purchasePrice: editingGoldPrice ? parseFloat(editingGoldPrice) : undefined };
+    const { notes: _n, purchasePrice: _p, ...base } = editingGold;
+    const updated: GoldAsset = {
+      ...base,
+      quantity: parseFloat(editingGoldQty),
+      carat: editingGoldCarat,
+      ...(editingGoldNotes.trim() ? { notes: editingGoldNotes.trim() } : {}),
+      ...(editingGoldPrice ? { purchasePrice: parseFloat(editingGoldPrice) } : {}),
+    };
     await setGold((gold || []).map(g => g.id === editingGold.id ? updated : g));
     setEditingGold(null);
   };
