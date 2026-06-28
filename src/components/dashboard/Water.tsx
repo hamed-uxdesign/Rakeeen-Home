@@ -95,6 +95,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   };
 
   const dynamicReports = getDynamicReports();
+  const [waterTab, setWaterTab] = useState<'water' | 'analysis'>('water');
 
   return (
     <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300">
@@ -123,10 +124,35 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         </div>
       </header>
 
+      {/* TABS */}
+      <div className="w-full max-w-[1000px] mx-auto mb-6">
+        <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)] w-fit">
+          {(['water', 'analysis'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setWaterTab(tab)}
+              className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-6 py-2.5 cursor-pointer transition-colors duration-200"
+              style={{ color: waterTab === tab ? 'var(--paper)' : 'var(--ink)' }}
+            >
+              {waterTab === tab && (
+                <motion.div
+                  layoutId="waterPageTabBg"
+                  className="absolute inset-0 bg-[var(--ink)]"
+                  transition={{ type: 'spring', stiffness: 450, damping: 36 }}
+                  style={{ zIndex: 0 }}
+                />
+              )}
+              <span className="relative z-10">{tab === 'water' ? 'Water Intake' : 'Analysis'}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* MAIN CONTENT */}
       <main className="w-full max-w-[1000px] mx-auto flex flex-col gap-6">
 
-        {/* HERO COUNTER CARD - STATIC (no hover lift) */}
+        {/* HERO COUNTER CARD */}
+        {waterTab === 'water' && (
         <div className="brutalist-dashed-card no-lift flex flex-col md:flex-row md:items-center md:justify-between gap-10">
           {/* Dot Matrix Counter */}
           <div className="flex-grow flex flex-col sm:flex-row sm:items-center gap-8">
@@ -178,7 +204,10 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
           </div>
         </div>
 
-        {/* ANALYTICS CARD - STATIC (no hover lift) */}
+        )}
+
+        {/* ANALYTICS CARD */}
+        {waterTab === 'analysis' && (
         <div className="brutalist-card no-lift">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8">
             <h2 className="font-sans-main text-2xl font-black uppercase tracking-tight">Analytics</h2>
@@ -286,6 +315,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
             </span>
           </div>
         </div>
+        )}
 
       </main>
     </div>

@@ -6,8 +6,7 @@ import { Calendar } from './components/dashboard/Calendar';
 import { Pomodoro } from './components/dashboard/Pomodoro';
 import { Prayer } from './components/dashboard/Prayer';
 import { Fitness } from './components/dashboard/Fitness';
-// FINANCE MODULE — disabled, re-enable when ready
-// import { Finance } from './components/dashboard/Finance';
+import { Finance } from './components/dashboard/Finance';
 import { Login } from './components/dashboard/Login';
 import { CustomCursor } from './components/ui/CustomCursor';
 import { FloatingTimer } from './components/ui/FloatingTimer';
@@ -74,7 +73,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/pomodoro" element={<AnimatedPage><Pomodoro navigate={nav} /></AnimatedPage>} />
           <Route path="/prayer" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
           <Route path="/fitness" element={<AnimatedPage><Fitness navigate={nav} /></AnimatedPage>} />
-          {/* <Route path="/finance" element={<AnimatedPage><Finance navigate={nav} /></AnimatedPage>} /> */}
+          <Route path="/finance" element={<AnimatedPage><Finance navigate={nav} /></AnimatedPage>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

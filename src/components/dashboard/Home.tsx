@@ -10,8 +10,8 @@ import { CustomModal } from '../ui/CustomModal';
 import { getLogicalDate } from '../../utils/timeHelpers';
 import { usePrayer } from '../../hooks/usePrayer';
 import { DotMatrixText } from '../ui/DotMatrixText';
-// FINANCE MODULE — disabled
-// import { useFinance } from '../../hooks/useFinance';
+import { DMTimer, WavyProgressBar } from '../ui/TimerComponents';
+import { useFinance } from '../../hooks/useFinance';
 
 interface HomeProps {
   navigate: (to: string) => void;
@@ -36,67 +36,6 @@ const SidebarActiveVector: React.FC = () => {
         <circle key={i} cx={cx} cy={cy} r="1.4"
           style={{ animation: 'vectorFade 1.5s ease-in-out infinite', animationDelay: `${i * 0.25}s` }} />
       ))}
-    </svg>
-  );
-};
-
-// RUNNING SIGNAL — broadcasting dot arcs; center always on, rings ripple outward.
-
-// ─── Dot-matrix digit data (5 rows × 4 cols) ──────────────────────────────
-const DM: Record<string, number[][]> = {
-  '0':[[1,1,1,1],[1,0,0,1],[1,0,0,1],[1,0,0,1],[1,1,1,1]],
-  '1':[[0,0,1,0],[0,1,1,0],[0,0,1,0],[0,0,1,0],[0,1,1,1]],
-  '2':[[1,1,1,1],[0,0,0,1],[1,1,1,1],[1,0,0,0],[1,1,1,1]],
-  '3':[[1,1,1,1],[0,0,0,1],[0,1,1,1],[0,0,0,1],[1,1,1,1]],
-  '4':[[1,0,0,1],[1,0,0,1],[1,1,1,1],[0,0,0,1],[0,0,0,1]],
-  '5':[[1,1,1,1],[1,0,0,0],[1,1,1,1],[0,0,0,1],[1,1,1,1]],
-  '6':[[1,1,1,1],[1,0,0,0],[1,1,1,1],[1,0,0,1],[1,1,1,1]],
-  '7':[[1,1,1,1],[0,0,0,1],[0,0,1,0],[0,1,0,0],[0,1,0,0]],
-  '8':[[1,1,1,1],[1,0,0,1],[1,1,1,1],[1,0,0,1],[1,1,1,1]],
-  '9':[[1,1,1,1],[1,0,0,1],[1,1,1,1],[0,0,0,1],[0,0,0,1]],
-};
-
-// Wavy progress bar — same logic as WavyRing but unrolled flat.
-// phase animates via RAF exactly like the Pomodoro page, progress limits the drawn path length.
-const WavyProgressBar: React.FC<{ pct: number; isOvertime: boolean; mode: string }> = ({ pct, isOvertime, mode }) => {
-  const [phase, setPhase] = useState(0);
-  const rafRef = useRef<number>(0);
-  useEffect(() => {
-    const tick = () => { setPhase(p => (p + 0.05) % (Math.PI * 2)); rafRef.current = requestAnimationFrame(tick); };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, []);
-
-  const W = 500; const H = 36; const midY = H / 2;
-  const amplitude = 9; const waves = 5; const pts = 220;
-
-  // Build a wavy path from x=0 to x = W*(limitPct/100), animated by phase
-  const genPath = (limitPct: number) => {
-    const endX = W * (limitPct / 100);
-    const out: string[] = [];
-    for (let i = 0; i <= pts; i++) {
-      const x = (i / pts) * endX;
-      const y = midY + Math.sin((x / W) * waves * Math.PI * 2 + phase) * amplitude;
-      out.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`);
-    }
-    return out.join(' ');
-  };
-
-  const strokeColor = isOvertime ? 'var(--rust)' : mode === 'break' ? 'var(--sepia)' : 'var(--forest)';
-
-  return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none" shapeRendering="geometricPrecision" overflow="visible">
-      {/* Full-length dim track */}
-      <path d={genPath(100)} fill="none" stroke="var(--ink)"
-        strokeWidth={3} strokeOpacity={0.07} strokeLinecap="round"
-        vectorEffect="non-scaling-stroke" />
-      {/* Progress path — grows from left as pct increases */}
-      {pct > 0 && (
-        <path d={genPath(pct)} fill="none" stroke={strokeColor}
-          strokeWidth={4} strokeLinecap="round"
-          vectorEffect="non-scaling-stroke" />
-      )}
     </svg>
   );
 };
@@ -205,6 +144,49 @@ const PrayerVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
   );
 };
 
+// FINANCE — vintage coin face; outer ring + inner cross-hatch + center dot.
+// Animation: shimmer sweeps clockwise around the coin edge.
+const FinanceVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
+  // Outer ring — 12 dots like clock positions
+  const ring: [number, number, number][] = [
+    [12, 3,  0],    // 12
+    [16.8, 4.2, 0.08], // 1
+    [20.2, 7.8, 0.17], // 2
+    [21, 12, 0.25], // 3
+    [20.2, 16.2, 0.33], // 4
+    [16.8, 19.8, 0.42], // 5
+    [12, 21, 0.50], // 6
+    [7.2, 19.8, 0.58], // 7
+    [3.8, 16.2, 0.67], // 8
+    [3, 12, 0.75], // 9
+    [3.8, 7.8, 0.83], // 10
+    [7.2, 4.2, 0.92], // 11
+  ];
+  // Inner £ symbol in dots (center of 24×24)
+  const symbol: [number, number, number][] = [
+    // top arc of £
+    [10, 8, 0.1], [12, 7, 0.15], [14, 8, 0.20],
+    // vertical stem
+    [10, 10, 0.25], [10, 12, 0.30],
+    // cross bar
+    [10, 14, 0.35], [12, 14, 0.40],
+    // base
+    [9, 17, 0.45], [11, 17, 0.50], [13, 17, 0.55],
+  ];
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+      {ring.map(([cx, cy, delay], i) => (
+        <circle key={`r${i}`} cx={cx} cy={cy} r="1.1"
+          style={{ animation: 'vectorFade 2.4s ease-in-out infinite', animationDelay: `${delay}s` }} />
+      ))}
+      {symbol.map(([cx, cy, delay], i) => (
+        <circle key={`s${i}`} cx={cx} cy={cy} r="0.9"
+          style={{ animation: 'vectorFade 2.4s ease-in-out infinite', animationDelay: `${delay + 0.3}s` }} />
+      ))}
+    </svg>
+  );
+};
+
 // FITNESS — dumbbell/barbell; energy pulse travels left plate → bar → right plate.
 // The shape is unmistakably "gym/strength". Animation = energy flowing through the lift.
 const FitnessVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
@@ -234,65 +216,18 @@ const FitnessVector: React.FC<{ size?: number }> = ({ size = 20 }) => {
   );
 };
 
-// Single responsive SVG that renders MM:SS in dot-matrix, scales via viewBox.
-// Used in both the big card (maxWidth="100%") and the fullscreen overlay.
-const DMTimer: React.FC<{ mm: string; ss: string; color: string; maxWidth?: string }> = ({ mm, ss, color, maxWidth = 'min(88vw, 540px)' }) => {
-  // MM: step=28, r=10  |  SS: step=17, r=6
-  const mS = 28; const mR = 10;
-  const sS = 17; const sR = 6;
-  const mH = 4 * mS; // 112 — span between outermost dot centers
-  const sH = 4 * sS; // 68
-  const sOffY = (mH - sH) / 2; // 22 — vertical centering of SS relative to MM
-
-  // x positions of each digit's first dot column
-  const xMM0 = 0;
-  const xMM1 = xMM0 + 3 * mS + mR * 2 + 18; // 84+20+18 = 122
-  const xCol  = xMM1 + 3 * mS + mR * 2 + 10; // 122+104+10 = 236
-  const colCX = xCol + mR * 1.5;              // colon center x
-  const xSS0  = xCol + mR * 3 + 14;           // after colon
-  const xSS1  = xSS0 + 3 * sS + sR * 2 + 14;
-  const totalW = xSS1 + 3 * sS;
-  const pad = mR + 4;
-
-  const renderDigit = (digit: string, tx: number, ty: number, step: number, r: number) =>
-    (DM[digit] ?? DM['0']).flatMap((row, ri) =>
-      row.map((val, ci) => (
-        <circle key={`${tx}-${ri}-${ci}`}
-          cx={tx + ci * step} cy={ty + ri * step} r={r}
-          fill={color} opacity={val ? 1 : 0.07}
-          style={val ? { animation: 'dotPulse 2.4s ease-in-out infinite', animationDelay: `${(ri * 4 + ci) * 0.06}s` } : undefined} />
-      ))
-    );
-
-  return (
-    <svg
-      viewBox={`${-pad} ${-pad} ${totalW + pad * 2} ${mH + pad * 2}`}
-      style={{ width: maxWidth, height: 'auto' }}
-      overflow="visible"
-    >
-      {renderDigit(mm[0], xMM0, 0, mS, mR)}
-      {renderDigit(mm[1], xMM1, 0, mS, mR)}
-      {/* Colon — two dots */}
-      <circle cx={colCX} cy={mH * 0.3} r={mR} fill={color} opacity={0.4} />
-      <circle cx={colCX} cy={mH * 0.7} r={mR} fill={color} opacity={0.4} />
-      {renderDigit(ss[0], xSS0, sOffY, sS, sR)}
-      {renderDigit(ss[1], xSS1, sOffY, sS, sR)}
-    </svg>
-  );
-};
 
 export const Home: React.FC<HomeProps> = ({ navigate }) => {
-  const [activeCardId, setActiveCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar'>('water');
+  const [activeCardId, setActiveCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | 'finance'>('water');
   const [lastManualClickTime, setLastManualClickTime] = useState<number>(0);
   // systemCardId tracks which card has system priority — independent of what user is viewing
-  const [systemCardId, setSystemCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | null>(null);
+  const [systemCardId, setSystemCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | 'finance' | null>(null);
   const [avatarUrl, setAvatarUrl] = useFirebaseSync<string | null>('avatar_url', null);
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
   const [workouts] = useFirebaseSync<any[]>('fitness_workouts', []);
-  // FINANCE MODULE — disabled
-  // const [financeBanks] = useFirebaseSync<Record<string, number>>('finance_banks', {});
-  // const { pendingItems } = useFinance();
-  // const totalPhysical = Object.values(financeBanks).reduce((a, b) => a + (Number(b) || 0), 0);
+  const [financeBanks] = useFirebaseSync<Record<string, number>>('finance_banks', {});
+  const { pendingItems } = useFinance();
+  const totalPhysical = Object.values(financeBanks).reduce((a, b) => a + (Number(b) || 0), 0);
   
   const workoutMinsToday = workouts
     .filter(w => w.date === getLogicalDate().toDateString())
@@ -635,7 +570,16 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               isRunning: workoutMinsToday > 0,
               metric: `${workoutMinsToday}m`,
               subText: 'LOGGED TODAY',
-            }
+            },
+            {
+              id: 'finance',
+              title: 'Finance',
+              Vector: FinanceVector,
+              route: 'finance',
+              isRunning: false,
+              metric: totalPhysical > 0 ? `${Math.round(totalPhysical).toLocaleString()}` : '—',
+              subText: 'TOTAL BALANCE',
+            },
           ] as const).map(card => {
             const isActive = activeCardId === card.id;
             const { Vector } = card;
@@ -688,7 +632,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         </div>
 
         {/* Active Stage (Center/Right) */}
-        <div className="flex-1 flex flex-col items-stretch lg:max-h-[614px]">
+        <div className="flex-1 flex flex-col items-stretch lg:h-[740px]">
           <div
             onClick={() => {
               const found = [
@@ -696,7 +640,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 { id: 'water', route: 'water' },
                 { id: 'fitness', route: 'fitness' },
                 { id: 'prayer', route: 'prayer' },
-                { id: 'calendar', route: 'calendar' }
+                { id: 'calendar', route: 'calendar' },
+                { id: 'finance', route: 'finance' },
               ].find(c => c.id === activeCardId);
               if (found) navigate(found.route);
             }}
@@ -747,7 +692,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       {/* Top — status strip, mirrors idle header */}
                       <div className="flex justify-between items-start">
                         <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] uppercase"
-                          style={{ color: pomodoroOvertime ? 'var(--rust)' : 'var(--forest)' }}>
+                          style={{ color: pomodoroOvertime ? 'var(--pomo-overtime)' : mode === 'break' ? 'var(--pomo-break)' : 'var(--pomo-focus)' }}>
                           {pomodoroOvertime ? '● OVERTIME' : `● ${mode.toUpperCase()}`}
                         </span>
                       </div>
@@ -755,9 +700,10 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       {/* Middle — dot-matrix countdown */}
                       {(() => {
                         const secs = pomodoroOvertime ? overtime : timeLeft;
-                        const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+                        const totalMins = Math.floor(secs / 60);
+                        const mm = totalMins >= 100 ? String(totalMins) : String(totalMins).padStart(2, '0');
                         const ss = String(secs % 60).padStart(2, '0');
-                        const col = pomodoroOvertime ? 'var(--rust)' : 'var(--ink)';
+                        const col = pomodoroOvertime ? 'var(--pomo-overtime)' : mode === 'break' ? 'var(--pomo-break)' : 'var(--pomo-focus)';
                         return (
                           <div className="flex-1 flex items-center justify-center w-full">
                             <DMTimer mm={mm} ss={ss} color={col} maxWidth="min(100%, 340px)" />
@@ -770,6 +716,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                         pct={pomodoroOvertime ? 100 : Math.max(0, (((mode === 'focus' ? focusDuration : breakDuration) * 60 - timeLeft) / ((mode === 'focus' ? focusDuration : breakDuration) * 60)) * 100)}
                         isOvertime={pomodoroOvertime}
                         mode={mode}
+                        running={pomodoroRunning}
+                        totalSecs={(mode === 'focus' ? focusDuration : breakDuration) * 60}
                       />
                     </>
                   ) : (
@@ -871,7 +819,35 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 </div>
               )}
 
-              {/* FINANCE CARD — disabled */}
+              {activeCardId === 'finance' && (
+                <div className="flex-1 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">FINANCE</h2>
+                    </div>
+                    <div className="text-ink opacity-60">
+                      <FinanceVector size={36} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-end gap-4">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono-main text-5xl sm:text-6xl font-black text-ink leading-none">
+                        {totalPhysical > 0 ? Math.round(totalPhysical).toLocaleString() : '—'}
+                      </span>
+                      {totalPhysical > 0 && (
+                        <span className="font-mono-main text-2xl font-bold text-ink/40">EGP</span>
+                      )}
+                    </div>
+                    {pendingItems.length > 0 && (
+                      <span className="font-mono-main text-[10px] font-bold tracking-[0.2em] text-ink/40 uppercase mb-1">
+                        {pendingItems.length} PENDING
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
           </div>
         </div>
 

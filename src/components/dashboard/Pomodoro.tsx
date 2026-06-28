@@ -5,6 +5,7 @@ import { formatTime } from '../../utils/timeHelpers';
 import { ChartTooltip } from '../ui/UIComponents';
 import { Play, Pause, RotateCcw, Maximize2, X, ArrowLeft, ChevronRight } from 'lucide-react';
 import { usePomodoro } from '../../hooks/usePomodoro';
+import { DMTimer, WavyProgressBar } from '../ui/TimerComponents';
 
 
 interface PomodoroProps {
@@ -130,44 +131,85 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
 
   const [view, setView] = React.useState<'week' | 'month' | 'year'>('week');
   const [phase, setPhase] = React.useState(0);
+  const [smoothRingPct, setSmoothRingPct] = React.useState(0);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [normalVisible, setNormalVisible] = React.useState(true);
+  const [pomTab, setPomTab] = React.useState<'focus' | 'analysis'>('focus');
+  const baselinePctRef = React.useRef(0);
+  const baselineTimeRef = React.useRef(Date.now());
 
-  useEffect(() => { document.title = 'Rakeeen - Pomodoro'; }, []);
-
-  // Wave animation
-  useEffect(() => {
-    let animId: number;
-    const animate = () => {
-      setPhase(p => (p + 0.05) % (Math.PI * 2));
-      animId = requestAnimationFrame(animate);
-    };
-    if (running || isOvertime) animId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animId);
-  }, [running, isOvertime]);
-
-  // ESC to exit fullscreen + Disable body scroll
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setIsFullscreen(false); };
-    window.addEventListener('keydown', handler);
-    
-    if (isFullscreen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-    
-    return () => {
-      window.removeEventListener('keydown', handler);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isFullscreen]);
-
+  // Declare early so useEffects below can reference them
   const FOCUS_S = focusDuration * 60;
   const BREAK_S = breakDuration * 60;
   const pct = isOvertime ? 100 : (mode === 'focus'
     ? ((FOCUS_S - timeLeft) / FOCUS_S) * 100
     : ((BREAK_S - timeLeft) / BREAK_S) * 100
   );
+
+  useEffect(() => { document.title = 'Rakeeen - Pomodoro'; }, []);
+
+  // Update baseline when pct ticks (once per second)
+  useEffect(() => {
+    baselinePctRef.current = pct;
+    baselineTimeRef.current = Date.now();
+  }, [pct]);
+
+  // Wave animation + smooth ring pct interpolation
+  useEffect(() => {
+    let animId: number;
+    const animate = () => {
+      setPhase(p => (p + 0.05) % (Math.PI * 2));
+      if (running && !isOvertime) {
+        const elapsed = (Date.now() - baselineTimeRef.current) / 1000;
+        const totalSecs = mode === 'focus' ? FOCUS_S : BREAK_S;
+        setSmoothRingPct(Math.min(baselinePctRef.current + (elapsed / totalSecs) * 100, 100));
+      } else {
+        setSmoothRingPct(pct);
+      }
+      animId = requestAnimationFrame(animate);
+    };
+    if (running || isOvertime) animId = requestAnimationFrame(animate);
+    else setSmoothRingPct(pct);
+    return () => cancelAnimationFrame(animId);
+  }, [running, isOvertime, FOCUS_S, BREAK_S, mode, pct]);
+
+  // Sync React state with browser fullscreen API + hide body scroll in fullscreen
+  useEffect(() => {
+    const onFsChange = () => {
+      if (!document.fullscreenElement) {
+        setIsFullscreen(false);
+        setNormalVisible(true); // browser fully exited — safe to show page
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (isFullscreen) {
+      html.style.overflow = 'hidden';
+      html.style.scrollbarGutter = 'auto';
+    } else {
+      html.style.overflow = '';
+      html.style.scrollbarGutter = '';
+    }
+    return () => {
+      html.style.overflow = '';
+      html.style.scrollbarGutter = '';
+    };
+  }, [isFullscreen]);
+
+  const enterFullscreen = async () => {
+    setNormalVisible(false);
+    setIsFullscreen(true);
+    try { await document.documentElement.requestFullscreen(); } catch {}
+  };
+
+  const exitFullscreen = () => {
+    setIsFullscreen(false);
+    // browser fullscreen exits in onExitComplete, after animation finishes
+  };
 
   const getTimerColor = () => {
     if (isOvertime) return 'var(--pomo-overtime)';
@@ -300,56 +342,68 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   return (
     <>
       {/* Fullscreen Overlay */}
-      <AnimatePresence>
+      <AnimatePresence onExitComplete={() => {
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+          // normalVisible will be set by fullscreenchange when browser fully exits
+        } else {
+          setNormalVisible(true); // not in browser fullscreen — show immediately
+        }
+      }}>
         {isFullscreen && (
           <motion.div
-            initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
-            animate={{ opacity: 1, backdropFilter: 'blur(40px)' }}
-            exit={{ opacity: 0, backdropFilter: 'blur(0px)', transition: { duration: 0.3 } }}
-            transition={{ duration: 0.5 }}
-            className="fixed inset-0 z-[200] bg-[var(--bg)]/95 flex flex-col items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: 'easeInOut' }}
+            className="fixed inset-0 z-[200] bg-[var(--bg)]"
           >
             <button
-              onClick={() => setIsFullscreen(false)}
-              className="absolute top-6 right-6 w-10 h-10 border border-ink/15 flex items-center justify-center text-ink/30 hover:border-ink/60 hover:text-ink/60 transition-all cursor-pointer"
+              onClick={exitFullscreen}
+              className="absolute top-6 right-6 w-10 h-10 border border-ink/15 flex items-center justify-center text-ink/30 hover:border-ink/60 hover:text-ink/60 transition-all cursor-pointer z-10"
             >
               <X size={20} />
             </button>
 
-            <div className="text-[10px] uppercase tracking-[0.5em] font-black mb-8" style={{ color: getTimerColor() }}>
-              {isOvertime ? 'Over-focusing' : (mode === 'focus' ? 'Focus' : 'Break')}
-            </div>
-
-            <div className="relative flex items-center justify-center w-[320px] h-[320px] sm:w-[600px] sm:h-[600px]">
-              <div className="absolute rounded-full blur-[100px] sm:blur-[160px] opacity-15 w-80 h-80 sm:w-[600px] sm:h-[600px] transition-colors duration-1000" style={{ backgroundColor: getTimerColor() }} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={600} waves={mode === 'focus' ? focusDuration : breakDuration} />
+            <div className="w-full h-full flex flex-col items-center justify-center">
+              {/* Status label */}
+              <div className="text-[10px] uppercase tracking-[0.5em] font-black mb-10" style={{ color: getTimerColor() }}>
+                {isOvertime ? '● OVERTIME' : `● ${mode.toUpperCase()}`}
               </div>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span 
-                  className="text-5xl sm:text-[96px] leading-none font-black tracking-tight mb-2 transition-colors duration-500 tabular-nums text-ink"
+
+              {/* DMTimer */}
+              {(() => {
+                const timeStr = isOvertime ? formatTime(overtime) : formatTime(timeLeft);
+                const [mmStr, ssStr] = timeStr.split(':');
+                return (
+                  <DMTimer
+                    mm={mmStr}
+                    ss={ssStr}
+                    color={getTimerColor()}
+                    maxWidth="min(90vw, 680px)"
+                  />
+                );
+              })()}
+
+              {/* WavyProgressBar */}
+              <div className="w-full max-w-[680px] mt-10 px-4">
+                <WavyProgressBar pct={pct} isOvertime={isOvertime} mode={mode} running={running} totalSecs={mode === 'focus' ? FOCUS_S : BREAK_S} />
+              </div>
+
+              {/* Controls — play/pause + reset */}
+              <div className="mt-10 flex items-center gap-4">
+                <button
+                  onClick={running ? pause : start}
+                  className="w-14 h-14 border border-ink flex items-center justify-center bg-[var(--ink)] text-[var(--paper)] hover:opacity-90 transition-all cursor-pointer"
                 >
-                  {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
-                </span>
-                <span className="text-[9px] sm:text-[10px] tracking-[0.5em] font-bold text-ink/30 uppercase">
-                  {isOvertime ? 'Overtime' : mode}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-12">
-              {controls}
-            </div>
-
-            <div className="flex gap-12 mt-10">
-              <div className="text-center">
-                <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/25 mb-1">Sessions</div>
-                <div className="text-4xl font-black text-sepia tabular-nums">{sessions}</div>
-              </div>
-              <div className="w-px bg-ink/10" />
-              <div className="text-center">
-                <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/25 mb-1">Focus time</div>
-                <div className="text-4xl font-black text-sepia tabular-nums">{Math.round(weekStats?.[todayIdx]?.minutes || 0)}m</div>
+                  {running ? <Pause size={20} /> : <Play size={20} />}
+                </button>
+                <button
+                  onClick={reset}
+                  className="w-14 h-14 border border-ink/20 flex items-center justify-center text-ink/30 hover:border-ink/60 hover:text-ink/60 transition-all cursor-pointer bg-transparent"
+                >
+                  <RotateCcw size={20} />
+                </button>
               </div>
             </div>
           </motion.div>
@@ -357,7 +411,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
       </AnimatePresence>
 
       {/* Normal View */}
-      <div className={`min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300 ${isFullscreen ? 'hidden' : ''}`}>
+      <div className={`min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300 ${normalVisible ? '' : 'invisible'}`}>
         
         {/* HEADER */}
         <header className="w-full max-w-[1000px] mx-auto mb-12">
@@ -381,38 +435,61 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
           </div>
         </header>
 
+        {/* TABS */}
+        <div className="w-full max-w-[1000px] mx-auto mb-6">
+          <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)] w-fit">
+            {(['focus', 'analysis'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setPomTab(tab)}
+                className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-6 py-2.5 cursor-pointer transition-colors duration-200"
+                style={{ color: pomTab === tab ? 'var(--paper)' : 'var(--ink)' }}
+              >
+                {pomTab === tab && (
+                  <motion.div
+                    layoutId="pomTabBg"
+                    className="absolute inset-0 bg-[var(--ink)]"
+                    transition={{ type: 'spring', stiffness: 450, damping: 36 }}
+                    style={{ zIndex: 0 }}
+                  />
+                )}
+                <span className="relative z-10">{tab === 'focus' ? 'Focus Time' : 'Analysis'}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* MAIN CONTENT */}
         <main className="w-full max-w-[1000px] mx-auto flex flex-col gap-6">
 
           {/* Focus Session Card */}
-          <div className="text-center brutalist-card no-lift relative p-6 sm:p-8">
+          {pomTab === 'focus' && (
+          <div className="text-center brutalist-card no-lift relative p-6 sm:p-10">
 
             {/* Fullscreen Button */}
             <button
-              onClick={() => setIsFullscreen(true)}
+              onClick={enterFullscreen}
               className="absolute top-4 right-4 w-8 h-8 border border-ink/20 flex items-center justify-center text-ink/30 hover:border-ink/60 hover:text-ink/60 transition-all cursor-pointer bg-transparent"
               title="Fullscreen"
             >
               <Maximize2 size={14} />
             </button>
 
-            <div className="text-[10px] uppercase tracking-[0.3em] font-black mb-8">
+            <div className="text-[10px] uppercase tracking-[0.3em] font-black mb-10">
               <span style={{ color: getTimerColor() }}>
                 {isOvertime ? 'Over-focusing' : (mode === 'focus' ? 'Focus session' : 'Break time')}
               </span>
             </div>
 
             {/* Timer Circle */}
-            <div className="relative w-full max-w-[280px] aspect-square mx-auto flex items-center justify-center">
+            <div className="relative w-full max-w-[300px] aspect-square mx-auto flex items-center justify-center">
               <div className="absolute inset-6 rounded-full blur-[40px] opacity-20 -z-10 transition-colors duration-1000" style={{ backgroundColor: getTimerColor() }} />
               <div className="absolute inset-0 flex items-center justify-center">
-                <WavyRing pct={pct} phase={phase} mode={mode} isOvertime={isOvertime} size={280} waves={mode === 'focus' ? focusDuration : breakDuration} />
+                <WavyRing pct={smoothRingPct} phase={phase} mode={mode} isOvertime={isOvertime} size={300} waves={mode === 'focus' ? focusDuration : breakDuration} />
               </div>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span
-                  className="text-4xl sm:text-5xl font-black mb-1 transition-colors duration-500 text-ink"
-                >
+                <span className="text-4xl sm:text-5xl font-black mb-1 transition-colors duration-500 text-ink">
                   {isOvertime ? `+${formatTime(overtime)}` : formatTime(timeLeft)}
                 </span>
                 <span className="text-[10px] tracking-[0.3em] font-bold text-ink/40 uppercase">
@@ -421,40 +498,33 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
               </div>
             </div>
 
-             {/* Dynamic session indicator */}
-             <div className="relative flex justify-center mt-4 select-none">
-               <span className="text-[10px] uppercase tracking-[0.2em] font-black text-ink/30">
-                 {mode === 'focus' ? '25m focus session' : `${breakDuration}m health break`}
-               </span>
-             </div>
+            <div className="relative flex justify-center mt-6 select-none">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-black text-ink/30">
+                {mode === 'focus' ? `${focusDuration}m focus session` : `${breakDuration}m health break`}
+              </span>
+            </div>
 
             {/* Controls */}
-            <div className="mt-8">{controls}</div>
-
-            {/* Session Stats */}
-            <div className="mt-10 flex justify-center gap-8 border-t border-ink/5 pt-6">
-              <div className="text-center">
-                <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/20 mb-1">Sessions</div>
-                <div className="text-3xl font-black text-sepia">{sessions}</div>
-              </div>
-              <div className="w-px bg-ink/10" />
-              <div className="text-center">
-                <div className="text-[9px] uppercase tracking-[0.3em] font-black text-ink/20 mb-1">Focus Today</div>
-                <div className="text-3xl font-black text-sepia">{Number(((weekStats?.[todayIdx]?.minutes || 0) / 60).toFixed(1))}h</div>
-              </div>
-            </div>
+            <div className="mt-10">{controls}</div>
           </div>
+          )}
 
           {/* Performance Reports */}
+          {pomTab === 'analysis' && (
           <div className="brutalist-card no-lift pb-6 p-6 sm:p-8">
-
             {/* Header row */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
               <div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Performance</h2>
-                <p className="text-[10px] uppercase tracking-[0.3em] font-black text-ink/20 mt-1">
-                  {reportType === 'sessions' ? 'Sessions per period' : 'Focus hours per period · Target 12h/day'}
-                </p>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="font-mono-main text-[10px] font-black text-ink/30 uppercase tracking-widest">
+                    {sessions} sessions today
+                  </span>
+                  <span className="text-ink/15">·</span>
+                  <span className="font-mono-main text-[10px] font-black text-ink/30 uppercase tracking-widest">
+                    {Number(((weekStats?.[todayIdx]?.minutes || 0) / 60).toFixed(1))}h focus today
+                  </span>
+                </div>
               </div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 {/* Period switch tab with sliding animation */}
@@ -569,6 +639,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
             </div>
 
           </div>
+          )}
         </main>
       </div>
     </>

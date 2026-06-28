@@ -10,10 +10,9 @@ export interface FinanceBanks {
 
 export interface FinanceBuckets {
   tawarr2: number;
-  leya: number;
-  iltizamat: number;
   mustaqbal: number;
   basmala: number;
+  sadaqa: number;
 }
 
 export interface FinanceTransaction {
@@ -48,6 +47,7 @@ export interface Subscription {
   name: string;
   cost: number;
   renewalDay: number;
+  reminderTime: string; // "HH:MM" e.g. "09:00"
   bank: string;
 }
 
@@ -60,19 +60,20 @@ export interface Debt {
 }
 
 const DEFAULT_BANKS: FinanceBanks = { cib: 0, ahly_main: 0, ahly_meeza: 0, bm: 0 };
-const DEFAULT_BUCKETS: FinanceBuckets = { tawarr2: 0, leya: 0, iltizamat: 0, mustaqbal: 0, basmala: 0 };
+const DEFAULT_BUCKETS: FinanceBuckets = { tawarr2: 0, mustaqbal: 0, basmala: 0, sadaqa: 0 };
+
+const VALID_BUCKET_KEYS = new Set<string>(['tawarr2', 'mustaqbal', 'basmala', 'sadaqa']);
 
 export const SALARY_SPLIT: Record<keyof Omit<FinanceBuckets, 'basmala'>, number> = {
   tawarr2: 0.10,
-  leya: 0.13,
-  iltizamat: 0.34,
   mustaqbal: 0.43,
+  sadaqa: 0.00,
 };
 
 export const FREELANCE_SPLIT: Record<string, number> = {
   tawarr2: 0.10,
-  leya: 0.10,
   mustaqbal: 0.80,
+  sadaqa: 0.00,
 };
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
@@ -87,6 +88,15 @@ export function useFinance() {
 
   const [pendingItems, setPendingItemsLocal] = useState<PendingItem[]>([]);
   const [backendOnline, setBackendOnline] = useState(false);
+
+  // Migrate old bucket structure to new 4-bucket schema (zeros everything)
+  useEffect(() => {
+    if (!buckets) return;
+    const hasOldKey = Object.keys(buckets).some(k => !VALID_BUCKET_KEYS.has(k));
+    if (hasOldKey) {
+      setBuckets(DEFAULT_BUCKETS);
+    }
+  }, [buckets]);
 
   const fetchPending = useCallback(async () => {
     try {

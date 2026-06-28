@@ -157,27 +157,39 @@ client.once('ready', async () => {
   
   console.log('🧹 Channel Cleanup Cron Job Scheduled (Runs daily at 02:00 AM)!');
 
-  // Daily subscriptions reminder cron job at 9:00 AM
-  cron.schedule('0 9 * * *', async () => {
+  // Subscription reminders — runs every minute, fires each sub at its own reminderTime (Egypt time UTC+3)
+  cron.schedule('* * * * *', async () => {
     try {
-      const today = new Date();
-      const currentDay = today.getDate();
-      console.log(`[${today.toLocaleTimeString()}] Running daily subscription renewal check for day: ${currentDay}...`);
-      
-      // Refresh subscriptions list from Firebase
-      await seedSubscriptions();
+      // Use Egypt timezone explicitly
+      const nowEgypt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
+      const currentDay = nowEgypt.getDate();
+      const currentHH = String(nowEgypt.getHours()).padStart(2, '0');
+      const currentMM = String(nowEgypt.getMinutes()).padStart(2, '0');
+      const currentTime = `${currentHH}:${currentMM}`;
 
-      const renewing = localSubscriptions.filter(sub => parseInt(sub.renewalDay) === currentDay);
-      console.log(`Found ${renewing.length} subscriptions renewing today`);
-      for (const sub of renewing) {
-        await sendSubscriptionAlert(sub);
+      const due = localSubscriptions.filter(sub => {
+        const subTime = sub.reminderTime || '09:00';
+        return parseInt(sub.renewalDay) === currentDay && subTime === currentTime;
+      });
+
+      if (due.length > 0) {
+        console.log(`[${currentTime} Cairo] 🔔 ${due.length} subscription(s) due`);
+        for (const sub of due) {
+          await sendSubscriptionAlert(sub);
+        }
       }
     } catch (error) {
-      console.error("Failed to run daily subscriptions cron:", error);
+      console.error("Failed to run subscription reminder cron:", error);
     }
   });
 
-  console.log('⏰ Subscriptions Renewal Cron Scheduled (Runs daily at 09:00 AM Egypt / Local)!');
+  // Re-seed subscriptions from Firebase every 30 minutes to stay fresh
+  cron.schedule('*/30 * * * *', async () => {
+    await seedSubscriptions();
+    console.log(`[${new Date().toLocaleTimeString()}] 🔄 Subscriptions re-synced from Firebase`);
+  });
+
+  console.log('⏰ Subscriptions Reminder Cron Scheduled (Cairo time, every minute)!');
 });
 
 client.login(BOT_TOKEN).catch(err => {
@@ -380,6 +392,7 @@ async function getFirebaseSubscriptions() {
             name: mapVal.name?.stringValue || '',
             cost: parseFloat(mapVal.cost?.doubleValue || mapVal.cost?.integerValue || mapVal.cost?.stringValue || '0'),
             renewalDay: parseInt(mapVal.renewalDay?.integerValue || mapVal.renewalDay?.stringValue || '1'),
+            reminderTime: mapVal.reminderTime?.stringValue || '09:00',
             bank: mapVal.bank?.stringValue || ''
           };
         });

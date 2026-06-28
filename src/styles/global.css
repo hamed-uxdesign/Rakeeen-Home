@@ -72,8 +72,8 @@
     --brand-green: #617615;
     --ghorab-color: #617615;
     --pomo-focus: var(--forest);
-    --pomo-break: #809B15;
-    --pomo-overtime: #425017;
+    --pomo-break: #2E7A6B;
+    --pomo-overtime: #B89228;
   }
 
   body.dark-theme {
@@ -88,8 +88,8 @@
     --brand-green: #D7EA6C;
     --ghorab-color: #617615;
     --pomo-focus: var(--forest);
-    --pomo-break: #A5C220;
-    --pomo-overtime: #617615;
+    --pomo-break: #5EC8B0;
+    --pomo-overtime: #E8C04A;
   }
 
   html, * {

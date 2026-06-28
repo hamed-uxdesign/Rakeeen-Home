@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Inbox, X, Banknote, Wallet, Trash2, Plus } from 'lucide-react';
+import { ArrowLeft, Inbox, X, Banknote, Wallet, Trash2, Plus, Minus, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useFinance,
@@ -129,11 +129,10 @@ const BANK_VECTORS: Record<keyof FinanceBanks, React.ComponentType> = {
 };
 
 const BUCKET_META: Record<keyof FinanceBuckets, { en: string; pct: string; accent: string }> = {
-  tawarr2:   { en: 'Emergency',   pct: '10%', accent: 'var(--rust)' },
-  leya:      { en: 'Leya',        pct: '13%', accent: 'var(--sepia)' },
-  iltizamat: { en: 'Commitments', pct: '34%', accent: 'var(--ink)' },
-  mustaqbal: { en: 'Future',      pct: '43%', accent: 'var(--forest)' },
-  basmala:   { en: 'Basmala',     pct: '—',   accent: 'var(--ink-faded)' },
+  tawarr2:  { en: 'Emergency', pct: '10%', accent: 'var(--rust)' },
+  mustaqbal:{ en: 'Future',    pct: '90%', accent: 'var(--forest)' },
+  basmala:  { en: 'Basmala',   pct: '—',   accent: 'var(--ink-faded)' },
+  sadaqa:   { en: 'Sadaqa',    pct: '—',   accent: '#B89228' },
 };
 
 type Category = 'Salary' | 'Freelance' | 'Transfer' | 'Ignore';
@@ -165,10 +164,6 @@ function translateArabicText(text: string): string {
     .replace(/جم/g, 'EGP');
 }
 
-function formatEGP(n: number) {
-  return `${Math.round(n).toLocaleString('en-EG')} EGP`;
-}
-
 function getSplitRows(amount: number, category: Category | null) {
   if (!category || category === 'Transfer' || category === 'Ignore') return null;
   const split = category === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
@@ -179,20 +174,24 @@ function getSplitRows(amount: number, category: Category | null) {
   }));
 }
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+function formatEGP(n: number) {
+  return `${Math.round(n).toLocaleString('en-EG')} EGP`;
+}
+
+
 
 export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const {
-    banks, buckets, transactions, pendingItems,
+    banks, buckets, pendingItems,
     totalPhysical, totalVirtual,
     gold, setGold,
     subscriptions, setSubscriptions,
     debts, setDebts,
     classifyDeposit, ignorePending,
-
+    updateBankBalance, updateBucketBalance,
   } = useFinance();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts' | 'analysis'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts'>('overview');
   const [classifyState, setClassifyState] = useState<ClassifyState | null>(null);
 
 
@@ -202,6 +201,27 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [showAddGoldModal, setShowAddGoldModal] = useState(false);
   const [showAddSubModal, setShowAddSubModal] = useState(false);
   const [showAddDebtModal, setShowAddDebtModal] = useState(false);
+  const [showAddDepositModal, setShowAddDepositModal] = useState(false);
+
+  // Edit modals
+  const [editingGold, setEditingGold] = useState<GoldAsset | null>(null);
+  const [editingGoldQty, setEditingGoldQty] = useState('');
+  const [editingGoldCarat, setEditingGoldCarat] = useState<24 | 21>(24);
+  const [editingGoldNotes, setEditingGoldNotes] = useState('');
+  const [editingGoldPrice, setEditingGoldPrice] = useState('');
+
+  const [editingSub, setEditingSub] = useState<Subscription | null>(null);
+  const [editingSubName, setEditingSubName] = useState('');
+  const [editingSubCost, setEditingSubCost] = useState('');
+  const [editingSubDay, setEditingSubDay] = useState('');
+  const [editingSubTime, setEditingSubTime] = useState('09:00');
+  const [editingSubBank, setEditingSubBank] = useState<keyof FinanceBanks>('cib');
+
+  const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  const [editingDebtName, setEditingDebtName] = useState('');
+  const [editingDebtAmount, setEditingDebtAmount] = useState('');
+  const [editingDebtType, setEditingDebtType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
+  const [editingDebtNotes, setEditingDebtNotes] = useState('');
 
   // Custom Dropdowns
   const [showBankDropdown, setShowBankDropdown] = useState(false);
@@ -219,6 +239,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [newSubName, setNewSubName] = useState('');
   const [newSubCost, setNewSubCost] = useState('');
   const [newSubDay, setNewSubDay] = useState('');
+  const [newSubTime, setNewSubTime] = useState('09:00');
   const [newSubBank, setNewSubBank] = useState<keyof FinanceBanks>('cib');
 
   const [newDebtName, setNewDebtName] = useState('');
@@ -226,7 +247,26 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [newDebtType, setNewDebtType] = useState<'owed_to_me' | 'owed_by_me'>('owed_to_me');
   const [newDebtNotes, setNewDebtNotes] = useState('');
 
+  const [newDepositAmount, setNewDepositAmount] = useState('');
+  const [newDepositBank, setNewDepositBank] = useState<keyof FinanceBanks>('cib');
+  const [newDepositCategory, setNewDepositCategory] = useState<'Salary' | 'Freelance'>('Salary');
+  const [depositMode, setDepositMode] = useState<'split' | 'manual'>('split');
+  const [manualTarget, setManualTarget] = useState<{ type: 'bank' | 'bucket'; key: string }>({ type: 'bucket', key: 'mustaqbal' });
+
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawTarget, setWithdrawTarget] = useState<{ type: 'bank' | 'bucket'; key: string }>({ type: 'bucket', key: 'mustaqbal' });
+
   React.useEffect(() => { document.title = 'Rakeeen — Finance'; }, []);
+
+  useEffect(() => {
+    if (showAddDepositModal || showWithdrawModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [showAddDepositModal, showWithdrawModal]);
 
   // Fetch Gold Prices with 30s auto-refresh when tab is active
   useEffect(() => {
@@ -234,17 +274,29 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
     const fetchPrices = (showLoader = false) => {
       if (showLoader) setLoadingGold(true);
-      fetch(`${BACKEND_URL}/api/gold-prices`)
+      // @ts-ignore
+      const apiKey = import.meta.env.VITE_GOLD_API_KEY as string | undefined;
+      if (!apiKey) {
+        console.warn('VITE_GOLD_API_KEY not set');
+        setGoldPrices(prev => prev || { price24: 0, price21: 0 });
+        if (showLoader) setLoadingGold(false);
+        return;
+      }
+      fetch('https://www.goldapi.io/api/XAU/EGP', {
+        headers: { 'x-access-token': apiKey, 'Content-Type': 'application/json' },
+      })
         .then(res => {
           if (res.ok) return res.json();
-          throw new Error('Failed to fetch gold prices');
+          throw new Error('goldapi error ' + res.status);
         })
         .then(data => {
-          setGoldPrices(data);
+          const price24 = Math.round(data.price_gram_24k);
+          const price21 = Math.round(data.price_gram_21k);
+          setGoldPrices({ price24, price21 });
         })
         .catch(err => {
           console.error(err);
-          setGoldPrices(prev => prev || { price24: 3800, price21: 3325 });
+          setGoldPrices(prev => prev || { price24: 0, price21: 0 });
         })
         .finally(() => {
           if (showLoader) setLoadingGold(false);
@@ -307,6 +359,53 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     await setGold((gold || []).filter(g => g.id !== id));
   };
 
+  const openEditGold = (g: GoldAsset) => {
+    setEditingGold(g);
+    setEditingGoldQty(String(g.quantity));
+    setEditingGoldCarat(g.carat);
+    setEditingGoldNotes(g.notes || '');
+    setEditingGoldPrice(g.purchasePrice ? String(g.purchasePrice) : '');
+  };
+  const handleSaveGold = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGold) return;
+    const updated: GoldAsset = { ...editingGold, quantity: parseFloat(editingGoldQty), carat: editingGoldCarat, notes: editingGoldNotes, purchasePrice: editingGoldPrice ? parseFloat(editingGoldPrice) : undefined };
+    await setGold((gold || []).map(g => g.id === editingGold.id ? updated : g));
+    setEditingGold(null);
+  };
+
+  const openEditSub = (sub: Subscription) => {
+    setEditingSub(sub);
+    setEditingSubName(sub.name);
+    setEditingSubCost(String(sub.cost));
+    setEditingSubDay(String(sub.renewalDay));
+    setEditingSubTime(sub.reminderTime || '09:00');
+    const bankKey = (Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).find(k => BANK_LABELS[k] === sub.bank) || 'cib';
+    setEditingSubBank(bankKey);
+  };
+  const handleSaveSub = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSub) return;
+    const updated: Subscription = { ...editingSub, name: editingSubName.trim(), cost: parseFloat(editingSubCost), renewalDay: parseInt(editingSubDay), reminderTime: editingSubTime, bank: BANK_LABELS[editingSubBank] };
+    await setSubscriptions((subscriptions || []).map(s => s.id === editingSub.id ? updated : s));
+    setEditingSub(null);
+  };
+
+  const openEditDebt = (d: Debt) => {
+    setEditingDebt(d);
+    setEditingDebtName(d.personName);
+    setEditingDebtAmount(String(d.amount));
+    setEditingDebtType(d.type);
+    setEditingDebtNotes(d.notes || '');
+  };
+  const handleSaveDebt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDebt) return;
+    const updated: Debt = { ...editingDebt, personName: editingDebtName.trim(), amount: parseFloat(editingDebtAmount), type: editingDebtType, notes: editingDebtNotes };
+    await setDebts((debts || []).map(d => d.id === editingDebt.id ? updated : d));
+    setEditingDebt(null);
+  };
+
   // Subscription operations
   const handleAddSub = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,12 +415,14 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       name: newSubName.trim(),
       cost: parseFloat(newSubCost),
       renewalDay: parseInt(newSubDay),
+      reminderTime: newSubTime || '09:00',
       bank: BANK_LABELS[newSubBank]
     };
     await setSubscriptions([...(subscriptions || []), sub]);
     setNewSubName('');
     setNewSubCost('');
     setNewSubDay('');
+    setNewSubTime('09:00');
     setShowAddSubModal(false);
   };
 
@@ -349,6 +450,55 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
   const handleRemoveDebt = async (id: string) => {
     await setDebts((debts || []).filter(d => d.id !== id));
+  };
+
+  // Deposit operations
+  const handleAddDeposit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(newDepositAmount);
+    if (!amount || amount <= 0) return;
+
+    if (depositMode === 'split') {
+      const split = newDepositCategory === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
+      await updateBankBalance(newDepositBank, (banks?.[newDepositBank] || 0) + amount);
+      for (const [key, pct] of Object.entries(split)) {
+        if (pct > 0) {
+          const k = key as keyof FinanceBuckets;
+          await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) + amount * pct) * 100) / 100);
+        }
+      }
+    } else {
+      if (manualTarget.type === 'bank') {
+        const k = manualTarget.key as keyof FinanceBanks;
+        await updateBankBalance(k, (banks?.[k] || 0) + amount);
+      } else {
+        const k = manualTarget.key as keyof FinanceBuckets;
+        await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) + amount) * 100) / 100);
+      }
+    }
+
+    setNewDepositAmount('');
+    setNewDepositBank('cib');
+    setNewDepositCategory('Salary');
+    setDepositMode('split');
+    setShowAddDepositModal(false);
+  };
+
+  const handleWithdraw = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) return;
+
+    if (withdrawTarget.type === 'bank') {
+      const k = withdrawTarget.key as keyof FinanceBanks;
+      await updateBankBalance(k, Math.round(((banks?.[k] || 0) - amount) * 100) / 100);
+    } else {
+      const k = withdrawTarget.key as keyof FinanceBuckets;
+      await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) - amount) * 100) / 100);
+    }
+
+    setWithdrawAmount('');
+    setShowWithdrawModal(false);
   };
 
   // Calculate valuations
@@ -384,7 +534,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       {/* TABS SWITCHER (Matched with training / Fitness.tsx component style) */}
       <div className="w-full max-w-[1400px] mx-auto mb-8">
         <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)] w-fit">
-          {(['overview', 'buckets', 'gold', 'subscriptions', 'debts', 'analysis'] as const).map(tab => (
+          {(['overview', 'buckets', 'gold', 'subscriptions', 'debts'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); setClassifyState(null); }}
@@ -412,6 +562,22 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
+            {/* ADD / WITHDRAW BUTTONS */}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowWithdrawModal(true)}
+                className="flex items-center gap-2 font-mono-main text-xs uppercase py-2.5 px-5 cursor-pointer border border-ink/30 text-ink/60 hover:text-ink hover:border-ink transition-colors bg-transparent"
+              >
+                <Minus size={13} /> Withdraw
+              </button>
+              <button
+                onClick={() => setShowAddDepositModal(true)}
+                className="btn-brutalist flex items-center gap-2 font-mono-main text-xs uppercase py-2.5 px-5 cursor-pointer"
+              >
+                <Plus size={13} /> Add Deposit
+              </button>
+            </div>
+
             {/* INLINE PENDING INBOX */}
             <AnimatePresence>
               {pendingItems.length > 0 && (
@@ -659,9 +825,9 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 );
               })()}
 
-              {/* 2. THE OTHER 4 BUCKETS - 2X2 GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(['tawarr2', 'iltizamat', 'leya', 'basmala'] as Array<keyof FinanceBuckets>).map(key => {
+              {/* 2. THE OTHER 3 BUCKETS - GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {(['tawarr2', 'basmala', 'sadaqa'] as Array<keyof FinanceBuckets>).map(key => {
                   const meta = BUCKET_META[key];
                   const value = buckets[key] || 0;
                   const percentOfTotal = totalVirtual > 0 ? (value / totalVirtual) * 100 : 0;
@@ -781,12 +947,10 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   const pnl = purchasedTotal !== null ? currentVal - purchasedTotal : null;
                   return (
                     <div key={g.id} className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark">
-                      <button
-                        onClick={() => handleRemoveGold(g.id)}
-                        className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-ink/25 hover:text-rust transition-all cursor-pointer"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={() => openEditGold(g)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil size={12} /></button>
+                        <button onClick={() => handleRemoveGold(g.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 size={12} /></button>
+                      </div>
 
                       {/* Left: weight + carat + notes */}
                       <div className="flex items-baseline gap-3">
@@ -855,17 +1019,15 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   const soon = daysLeft <= 5;
                   return (
                     <div key={sub.id} className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark">
-                      <button
-                        onClick={() => handleRemoveSub(sub.id)}
-                        className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-ink/25 hover:text-rust transition-all cursor-pointer"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={() => openEditSub(sub)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil size={12} /></button>
+                        <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 size={12} /></button>
+                      </div>
 
                       <div className="flex items-center gap-4">
                         <div>
                           <p className="font-sans-main text-sm font-black text-ink">{sub.name}</p>
-                          <p className="font-mono-main text-[10px] text-ink/35 mt-0.5">{sub.bank} · Day {sub.renewalDay}</p>
+                          <p className="font-mono-main text-[10px] text-ink/35 mt-0.5">{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''}</p>
                         </div>
                       </div>
 
@@ -895,8 +1057,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 </p>
               </div>
               <div className="text-right space-y-1">
-                <p className="font-mono-main text-xs text-forest font-bold">+{formatEGP(totalDebtsOwedToMe)}</p>
-                <p className="font-mono-main text-xs text-rust font-bold">-{formatEGP(totalDebtsOwedByMe)}</p>
+                <p className="font-mono-main text-xs text-ink/60 font-bold">↑ {formatEGP(totalDebtsOwedToMe)}</p>
+                <p className="font-mono-main text-xs text-ink/40 font-bold">↓ {formatEGP(totalDebtsOwedByMe)}</p>
               </div>
             </div>
 
@@ -920,14 +1082,12 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   <div
                     key={debt.id}
                     className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark"
-                    style={{ borderLeft: `3px solid ${debt.type === 'owed_to_me' ? 'var(--forest)' : 'var(--rust)'}` }}
+                    style={{ borderLeft: `3px solid var(--ink)`, opacity: debt.type === 'owed_by_me' ? 0.6 : 1 }}
                   >
-                    <button
-                      onClick={() => handleRemoveDebt(debt.id)}
-                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-ink/25 hover:text-rust transition-all cursor-pointer"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => openEditDebt(debt)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil size={12} /></button>
+                      <button onClick={() => handleRemoveDebt(debt.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 size={12} /></button>
+                    </div>
 
                     <div>
                       <p className="font-sans-main text-sm font-black text-ink">{debt.personName}</p>
@@ -935,10 +1095,10 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     </div>
 
                     <div className="text-right pr-6">
-                      <p className="font-mono-main text-base font-black" style={{ color: debt.type === 'owed_to_me' ? 'var(--forest)' : 'var(--rust)' }}>
-                        {debt.type === 'owed_to_me' ? '+' : '-'}{formatEGP(debt.amount)}
+                      <p className="font-mono-main text-base font-black text-ink">
+                        {debt.type === 'owed_to_me' ? '+' : '−'}{formatEGP(debt.amount)}
                       </p>
-                      <p className="font-mono-main text-[9px] text-ink/25 mt-0.5">
+                      <p className="font-mono-main text-[9px] text-ink/25 mt-0.5 uppercase tracking-widest">
                         {debt.type === 'owed_to_me' ? 'Receivable' : 'Payable'}
                       </p>
                     </div>
@@ -950,64 +1110,6 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         )}
 
         {/* ANALYSIS TAB */}
-        {activeTab === 'analysis' && (
-          <div className="space-y-6">
-            {/* Split profiles */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { label: 'مرتب', split: SALARY_SPLIT },
-                { label: 'فريلانس', split: FREELANCE_SPLIT },
-              ].map(({ label, split }) => (
-                <div key={label} className="brutalist-card no-lift p-5 bg-paper-dark space-y-4">
-                  <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30">{label}</p>
-                  <div className="space-y-3">
-                    {Object.entries(split).map(([key, pct]) => {
-                      const meta = BUCKET_META[key as keyof FinanceBuckets];
-                      return (
-                        <div key={key} className="space-y-1">
-                          <div className="flex justify-between font-mono-main text-[11px] font-bold">
-                            <span className="text-ink/60">{meta?.en || key}</span>
-                            <span className="text-ink/40">{Math.round(pct * 100)}%</span>
-                          </div>
-                          <div className="w-full h-1.5 bg-ink/8">
-                            <div className="h-full" style={{ width: `${pct * 100}%`, backgroundColor: meta?.accent || 'var(--ink)' }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Transactions */}
-            <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30">Recent Transactions</p>
-            {transactions.length === 0 ? (
-              <div className="border border-dashed border-ink/15 py-12 text-center">
-                <p className="font-mono-main text-xs text-ink/25">No transactions recorded yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {transactions.slice(0, 30).map(tx => (
-                  <div key={tx.id} className="brutalist-card no-lift p-4 flex items-center justify-between bg-paper-dark">
-                    <div className="flex items-center gap-3">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tx.type === 'debit' ? 'var(--rust)' : 'var(--forest)' }} />
-                      <div>
-                        <p className="font-mono-main text-xs font-bold text-ink">{translateArabicText(tx.description)}</p>
-                        <p className="font-mono-main text-[9px] text-ink/30 mt-0.5">
-                          {tx.bank} · {new Date(tx.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="font-mono-main text-sm font-black" style={{ color: tx.type === 'debit' ? 'var(--rust)' : 'var(--forest)' }}>
-                      {tx.type === 'debit' ? '−' : '+'}{formatEGP(tx.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
       </div>
 
@@ -1018,102 +1120,82 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       {/* ADD GOLD MODAL */}
       <AnimatePresence>
         {showAddGoldModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-paper/45 backdrop-blur-md" onClick={() => setShowAddGoldModal(false)} />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddGoldModal(false)} />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md border-4 border-ink bg-paper-dark shadow-[12px_12px_0px_0px_var(--ink)] p-10 z-10"
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 16, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10"
+              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
             >
-              <div className="flex items-start justify-between mb-8">
-                <h3 className="font-sans-main text-2xl font-black uppercase tracking-tight text-ink">
-                  Add Gold Asset
-                </h3>
-                <button onClick={() => setShowAddGoldModal(false)} className="text-ink/35 hover:text-ink cursor-pointer transition-colors p-1">
-                  <X size={20} strokeWidth={3} />
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Add Gold Asset</h3>
+                <button onClick={() => setShowAddGoldModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
+                  <X size={16} strokeWidth={2} />
                 </button>
               </div>
 
-              <form onSubmit={handleAddGold} className="space-y-5">
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Weight in Grams
-                  </label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    placeholder="e.g. 10.500"
-                    value={newGoldQty}
-                    onChange={e => setNewGoldQty(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                    required
-                  />
-                </div>
+              <form onSubmit={handleAddGold}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Weight in Grams</label>
+                    <input type="number" step="0.001" placeholder="e.g. 10.500" value={newGoldQty} onChange={e => setNewGoldQty(e.target.value)} required autoFocus
+                      className="w-full font-mono-main font-bold outline-none transition-colors"
+                      style={{ padding: '14px 16px', fontSize: 20, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
+                  </div>
 
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Carat Type
-                  </label>
-                  <div className="flex gap-4">
-                    {([24, 21] as const).map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => setNewGoldCarat(c)}
-                        className={`flex-1 py-3.5 border-2 font-mono-main text-sm font-black transition-all duration-150 relative cursor-pointer ${
-                          newGoldCarat === c
-                            ? 'border-ink bg-ink text-paper shadow-[3px_3px_0_0_var(--ink)]'
-                            : 'border-ink/20 text-ink/40 hover:border-ink/50 bg-paper'
-                        }`}
-                      >
-                        {c}K
-                        {newGoldCarat === c && (
-                          <span className="absolute top-1.5 right-2 text-[8px] bg-forest text-paper px-1.5 py-0.5 font-bold rounded-sm">✓</span>
-                        )}
-                      </button>
-                    ))}
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Carat</label>
+                    <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+                      {([24, 21] as const).map((c, i) => (
+                        <button key={c} type="button" onClick={() => setNewGoldCarat(c)}
+                          className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors"
+                          style={{ fontSize: 13, padding: '14px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: newGoldCarat === c ? '#7A9E1A' : 'transparent', color: newGoldCarat === c ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                        >{c}K</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Purchase Price / gram — EGP</label>
+                    <input type="number" step="0.01"
+                      placeholder={goldPrices ? `Current: ${newGoldCarat === 24 ? goldPrices.price24 : goldPrices.price21}` : 'e.g. 3800'}
+                      value={newGoldPurchasePrice} onChange={e => setNewGoldPurchasePrice(e.target.value)}
+                      className="w-full font-mono-main outline-none transition-colors"
+                      style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
+                    {goldPrices && !newGoldPurchasePrice && (
+                      <p className="font-mono-main mt-2" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)' }}>
+                        Auto-saves spot price ({formatEGP(newGoldCarat === 24 ? goldPrices.price24 : goldPrices.price21)} / g)
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Notes / Label <span style={{ opacity: 0.5 }}>(optional)</span></label>
+                    <input type="text" placeholder="Optional" value={newGoldNotes} onChange={e => setNewGoldNotes(e.target.value)}
+                      className="w-full font-mono-main outline-none transition-colors"
+                      style={{ padding: '12px 16px', fontSize: 14, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Purchase Price (per gram) — EGP
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder={goldPrices ? `Current: ${newGoldCarat === 24 ? goldPrices.price24 : goldPrices.price21}` : 'e.g. 3800'}
-                    value={newGoldPurchasePrice}
-                    onChange={e => setNewGoldPurchasePrice(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                  />
-                  {goldPrices && !newGoldPurchasePrice && (
-                    <p className="font-mono-main text-[9px] text-ink/30 mt-1">
-                      Will auto-save current spot price ({formatEGP(newGoldCarat === 24 ? goldPrices.price24 : goldPrices.price21)} / g)
-                    </p>
-                  )}
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                    style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
+                  >Add Asset</button>
                 </div>
-
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Notes / Label
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Optional"
-                    value={newGoldNotes}
-                    onChange={e => setNewGoldNotes(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full btn-brutalist justify-center py-4 text-xs font-mono-main font-bold uppercase tracking-widest mt-6 cursor-pointer"
-                >
-                  Add Asset
-                </button>
               </form>
             </motion.div>
           </div>
@@ -1123,111 +1205,102 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       {/* ADD SUBSCRIPTION MODAL */}
       <AnimatePresence>
         {showAddSubModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-paper/45 backdrop-blur-md" onClick={() => setShowAddSubModal(false)} />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddSubModal(false)} />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md border-4 border-ink bg-paper-dark shadow-[12px_12px_0px_0px_var(--ink)] p-10 z-10"
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 16, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10"
+              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
             >
-              <div className="flex items-start justify-between mb-8">
-                <h3 className="font-sans-main text-2xl font-black uppercase tracking-tight text-ink">
-                  Add Subscription
-                </h3>
-                <button onClick={() => setShowAddSubModal(false)} className="text-ink/35 hover:text-ink cursor-pointer transition-colors p-1">
-                  <X size={20} strokeWidth={3} />
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Add Subscription</h3>
+                <button onClick={() => setShowAddSubModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
+                  <X size={16} strokeWidth={2} />
                 </button>
               </div>
 
-              <form onSubmit={handleAddSub} className="space-y-5">
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Subscription Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Netflix, Spotify"
-                    value={newSubName}
-                    onChange={e => setNewSubName(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                    required
-                  />
+              <form onSubmit={handleAddSub}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Name</label>
+                    <input type="text" placeholder="e.g. Netflix, Spotify" value={newSubName} onChange={e => setNewSubName(e.target.value)} required autoFocus
+                      className="w-full font-mono-main outline-none transition-colors"
+                      style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Monthly Cost — EGP</label>
+                    <input type="number" step="0.01" placeholder="e.g. 250" value={newSubCost} onChange={e => setNewSubCost(e.target.value)} required
+                      className="w-full font-mono-main font-bold outline-none transition-colors"
+                      style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Renewal Day</label>
+                      <input type="number" min="1" max="31" placeholder="e.g. 15" value={newSubDay} onChange={e => setNewSubDay(e.target.value)} required
+                        className="w-full font-mono-main outline-none transition-colors"
+                        style={{ padding: '12px 14px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                      />
+                    </div>
+                    <div>
+                      <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Reminder Time</label>
+                      <input type="time" value={newSubTime} onChange={e => setNewSubTime(e.target.value)} required
+                        className="w-full font-mono-main outline-none transition-colors"
+                        style={{ padding: '12px 14px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Payment Account</label>
+                    <button type="button" onClick={() => setShowBankDropdown(!showBankDropdown)}
+                      className="w-full font-mono-main font-bold text-left flex justify-between items-center cursor-pointer transition-colors"
+                      style={{ padding: '12px 16px', fontSize: 13, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                    >
+                      <span>{BANK_LABELS[newSubBank]}</span>
+                      <span style={{ fontSize: 9, opacity: 0.4 }}>▼</span>
+                    </button>
+                    <AnimatePresence>
+                      {showBankDropdown && (
+                        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                          className="absolute left-0 right-0 z-50"
+                          style={{ top: '100%', marginTop: 2, background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 20%, transparent)' }}
+                        >
+                          {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                            <button key={bk} type="button" onClick={() => { setNewSubBank(bk); setShowBankDropdown(false); }}
+                              className="w-full text-left font-mono-main cursor-pointer block transition-colors"
+                              style={{ padding: '12px 16px', fontSize: 12, color: 'var(--ink)', borderBottom: '1px solid color-mix(in srgb, var(--ink) 8%, transparent)', background: 'transparent' }}
+                              onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--ink) 6%, transparent)')}
+                              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                            >{BANK_LABELS[bk]}</button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Monthly Cost (EGP)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 250"
-                    value={newSubCost}
-                    onChange={e => setNewSubCost(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                    required
-                  />
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                    style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
+                  >Add Subscription</button>
                 </div>
-
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Renewal Day of Month (1 - 31)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    placeholder="e.g. 15"
-                    value={newSubDay}
-                    onChange={e => setNewSubDay(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                    required
-                  />
-                </div>
-
-                {/* Custom Branded Dropdown */}
-                <div className="relative">
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Payment Account
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowBankDropdown(!showBankDropdown)}
-                    className="w-full bg-paper border-2 border-ink p-3 text-left font-mono-main text-xs font-bold flex justify-between items-center cursor-pointer hover:bg-paper-dark transition-colors"
-                  >
-                    <span>{BANK_LABELS[newSubBank]}</span>
-                    <span className="text-[10px]">▼</span>
-                  </button>
-                  <AnimatePresence>
-                    {showBankDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -5 }}
-                        className="absolute left-0 right-0 mt-1.5 border-2 border-ink bg-paper-dark z-50 shadow-[6px_6px_0_0_var(--ink)]"
-                      >
-                        {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
-                          <button
-                            key={bk}
-                            type="button"
-                            onClick={() => { setNewSubBank(bk); setShowBankDropdown(false); }}
-                            className="w-full p-3 text-left font-mono-main text-xs hover:bg-ink/5 border-b border-ink/10 last:border-0 cursor-pointer block transition-colors"
-                          >
-                            {BANK_LABELS[bk]}
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full btn-brutalist justify-center py-4 text-xs font-mono-main font-bold uppercase tracking-widest mt-6 cursor-pointer"
-                >
-                  Add Subscription
-                </button>
               </form>
             </motion.div>
           </div>
@@ -1237,102 +1310,476 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       {/* ADD DEBT ENTRY MODAL */}
       <AnimatePresence>
         {showAddDebtModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6">
-            <div className="absolute inset-0 bg-paper/45 backdrop-blur-md" onClick={() => setShowAddDebtModal(false)} />
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddDebtModal(false)} />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md border-4 border-ink bg-paper-dark shadow-[12px_12px_0px_0px_var(--ink)] p-10 z-10"
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 16, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10"
+              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
             >
-              <div className="flex items-start justify-between mb-8">
-                <h3 className="font-sans-main text-2xl font-black uppercase tracking-tight text-ink">
-                  Record Debt Entry
-                </h3>
-                <button onClick={() => setShowAddDebtModal(false)} className="text-ink/35 hover:text-ink cursor-pointer transition-colors p-1">
-                  <X size={20} strokeWidth={3} />
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Log Debt</h3>
+                <button onClick={() => setShowAddDebtModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
+                  <X size={16} strokeWidth={2} />
                 </button>
               </div>
 
-              <form onSubmit={handleAddDebt} className="space-y-5">
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Counterparty Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Aly, Hamed"
-                    value={newDebtName}
-                    onChange={e => setNewDebtName(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                    required
-                  />
-                </div>
+              <form onSubmit={handleAddDebt}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {/* Type toggle */}
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Type</label>
+                    <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+                      {(['owed_to_me', 'owed_by_me'] as const).map((t, i) => (
+                        <button key={t} type="button" onClick={() => setNewDebtType(t)}
+                          className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors"
+                          style={{ fontSize: 11, padding: '14px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: newDebtType === t ? '#7A9E1A' : 'transparent', color: newDebtType === t ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                        >{t === 'owed_to_me' ? 'Owed to Me' : 'I Owe Them'}</button>
+                      ))}
+                    </div>
+                  </div>
 
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Amount (EGP)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="e.g. 500"
-                    value={newDebtAmount}
-                    onChange={e => setNewDebtAmount(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                    required
-                  />
-                </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Name</label>
+                    <input type="text" placeholder="e.g. Aly, Hamed" value={newDebtName} onChange={e => setNewDebtName(e.target.value)} required autoFocus
+                      className="w-full font-mono-main outline-none transition-colors"
+                      style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
+                  </div>
 
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Ledger Category
-                  </label>
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={() => setNewDebtType('owed_to_me')}
-                      className={`flex-1 py-3 border-2 font-mono-main text-xs font-black transition-all duration-150 cursor-pointer ${
-                        newDebtType === 'owed_to_me'
-                          ? 'border-forest bg-forest/10 text-forest shadow-[2px_2px_0_0_var(--forest)]'
-                          : 'border-ink/20 text-ink/50 bg-paper'
-                      }`}
-                    >
-                      Owed to Me
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setNewDebtType('owed_by_me')}
-                      className={`flex-1 py-3 border-2 font-mono-main text-xs font-black transition-all duration-150 cursor-pointer ${
-                        newDebtType === 'owed_by_me'
-                          ? 'border-rust bg-rust/10 text-rust shadow-[2px_2px_0_0_var(--rust)]'
-                          : 'border-ink/20 text-ink/50 bg-paper'
-                      }`}
-                    >
-                      I Owe Them
-                    </button>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Amount — EGP</label>
+                    <input type="number" step="0.01" placeholder="0.00" value={newDebtAmount} onChange={e => setNewDebtAmount(e.target.value)} required
+                      className="w-full font-mono-main font-bold outline-none transition-colors"
+                      style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Notes <span style={{ opacity: 0.5 }}>(optional)</span></label>
+                    <input type="text" placeholder="e.g. Dinner cash back" value={newDebtNotes} onChange={e => setNewDebtNotes(e.target.value)}
+                      className="w-full font-mono-main outline-none transition-colors"
+                      style={{ padding: '12px 16px', fontSize: 14, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="font-sans-main text-[11px] font-black uppercase tracking-wider text-ink/65 mb-1.5 block">
-                    Notes
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dinner cash back"
-                    value={newDebtNotes}
-                    onChange={e => setNewDebtNotes(e.target.value)}
-                    className="w-full bg-paper border-2 border-ink p-3 font-mono-main text-sm outline-none focus:bg-paper-dark transition-colors"
-                  />
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                    style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
+                  >Log Debt</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ADD DEPOSIT MODAL */}
+      <AnimatePresence>
+        {showAddDepositModal && (() => {
+          const split = newDepositCategory === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
+          const amt = parseFloat(newDepositAmount) || 0;
+          const totalPct = Object.values(split).reduce((a, b) => a + b, 0);
+          return (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5" style={{ overflow: 'hidden' }}>
+              <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddDepositModal(false)} />
+              <motion.div
+                initial={{ y: 16, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 16, opacity: 0 }}
+                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                className="relative w-full max-w-sm z-10"
+                style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>
+                    Add Deposit
+                  </h3>
+                  <button
+                    onClick={() => setShowAddDepositModal(false)}
+                    className="cursor-pointer transition-opacity"
+                    style={{ color: 'var(--ink)', opacity: 0.35 }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}
+                  >
+                    <X size={16} strokeWidth={2} />
+                  </button>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full btn-brutalist justify-center py-4 text-xs font-mono-main font-bold uppercase tracking-widest mt-6 cursor-pointer"
-                >
-                  Log Debt
+                <form onSubmit={handleAddDeposit}>
+                  <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+                    {/* Mode toggle: Split / Manual */}
+                    <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+                      {(['split', 'manual'] as const).map((m, i) => (
+                        <button key={m} type="button" onClick={() => setDepositMode(m)}
+                          className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors"
+                          style={{ fontSize: 11, padding: '12px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: depositMode === m ? '#7A9E1A' : 'transparent', color: depositMode === m ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                        >{m === 'split' ? 'Auto Split' : 'Manual'}</button>
+                      ))}
+                    </div>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>
+                        Amount
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono-main select-none" style={{ fontSize: 11, color: 'color-mix(in srgb, var(--ink) 25%, transparent)' }}>EGP</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={newDepositAmount}
+                          onChange={e => setNewDepositAmount(e.target.value)}
+                          required
+                          autoFocus
+                          className="w-full font-mono-main font-bold outline-none transition-colors"
+                          style={{
+                            paddingLeft: 50, paddingRight: 16, paddingTop: 16, paddingBottom: 16,
+                            fontSize: 28,
+                            background: 'color-mix(in srgb, var(--ink) 4%, transparent)',
+                            border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)',
+                            color: 'var(--ink)',
+                          }}
+                          onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                          onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Split mode: Source + Bank + preview */}
+                    {depositMode === 'split' && (<>
+                      <div>
+                        <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Source</label>
+                        <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+                          {(['Salary', 'Freelance'] as const).map((cat, i) => (
+                            <button key={cat} type="button" onClick={() => setNewDepositCategory(cat)}
+                              className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors"
+                              style={{ fontSize: 12, padding: '16px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: newDepositCategory === cat ? '#7A9E1A' : 'transparent', color: newDepositCategory === cat ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                            >{cat}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Bank Account</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                            <button key={bk} type="button" onClick={() => setNewDepositBank(bk)}
+                              className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors"
+                              style={{ fontSize: 12, padding: '14px 0', border: newDepositBank === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: newDepositBank === bk ? 'var(--ink)' : 'transparent', color: newDepositBank === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                            >{BANK_LABELS[bk]}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {amt > 0 && (
+                        <div style={{ background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)', padding: '18px 20px' }}>
+                          <p className="font-mono-main uppercase tracking-widest mb-4" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 30%, transparent)' }}>Distribution</p>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            {Object.entries(split).filter(([, p]) => p > 0).map(([key, pct]) => {
+                              const meta = BUCKET_META[key as keyof FinanceBuckets];
+                              return (
+                                <div key={key} className="flex justify-between items-center">
+                                  <span className="font-sans-main" style={{ fontSize: 12, color: 'color-mix(in srgb, var(--ink) 50%, transparent)' }}>
+                                    {meta?.en} <span style={{ opacity: 0.5 }}>· {Math.round(pct * 100)}%</span>
+                                  </span>
+                                  <span className="font-mono-main font-bold" style={{ fontSize: 13, color: 'var(--ink)' }}>{formatEGP(amt * pct)}</span>
+                                </div>
+                              );
+                            })}
+                            {totalPct < 1 && (
+                              <div className="flex justify-between pt-3" style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 8%, transparent)' }}>
+                                <span className="font-sans-main" style={{ fontSize: 11, color: 'color-mix(in srgb, var(--ink) 20%, transparent)' }}>Not allocated</span>
+                                <span className="font-mono-main" style={{ fontSize: 11, color: 'color-mix(in srgb, var(--ink) 20%, transparent)' }}>{formatEGP(amt * (1 - totalPct))}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </>)}
+
+                    {/* Manual mode: pick bucket or bank */}
+                    {depositMode === 'manual' && (
+                      <div>
+                        <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Destination</label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginBottom: 4 }}>Buckets</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(Object.keys(BUCKET_META) as Array<keyof FinanceBuckets>).map(bk => (
+                              <button key={bk} type="button"
+                                onClick={() => setManualTarget({ type: 'bucket', key: bk })}
+                                className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                                style={{ fontSize: 11, padding: '12px 14px', border: manualTarget.type === 'bucket' && manualTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: manualTarget.type === 'bucket' && manualTarget.key === bk ? 'var(--ink)' : 'transparent', color: manualTarget.type === 'bucket' && manualTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                              >
+                                <span style={{ display: 'block', fontSize: 10 }}>{BUCKET_META[bk].en}</span>
+                                {buckets?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(buckets[bk])}</span>}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginTop: 8, marginBottom: 4 }}>Banks</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                              <button key={bk} type="button"
+                                onClick={() => setManualTarget({ type: 'bank', key: bk })}
+                                className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                                style={{ fontSize: 11, padding: '12px 14px', border: manualTarget.type === 'bank' && manualTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: manualTarget.type === 'bank' && manualTarget.key === bk ? 'var(--ink)' : 'transparent', color: manualTarget.type === 'bank' && manualTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                              >
+                                <span style={{ display: 'block', fontSize: 10 }}>{BANK_LABELS[bk]}</span>
+                                {banks?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(banks[bk])}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer — Confirm only */}
+                  <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                    <button
+                      type="submit"
+                      className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                      style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
+                    >
+                      Confirm Deposit
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
+
+      {/* WITHDRAW MODAL */}
+      <AnimatePresence>
+        {showWithdrawModal && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setShowWithdrawModal(false)} />
+            <motion.div
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 16, opacity: 0 }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10"
+              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
+            >
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Withdraw</h3>
+                <button onClick={() => setShowWithdrawModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
+                  <X size={16} strokeWidth={2} />
                 </button>
+              </div>
+
+              <form onSubmit={handleWithdraw}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                  {/* Amount */}
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Amount</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-mono-main select-none" style={{ fontSize: 11, color: 'color-mix(in srgb, var(--ink) 25%, transparent)' }}>EGP</span>
+                      <input type="number" step="0.01" placeholder="0.00" value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} required autoFocus
+                        className="w-full font-mono-main font-bold outline-none transition-colors"
+                        style={{ paddingLeft: 50, paddingRight: 16, paddingTop: 16, paddingBottom: 16, fontSize: 28, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
+                      />
+                    </div>
+                  </div>
+
+                  {/* From */}
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>From</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginBottom: 4 }}>Buckets</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(Object.keys(BUCKET_META) as Array<keyof FinanceBuckets>).map(bk => (
+                          <button key={bk} type="button"
+                            onClick={() => setWithdrawTarget({ type: 'bucket', key: bk })}
+                            className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                            style={{ fontSize: 11, padding: '12px 14px', border: withdrawTarget.type === 'bucket' && withdrawTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: withdrawTarget.type === 'bucket' && withdrawTarget.key === bk ? 'var(--ink)' : 'transparent', color: withdrawTarget.type === 'bucket' && withdrawTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                          >
+                            <span style={{ display: 'block', fontSize: 10 }}>{BUCKET_META[bk].en}</span>
+                            {buckets?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(buckets[bk])}</span>}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginTop: 8, marginBottom: 4 }}>Banks</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                          <button key={bk} type="button"
+                            onClick={() => setWithdrawTarget({ type: 'bank', key: bk })}
+                            className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                            style={{ fontSize: 11, padding: '12px 14px', border: withdrawTarget.type === 'bank' && withdrawTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: withdrawTarget.type === 'bank' && withdrawTarget.key === bk ? 'var(--ink)' : 'transparent', color: withdrawTarget.type === 'bank' && withdrawTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                          >
+                            <span style={{ display: 'block', fontSize: 10 }}>{BANK_LABELS[bk]}</span>
+                            {banks?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(banks[bk])}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                    style={{ fontSize: 13, padding: '20px 0', background: 'var(--rust)', color: 'var(--paper)', border: 'none' }}
+                  >
+                    Confirm Withdrawal
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EDIT GOLD MODAL */}
+      <AnimatePresence>
+        {editingGold && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setEditingGold(null)} />
+            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Gold</h3>
+                <button onClick={() => setEditingGold(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X size={16} strokeWidth={2} /></button>
+              </div>
+              <form onSubmit={handleSaveGold}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Weight (g)</label>
+                    <input type="number" step="0.001" value={editingGoldQty} onChange={e => setEditingGoldQty(e.target.value)} required autoFocus className="w-full font-mono-main font-bold outline-none transition-colors" style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Carat</label>
+                    <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+                      {([24, 21] as const).map((c, i) => (
+                        <button key={c} type="button" onClick={() => setEditingGoldCarat(c)} className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors" style={{ fontSize: 13, padding: '13px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: editingGoldCarat === c ? '#7A9E1A' : 'transparent', color: editingGoldCarat === c ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}>{c}K</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Purchase Price / g</label>
+                    <input type="number" step="0.01" value={editingGoldPrice} onChange={e => setEditingGoldPrice(e.target.value)} placeholder="optional" className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Notes</label>
+                    <input type="text" value={editingGoldNotes} onChange={e => setEditingGoldNotes(e.target.value)} placeholder="optional" className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 16px', fontSize: 14, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                </div>
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')} onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}>Save Changes</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EDIT SUBSCRIPTION MODAL */}
+      <AnimatePresence>
+        {editingSub && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setEditingSub(null)} />
+            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Subscription</h3>
+                <button onClick={() => setEditingSub(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X size={16} strokeWidth={2} /></button>
+              </div>
+              <form onSubmit={handleSaveSub}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Name</label>
+                    <input type="text" value={editingSubName} onChange={e => setEditingSubName(e.target.value)} required autoFocus className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Monthly Cost — EGP</label>
+                    <input type="number" step="0.01" value={editingSubCost} onChange={e => setEditingSubCost(e.target.value)} required className="w-full font-mono-main font-bold outline-none transition-colors" style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Renewal Day</label>
+                      <input type="number" min="1" max="31" value={editingSubDay} onChange={e => setEditingSubDay(e.target.value)} required className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 14px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                    </div>
+                    <div>
+                      <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Time</label>
+                      <input type="time" value={editingSubTime} onChange={e => setEditingSubTime(e.target.value)} required className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 14px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Bank Account</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                        <button key={bk} type="button" onClick={() => setEditingSubBank(bk)} className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors" style={{ fontSize: 12, padding: '13px 0', border: editingSubBank === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: editingSubBank === bk ? 'var(--ink)' : 'transparent', color: editingSubBank === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}>{BANK_LABELS[bk]}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')} onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}>Save Changes</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EDIT DEBT MODAL */}
+      <AnimatePresence>
+        {editingDebt && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
+            <div className="absolute inset-0 bg-black/90" onClick={() => setEditingDebt(null)} />
+            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Debt</h3>
+                <button onClick={() => setEditingDebt(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X size={16} strokeWidth={2} /></button>
+              </div>
+              <form onSubmit={handleSaveDebt}>
+                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Type</label>
+                    <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
+                      {(['owed_to_me', 'owed_by_me'] as const).map((t, i) => (
+                        <button key={t} type="button" onClick={() => setEditingDebtType(t)} className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors" style={{ fontSize: 11, padding: '13px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: editingDebtType === t ? '#7A9E1A' : 'transparent', color: editingDebtType === t ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}>{t === 'owed_to_me' ? 'Owed to Me' : 'I Owe Them'}</button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Name</label>
+                    <input type="text" value={editingDebtName} onChange={e => setEditingDebtName(e.target.value)} required autoFocus className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Amount — EGP</label>
+                    <input type="number" step="0.01" value={editingDebtAmount} onChange={e => setEditingDebtAmount(e.target.value)} required className="w-full font-mono-main font-bold outline-none transition-colors" style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Notes <span style={{ opacity: 0.5 }}>(optional)</span></label>
+                    <input type="text" value={editingDebtNotes} onChange={e => setEditingDebtNotes(e.target.value)} placeholder="e.g. Dinner cash back" className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 16px', fontSize: 14, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                  </div>
+                </div>
+                <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
+                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')} onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}>Save Changes</button>
+                </div>
               </form>
             </motion.div>
           </div>
