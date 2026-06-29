@@ -7,6 +7,7 @@ import { Pomodoro } from './components/dashboard/Pomodoro';
 import { Prayer } from './components/dashboard/Prayer';
 import { Fitness } from './components/dashboard/Fitness';
 import { Finance } from './components/dashboard/Finance';
+import { QuranReader } from './components/dashboard/QuranReader';
 import { Login } from './components/dashboard/Login';
 import { TouchIDGate } from './components/dashboard/TouchIDGate';
 import { CustomCursor } from './components/ui/CustomCursor';
@@ -83,6 +84,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/calendar" element={<AnimatedPage><Calendar navigate={nav} /></AnimatedPage>} />
           <Route path="/pomodoro" element={<AnimatedPage><Pomodoro navigate={nav} /></AnimatedPage>} />
           <Route path="/prayer" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
+          <Route path="/quran" element={<AnimatedPage><QuranReader navigate={nav} /></AnimatedPage>} />
           <Route path="/fitness" element={<AnimatedPage><Fitness navigate={nav} /></AnimatedPage>} />
           <Route path="/finance" element={<AnimatedPage><Finance navigate={nav} /></AnimatedPage>} />
           <Route path="*" element={<Navigate to="/" replace />} />

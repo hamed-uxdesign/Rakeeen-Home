@@ -92,9 +92,6 @@
     --pomo-overtime: #E8C04A;
   }
 
-  html, * {
-    cursor: none !important;
-  }
 
   body {
     background: var(--paper);
@@ -227,7 +224,7 @@
     padding: 0.6rem 1.5rem;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
-    cursor: pointer;
+    cursor: none;
     outline: none;
   }
   .btn-brutalist:hover {
@@ -371,5 +368,10 @@ body.dark-theme .brutalist-dashed-card:hover:not(.no-lift) {
 }
 body.dark-theme [class*="border-ink"] {
   border-color: rgba(231, 232, 225, 0.15) !important;
+}
+
+/* Hide native cursor globally — must be outside @layer to beat Tailwind utilities */
+*, *::before, *::after {
+  cursor: none !important;
 }
 

@@ -3,6 +3,12 @@ import cron from 'node-cron';
 import dotenv from 'dotenv';
 import express from 'express';
 import { parseSMS } from './smsParser.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SUBS_FILE = path.join(__dirname, 'subscriptions.json');
 
 dotenv.config();
 
@@ -269,17 +275,23 @@ async function sendDebitAlert(parsed) {
 }
 
 async function sendSubscriptionAlert(sub) {
+  const nowEgypt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Cairo' }));
+  const dateStr = nowEgypt.toLocaleDateString('en-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   const embed = {
-    title: '🔁 Subscription Renewal Reminder',
-    color: 3447003, // Blue
+    title: '🔁  Subscription Renewal Due',
+    color: 0xF0C040, // Gold/amber
+    description: `**${sub.name}** is renewing today — make sure it's covered.`,
     fields: [
-      { name: 'Subscription', value: `**${sub.name}**`, inline: true },
-      { name: 'Cost', value: `**${sub.cost.toLocaleString('en-EG')} EGP**`, inline: true },
-      { name: 'Payment Method', value: sub.bank || 'Unknown', inline: true }
+      { name: '💳  Amount', value: `\`${sub.cost.toLocaleString('en-EG')} EGP\``, inline: true },
+      { name: '🏦  Bank', value: sub.bank || '—', inline: true },
+      { name: '📅  Date', value: dateStr, inline: false },
     ],
-    description: `This subscription is scheduled for renewal today (Day ${sub.renewalDay} of the month).`
+    footer: { text: 'Rakeeen · Finance · Subscriptions' },
+    thumbnail: { url: 'https://cdn-icons-png.flaticon.com/512/2088/2088617.png' }
   };
-  const altText = `🔁 **Subscription Reminder**\nYour subscription **${sub.name}** (${sub.cost} EGP) is due today.`;
+
+  const altText = `🔁 **Subscription Due: ${sub.name}**\n💳 ${sub.cost.toLocaleString('en-EG')} EGP · 🏦 ${sub.bank || 'Unknown'}\n📅 ${dateStr}`;
   await sendDiscordEmbed(embed, altText);
 }
 
@@ -371,45 +383,38 @@ async function getGoldPrices() {
 // ============================================================
 // FIREBASE SUBSCRIPTION SYNC & SEEDING
 // ============================================================
-let localSubscriptions = [];
 
-async function getFirebaseSubscriptions() {
+// Load subscriptions from local file (persisted across restarts)
+function loadSubscriptionsFromFile() {
   try {
-    const url = 'https://firestore.googleapis.com/v1/projects/rakeeen-home/databases/(default)/documents/dashboard/finance_subscriptions';
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) {
-      console.warn(`Firestore REST API returned status ${res.status}`);
-      return [];
-    }
-    const data = await res.json();
-    if (data.fields && data.fields.value) {
-      const val = data.fields.value;
-      if (val.arrayValue && val.arrayValue.values) {
-        return val.arrayValue.values.map(item => {
-          const mapVal = item.mapValue?.fields || {};
-          return {
-            id: mapVal.id?.stringValue || '',
-            name: mapVal.name?.stringValue || '',
-            cost: parseFloat(mapVal.cost?.doubleValue || mapVal.cost?.integerValue || mapVal.cost?.stringValue || '0'),
-            renewalDay: parseInt(mapVal.renewalDay?.integerValue || mapVal.renewalDay?.stringValue || '1'),
-            reminderTime: mapVal.reminderTime?.stringValue || '09:00',
-            bank: mapVal.bank?.stringValue || ''
-          };
-        });
+    if (fs.existsSync(SUBS_FILE)) {
+      const raw = fs.readFileSync(SUBS_FILE, 'utf8');
+      const subs = JSON.parse(raw);
+      if (Array.isArray(subs) && subs.length > 0) {
+        console.log(`📂 Loaded ${subs.length} subscriptions from local file`);
+        return subs;
       }
     }
   } catch (err) {
-    console.error('❌ Failed to fetch subscriptions from Firebase REST API:', err.message);
+    console.error('⚠️ Failed to load subscriptions from file:', err.message);
   }
   return [];
 }
 
-async function seedSubscriptions() {
-  const subs = await getFirebaseSubscriptions();
-  if (subs && subs.length > 0) {
-    localSubscriptions = subs;
-    console.log(`🌱 Seeded ${localSubscriptions.length} subscriptions from Firestore`);
+function saveSubscriptionsToFile(subs) {
+  try {
+    fs.writeFileSync(SUBS_FILE, JSON.stringify(subs, null, 2), 'utf8');
+  } catch (err) {
+    console.error('⚠️ Failed to save subscriptions to file:', err.message);
   }
+}
+
+let localSubscriptions = loadSubscriptionsFromFile();
+
+async function seedSubscriptions() {
+  // Subscriptions are kept in memory and persisted to file via /api/subscriptions/sync
+  // Firebase REST seeding is skipped (requires auth not available in backend)
+  console.log(`📋 Current subscriptions in memory: ${localSubscriptions.length}`);
 }
 
 // ============================================================
@@ -489,7 +494,8 @@ app.get('/api/gold-prices', async (_req, res) => {
 app.post('/api/subscriptions/sync', (req, res) => {
   if (Array.isArray(req.body)) {
     localSubscriptions = req.body;
-    console.log(`🔄 Synced ${localSubscriptions.length} subscriptions from client`);
+    saveSubscriptionsToFile(localSubscriptions);
+    console.log(`🔄 Synced & saved ${localSubscriptions.length} subscriptions from client`);
   }
   res.json({ status: 'ok', count: localSubscriptions.length });
 });

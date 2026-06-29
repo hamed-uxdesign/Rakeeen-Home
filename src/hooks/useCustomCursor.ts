@@ -5,50 +5,48 @@ export const useCustomCursor = (cursorRef: React.RefObject<HTMLDivElement>) => {
     const el = cursorRef.current;
     if (!el) return;
 
-    let mouseX = 0;
-    let mouseY = 0;
-    let currentX = 0;
-    let currentY = 0;
+    let mouseX = -999;
+    let mouseY = -999;
     let isHovered = false;
+    let visible = false;
     let frameId: number;
+
+    // Hide until first real mousemove
+    el.style.opacity = '0';
 
     const onMouseMove = (e: MouseEvent) => {
       mouseX = e.clientX;
       mouseY = e.clientY;
+      if (!visible) {
+        visible = true;
+        el.style.opacity = '1';
+      }
     };
 
     const updatePosition = () => {
-      currentX = mouseX;
-      currentY = mouseY;
-      if (el) {
-        // Compute both scale and translation together to prevent rendering conflicts (jitters)
-        const scaleVal = isHovered ? 1.15 : 1;
-        el.style.transform = `translate3d(${currentX}px, ${currentY}px, 0) scale(${scaleVal})`;
-      }
+      el.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0) scale(${isHovered ? 1.15 : 1})`;
       frameId = requestAnimationFrame(updatePosition);
     };
-
-    window.addEventListener('mousemove', onMouseMove);
-    frameId = requestAnimationFrame(updatePosition);
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target) return;
-      
-      const isInteractive = 
-        target.tagName.toLowerCase() === 'a' || 
-        target.tagName.toLowerCase() === 'button' || 
-        target.tagName.toLowerCase() === 'input' || 
-        target.tagName.toLowerCase() === 'textarea' || 
+      isHovered = !!(
+        target.tagName === 'A' ||
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
         target.closest('a') ||
         target.closest('button') ||
         target.classList.contains('cursor-pointer') ||
-        target.closest('.cursor-pointer');
-
-      isHovered = !!isInteractive;
+        target.closest('.cursor-pointer')
+      );
     };
 
+    window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseover', handleMouseOver);
+    frameId = requestAnimationFrame(updatePosition);
 
     return () => {
       window.removeEventListener('mousemove', onMouseMove);

@@ -559,6 +559,11 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   };
 
   const totalGoldValuation = (gold || []).reduce((acc, curr) => acc + getGoldValue(curr), 0);
+  const totalGoldPnl = goldPrices ? (gold || []).reduce((sum, g) => {
+    if (!g.purchasePrice) return sum;
+    return sum + (getGoldValue(g) - g.purchasePrice * g.quantity);
+  }, 0) : null;
+  const hasAnyGoldPurchasePrice = (gold || []).some(g => g.purchasePrice);
   const totalDebtsOwedToMe = (debts || []).filter(d => d.type === 'owed_to_me').reduce((acc, curr) => acc + curr.amount, 0);
   const totalDebtsOwedByMe = (debts || []).filter(d => d.type === 'owed_by_me').reduce((acc, curr) => acc + curr.amount, 0);
   const netDebts = totalDebtsOwedToMe - totalDebtsOwedByMe;
@@ -990,6 +995,13 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                       {(gold || []).reduce((s, g) => s + g.quantity, 0).toFixed(2)}g total weight
                     </p>
                   )}
+                  {goldPrices && hasAnyGoldPurchasePrice && totalGoldPnl !== null && (
+                    <p className="font-mono-main text-[11px] font-bold mt-1" style={{ color: totalGoldPnl >= 0 ? 'var(--forest)' : '#C0392B' }}>
+                      {totalGoldPnl >= 0 ? '▲ ' : '▼ '}
+                      <MaskedValue disabled={!privacyMode}>{formatEGP(Math.abs(totalGoldPnl))}</MaskedValue>
+                      {' '}{totalGoldPnl >= 0 ? 'profit' : 'loss'}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1038,7 +1050,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                         )}
                         <p className="font-mono-main text-sm font-black text-ink"><MaskedValue disabled={!privacyMode}>{formatEGP(currentVal)}</MaskedValue></p>
                         {pnl !== null && (
-                          <p className="font-mono-main text-[10px] font-bold" style={{ color: pnl >= 0 ? 'var(--forest)' : 'var(--rust)' }}>
+                          <p className="font-mono-main text-[10px] font-bold" style={{ color: pnl >= 0 ? 'var(--forest)' : '#C0392B' }}>
                             {pnl >= 0 ? '+' : ''}<MaskedValue disabled={!privacyMode}>{formatEGP(pnl)}</MaskedValue>
                           </p>
                         )}

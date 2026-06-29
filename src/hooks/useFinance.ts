@@ -77,6 +77,7 @@ export const FREELANCE_SPLIT: Record<string, number> = {
 };
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const BOMMY_URL = import.meta.env.VITE_BOMMY_URL || 'http://localhost:3002';
 
 export function useFinance() {
   const [banks, setBanks] = useFirebaseSync<FinanceBanks>('finance_banks', DEFAULT_BANKS);
@@ -117,15 +118,22 @@ export function useFinance() {
     return () => clearInterval(interval);
   }, [fetchPending]);
 
-  // Sync subscriptions with backend when online
+  // Sync subscriptions with backend + Bommy bot
   useEffect(() => {
-    if (backendOnline && subscriptions && subscriptions.length >= 0) {
+    if (!subscriptions) return;
+    const body = JSON.stringify(subscriptions);
+    if (backendOnline) {
       fetch(`${BACKEND_URL}/api/subscriptions/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscriptions)
-      }).catch(err => console.error('Subscription sync failed:', err));
+        body
+      }).catch(() => {});
     }
+    fetch(`${BOMMY_URL}/api/subscriptions/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body
+    }).catch(() => {});
   }, [subscriptions, backendOnline]);
 
   const totalPhysical = (Object.values(banks) as number[]).reduce((a, b) => a + b, 0);

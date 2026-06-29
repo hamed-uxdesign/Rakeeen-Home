@@ -209,6 +209,21 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                   );
                 })}
 
+                {/* Quran Reader Card */}
+                <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center border border-ink bg-paper-dark prayer-card-inactive text-ink">
+                  <div className="flex-1">
+                    <div className="text-3xl font-black tracking-tighter text-ink">
+                      Holy Quran
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate('quran')}
+                    className="btn-brutalist px-6 py-2.5 text-xs font-mono-main cursor-pointer mt-3 sm:mt-0 w-full sm:w-auto"
+                  >
+                    READ
+                  </button>
+                </div>
+
                 {/* Quran Radio Card */}
                 <div className={`p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center transition-all duration-300 border border-ink ${
                   isPlaying 
@@ -216,8 +231,8 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
                     : 'bg-paper-dark prayer-card-inactive text-ink'
                 }`}>
                   <div className="flex-1">
-                     <div lang="ar" className="font-arabic-main text-3xl font-black tracking-tighter text-ink">
-                        إذاعة القرآن الكريم
+                     <div className="text-3xl font-black tracking-tighter text-ink">
+                        Quran Radio
                      </div>
                   </div>
                   <div className="text-left sm:text-right flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-3 sm:mt-0 w-full sm:w-auto">
@@ -272,6 +287,7 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
         )}
 
       </main>
+
     </div>
   );
 };
