@@ -76,6 +76,18 @@ client.once('ready', async () => {
   // Seed subscriptions on startup
   await seedSubscriptions();
 
+  // Fetch gold prices on startup (if cache is older than 8 hours)
+  const eightHours = 8 * 60 * 60 * 1000;
+  if (!cachedGoldPrices.lastUpdated || (Date.now() - cachedGoldPrices.lastUpdated > eightHours)) {
+    await fetchGoldPrices();
+  }
+
+  // Fetch gold prices 3x/day: 11:00 AM, 6:00 PM, 11:00 PM (Cairo)
+  cron.schedule('0 11 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
+  cron.schedule('0 18 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
+  cron.schedule('0 23 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
+  console.log('💰 Gold price cron scheduled (11:00, 18:00, 23:00 Cairo — 3 calls/day, ~90/month)');
+
   // --- TEST MESSAGE (Runs immediately upon starting) ---
   try {
     console.log("⏳ Sending test message to verify connection...");
@@ -296,87 +308,45 @@ async function sendSubscriptionAlert(sub) {
 }
 
 // ============================================================
-// GOLD PRICE SCRAPER & CACHE
+// GOLD PRICE CACHE — fetched 3x/day via goldapi.io
 // ============================================================
-let cachedGoldPrices = {
-  price24: 3800,
-  price21: 3325,
-  lastUpdated: null
-};
+const GOLD_CACHE_FILE = path.join(__dirname, 'gold_cache.json');
 
-function parsePrice(html, carat) {
-  const regexDetails = new RegExp(`&quot;label&quot;\\s*:\\s*&quot;عيار\\s*${carat}&quot;\\s*,\\s*&quot;value&quot;\\s*:\\s*&quot;([\\d,]+)\\s*جنيه&quot;`);
-  const matchDetails = html.match(regexDetails);
-  if (matchDetails) {
-    return parseFloat(matchDetails[1].replace(/,/g, ''));
-  }
+let cachedGoldPrices = (() => {
+  try {
+    if (fs.existsSync(GOLD_CACHE_FILE)) {
+      return JSON.parse(fs.readFileSync(GOLD_CACHE_FILE, 'utf8'));
+    }
+  } catch {}
+  return { price24: 0, price21: 0, lastUpdated: null };
+})();
 
-  const regexTable = new RegExp(`عيار\\s*${carat}[^<]*<\\/td>\\s*<td>\\s*([\\d,]+)\\s*جنيه`, 'i');
-  const matchTable = html.match(regexTable);
-  if (matchTable) {
-    return parseFloat(matchTable[1].replace(/,/g, ''));
-  }
-
-  const regexNear = new RegExp(`عيار\\s*${carat}[^]{1,100}?([\\d,]{4,6})\\s*(?:جنيه|EGP)`, 'i');
-  const matchNear = html.match(regexNear);
-  if (matchNear) {
-    return parseFloat(matchNear[1].replace(/,/g, ''));
-  }
-
-  return null;
-}
-
-async function getGoldPrices() {
-  const now = Date.now();
-  if (cachedGoldPrices.lastUpdated && (now - cachedGoldPrices.lastUpdated < 30000)) {
-    return cachedGoldPrices;
+async function fetchGoldPrices() {
+  const apiKey = process.env.GOLD_API_KEY;
+  if (!apiKey) {
+    console.warn('⚠️ GOLD_API_KEY not set in .env');
+    return;
   }
   try {
-    const res = await fetch('https://egypt.gold-price-today.com/', {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      signal: AbortSignal.timeout(5000)
+    const res = await fetch('https://www.goldapi.io/api/XAU/EGP', {
+      headers: { 'x-access-token': apiKey, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(8000)
     });
-    if (res.ok) {
-      const html = await res.text();
-      let p24 = null;
-      let p21 = null;
-
-      // Primary strategy: parse today's prices from the data-is-today attribute
-      const match = html.match(/data-details="([^"]+)"[^>]*data-is-today="1"/);
-      if (match) {
-        try {
-          const jsonStr = match[1].replace(/&quot;/g, '"');
-          const data = JSON.parse(jsonStr);
-          if (data && data.items) {
-            for (const item of data.items) {
-              if (item.label.includes('24')) {
-                p24 = parseFloat(item.value.replace(/,/g, '').replace(/[^0-9.]/g, ''));
-              } else if (item.label.includes('21')) {
-                p21 = parseFloat(item.value.replace(/,/g, '').replace(/[^0-9.]/g, ''));
-              }
-            }
-          }
-        } catch (err) {
-          console.error('⚠️ Failed to parse data-is-today JSON:', err.message);
-        }
-      }
-
-      // Fallback to old regex parsing if today's price extraction failed
-      if (!p24) p24 = parsePrice(html, 24);
-      if (!p21) p21 = parsePrice(html, 21);
-
-      if (p24 && p21) {
-        cachedGoldPrices = {
-          price24: p24,
-          price21: p21,
-          lastUpdated: now
-        };
-        console.log(`✨ Gold prices updated: 24K=${p24} EGP, 21K=${p21} EGP`);
-      }
+    if (!res.ok) throw new Error(`goldapi HTTP ${res.status}`);
+    const data = await res.json();
+    const p24 = Math.round(data.price_gram_24k);
+    const p21 = Math.round(data.price_gram_21k);
+    if (p24 && p21) {
+      cachedGoldPrices = { price24: p24, price21: p21, lastUpdated: Date.now() };
+      fs.writeFileSync(GOLD_CACHE_FILE, JSON.stringify(cachedGoldPrices), 'utf8');
+      console.log(`✨ Gold prices updated: 24K=${p24} EGP, 21K=${p21} EGP`);
     }
   } catch (e) {
-    console.error('⚠️ Failed to scrape gold prices, using default/cached values:', e.message);
+    console.error('⚠️ Failed to fetch gold prices:', e.message);
   }
+}
+
+function getGoldPrices() {
   return cachedGoldPrices;
 }
 
@@ -486,9 +456,8 @@ app.delete('/api/pending/:id', (req, res) => {
   res.json({ status: 'deleted' });
 });
 
-app.get('/api/gold-prices', async (_req, res) => {
-  const prices = await getGoldPrices();
-  res.json(prices);
+app.get('/api/gold-prices', (_req, res) => {
+  res.json(getGoldPrices());
 });
 
 app.post('/api/subscriptions/sync', (req, res) => {

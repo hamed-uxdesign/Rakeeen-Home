@@ -311,51 +311,34 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     return () => { document.body.style.overflow = ''; };
   }, [showAddDepositModal, showWithdrawModal]);
 
-  // Fetch Gold Prices with 30s auto-refresh when tab is active
+  // Fetch Gold Prices from backend cache (updated 3x/day by the backend bot)
   useEffect(() => {
-    let intervalId: any;
+    if (activeTab !== 'gold') return;
+
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const LS_KEY = 'gold_prices_cache';
 
     const fetchPrices = (showLoader = false) => {
       if (showLoader) setLoadingGold(true);
-      // @ts-ignore
-      const apiKey = import.meta.env.VITE_GOLD_API_KEY as string | undefined;
-      if (!apiKey) {
-        console.warn('VITE_GOLD_API_KEY not set');
-        setGoldPrices(prev => prev || { price24: 0, price21: 0 });
-        if (showLoader) setLoadingGold(false);
-        return;
-      }
-      fetch('https://www.goldapi.io/api/XAU/EGP', {
-        headers: { 'x-access-token': apiKey, 'Content-Type': 'application/json' },
-      })
-        .then(res => {
-          if (res.ok) return res.json();
-          throw new Error('goldapi error ' + res.status);
-        })
+      fetch(`${BACKEND_URL}/api/gold-prices`, { signal: AbortSignal.timeout(4000) })
+        .then(res => { if (res.ok) return res.json(); throw new Error('offline'); })
         .then(data => {
-          const price24 = Math.round(data.price_gram_24k);
-          const price21 = Math.round(data.price_gram_21k);
-          setGoldPrices({ price24, price21 });
+          if (data.price24 && data.price21) {
+            setGoldPrices({ price24: data.price24, price21: data.price21 });
+            localStorage.setItem(LS_KEY, JSON.stringify({ price24: data.price24, price21: data.price21 }));
+          }
         })
-        .catch(err => {
-          console.error(err);
-          setGoldPrices(prev => prev || { price24: 0, price21: 0 });
+        .catch(() => {
+          // Backend offline — use localStorage cache
+          try {
+            const cached = JSON.parse(localStorage.getItem(LS_KEY) || '');
+            if (cached?.price24) setGoldPrices(cached);
+          } catch {}
         })
-        .finally(() => {
-          if (showLoader) setLoadingGold(false);
-        });
+        .finally(() => { if (showLoader) setLoadingGold(false); });
     };
 
-    if (activeTab === 'gold') {
-      fetchPrices(true);
-      intervalId = setInterval(() => {
-        fetchPrices(false);
-      }, 30000); // 30 seconds
-    }
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
+    fetchPrices(true);
   }, [activeTab]);
 
   const openClassify = (item: PendingItem) => {
