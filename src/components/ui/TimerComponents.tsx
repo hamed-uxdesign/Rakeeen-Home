@@ -70,40 +70,41 @@ export const DMTimer: React.FC<{ mm: string; ss: string; color: string; maxWidth
   );
 };
 
-// Wavy progress bar — same logic as WavyRing but unrolled flat.
+// Wavy progress bar — phase animates via RAF; pct is smoothly interpolated between updates.
 export const WavyProgressBar: React.FC<{
   pct: number;
   isOvertime: boolean;
   mode: string;
   running?: boolean;
   totalSecs?: number;
-}> = ({ pct, isOvertime, mode, running = false, totalSecs = 1500 }) => {
+}> = ({ pct, isOvertime, mode }) => {
   const [phase, setPhase] = useState(0);
   const [smoothPct, setSmoothPct] = useState(pct);
   const rafRef = useRef<number>(0);
-  const baselinePct = useRef(pct);
-  const baselineTime = useRef(Date.now());
+  const fromPct = useRef(pct);
+  const toPct = useRef(pct);
+  const interpStart = useRef(Date.now());
+  const INTERP_MS = 250;
 
-  // When pct ticks (once per second), update baseline for interpolation
+  // When pct ticks (every ~200ms), set new interpolation target
   useEffect(() => {
-    baselinePct.current = pct;
-    baselineTime.current = Date.now();
-    if (!running) setSmoothPct(pct);
-  }, [pct, running]);
+    fromPct.current = smoothPct;
+    toPct.current = pct;
+    interpStart.current = Date.now();
+  }, [pct]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const tick = () => {
       setPhase(p => (p + 0.05) % (Math.PI * 2));
-      if (running && !isOvertime && totalSecs > 0) {
-        const elapsed = (Date.now() - baselineTime.current) / 1000;
-        const pctPerSec = 100 / totalSecs;
-        setSmoothPct(Math.min(baselinePct.current + elapsed * pctPerSec, 100));
-      }
+      const elapsed = Date.now() - interpStart.current;
+      const t = Math.min(elapsed / INTERP_MS, 1);
+      const ease = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      setSmoothPct(fromPct.current + (toPct.current - fromPct.current) * ease);
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [running, isOvertime, totalSecs]);
+  }, []);
 
   const W = 500; const H = 36; const midY = H / 2;
   const amplitude = 9; const waves = 5; const pts = 220;

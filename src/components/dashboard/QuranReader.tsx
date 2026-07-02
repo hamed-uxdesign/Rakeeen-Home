@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, ChevronRight, ChevronLeft, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ChevronRight, ChevronLeft, Volume2, VolumeX, Square } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Ayah {
@@ -20,7 +20,7 @@ const RECITERS: { value: Reciter; label: string }[] = [
 
 const TOTAL_PAGES = 604;
 const STORAGE_KEY = 'quran_last_page';
-const TRIGGER_ZONE = 80; // px from edge to trigger header/footer
+const TRIGGER_ZONE = 80;
 
 function audioUrl(reciter: Reciter, n: number) {
   return `https://cdn.islamic.network/quran/audio/128/${reciter}/${n}.mp3`;
@@ -48,7 +48,19 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
   const [isDark, setIsDark] = useState(() => document.body.classList.contains('dark-theme'));
   const [showHeader, setShowHeader] = useState(false);
   const [showFooter, setShowFooter] = useState(false);
+
+  // Refs to avoid stale closures in audio callbacks
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ayahsRef = useRef<Ayah[]>([]);
+  const reciterRef = useRef<Reciter>(reciter);
+  const mutedRef = useRef(muted);
+  const pageRef = useRef(page);
+  const pendingAutoPlay = useRef(false);
+
+  useEffect(() => { ayahsRef.current = ayahs; }, [ayahs]);
+  useEffect(() => { reciterRef.current = reciter; }, [reciter]);
+  useEffect(() => { mutedRef.current = muted; if (audioRef.current) audioRef.current.volume = muted ? 0 : 1; }, [muted]);
+  useEffect(() => { pageRef.current = page; }, [page]);
 
   const toggleTheme = () => {
     const next = !isDark;
@@ -62,12 +74,37 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
     setPlayingIdx(null);
   }, []);
 
-  // Mouse proximity detection for header/footer
+  // Build the audio chain starting at a given index in the provided ayahs array
+  const buildChain = useCallback((idx: number, ayahsData: Ayah[]) => {
+    const ayah = ayahsData[idx];
+    if (!ayah) return;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; }
+    const audio = new Audio(audioUrl(reciterRef.current, ayah.number));
+    audio.volume = mutedRef.current ? 0 : 1;
+    audioRef.current = audio;
+    setPlayingIdx(idx);
+    audio.play().catch(() => {});
+    audio.onended = () => {
+      const next = idx + 1;
+      const currentAyahs = ayahsRef.current;
+      if (next < currentAyahs.length) {
+        buildChain(next, currentAyahs);
+      } else if (pageRef.current < TOTAL_PAGES) {
+        // Last ayah on page — flag to auto-play on next page load
+        pendingAutoPlay.current = true;
+        setPlayingIdx(null);
+        setPage(p => Math.min(TOTAL_PAGES, p + 1));
+      } else {
+        setPlayingIdx(null);
+      }
+    };
+  }, []);
+
+  // Mouse proximity for header/footer
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
-      const h = window.innerHeight;
       setShowHeader(e.clientY < TRIGGER_ZONE);
-      setShowFooter(e.clientY > h - TRIGGER_ZONE);
+      setShowFooter(e.clientY > window.innerHeight - TRIGGER_ZONE);
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
@@ -76,42 +113,36 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
   // Fetch page
   useEffect(() => {
     let cancelled = false;
-    setLoading(true); setError(''); setPlayingIdx(null); stopAudio();
+    setLoading(true); setError('');
+    if (!pendingAutoPlay.current) {
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ''; audioRef.current = null; }
+      setPlayingIdx(null);
+    }
     fetch(`https://api.alquran.cloud/v1/page/${page}/quran-uthmani`)
       .then(r => r.json())
       .then(json => {
         if (cancelled) return;
-        if (json.code === 200) { setAyahs(json.data.ayahs ?? json.data); localStorage.setItem(STORAGE_KEY, String(page)); }
-        else setError('Failed to load page.');
+        if (json.code === 200) {
+          const newAyahs: Ayah[] = json.data.ayahs ?? json.data;
+          ayahsRef.current = newAyahs;
+          setAyahs(newAyahs);
+          localStorage.setItem(STORAGE_KEY, String(page));
+          if (pendingAutoPlay.current && newAyahs.length > 0) {
+            pendingAutoPlay.current = false;
+            buildChain(0, newAyahs);
+          }
+        } else {
+          setError('Failed to load page.');
+        }
       })
       .catch(() => { if (!cancelled) setError('Network error.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [page]);
+  }, [page, buildChain]);
 
-  const playAyah = useCallback((idx: number, ayahNumber: number) => {
-    stopAudio();
-    const audio = new Audio(audioUrl(reciter, ayahNumber));
-    audio.volume = muted ? 0 : 1;
-    audioRef.current = audio;
-    setPlayingIdx(idx);
-    audio.play().catch(() => {});
-    audio.onended = () => {
-      setPlayingIdx(prev => {
-        if (prev === null) return null;
-        const next = prev + 1;
-        if (next < ayahs.length) {
-          const na = new Audio(audioUrl(reciter, ayahs[next].number));
-          na.volume = muted ? 0 : 1;
-          audioRef.current = na;
-          na.play().catch(() => {});
-          na.onended = audio.onended as any;
-          return next;
-        }
-        return null;
-      });
-    };
-  }, [reciter, muted, ayahs, stopAudio]);
+  const playAyah = useCallback((idx: number) => {
+    buildChain(idx, ayahsRef.current);
+  }, [buildChain]);
 
   useEffect(() => () => stopAudio(), [stopAudio]);
 
@@ -119,7 +150,6 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
     setPage(Math.min(TOTAL_PAGES, Math.max(1, p)));
   }, []);
 
-  // Keyboard: ← = next (RTL forward), → = prev
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return;
@@ -142,6 +172,7 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
   const juz = ayahs[0]?.juz ?? null;
   const isPlaying = playingIdx !== null;
   const currentLabel = RECITERS.find(r => r.value === reciter)?.label ?? '';
+  const headerVisible = showHeader || reciterOpen;
 
   const barStyle: React.CSSProperties = {
     background: 'var(--paper)',
@@ -157,7 +188,7 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
       {/* ── Header — shows on mouse near top ── */}
       <div
         className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 py-3 border-b transition-all duration-300"
-        style={{ ...barStyle, opacity: showHeader ? 1 : 0, pointerEvents: showHeader ? 'auto' : 'none', transform: showHeader ? 'translateY(0)' : 'translateY(-8px)' }}
+        style={{ ...barStyle, overflow: 'visible', opacity: headerVisible ? 1 : 0, pointerEvents: headerVisible ? 'auto' : 'none', transform: headerVisible ? 'translateY(0)' : 'translateY(-8px)' }}
       >
         <button onClick={() => { stopAudio(); navigate('prayer'); }} className="flex items-center gap-2 text-ink/40 hover:text-ink transition-colors group">
           <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
@@ -176,11 +207,7 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
           <button onClick={() => setMuted(m => !m)} className="text-ink/40 hover:text-ink transition-colors cursor-pointer">
             {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
-          {isPlaying && (
-            <button onClick={stopAudio} className="font-mono-main text-[9px] uppercase tracking-widest text-rust border border-rust/40 px-2 py-1 cursor-pointer" style={{ borderRadius: 0 }}>
-              STOP
-            </button>
-          )}
+          {/* Reciter dropdown — rendered relative to viewport to avoid clipping */}
           <div className="relative">
             <button
               type="button"
@@ -193,27 +220,51 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
             </button>
             <AnimatePresence>
               {reciterOpen && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                  className="absolute right-0 z-50"
-                  style={{ top: '100%', marginTop: 2, minWidth: '100%', background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 20%, transparent)' }}
-                >
-                  {RECITERS.map(r => (
-                    <button key={r.value} type="button"
-                      onClick={() => { stopAudio(); setReciter(r.value); setReciterOpen(false); }}
-                      className="w-full text-left font-mono-main cursor-pointer block"
-                      style={{ padding: '10px 14px', fontSize: 11, color: 'var(--ink)', borderBottom: '1px solid color-mix(in srgb, var(--ink) 8%, transparent)', background: reciter === r.value ? 'color-mix(in srgb, var(--ink) 8%, transparent)' : 'transparent' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = 'color-mix(in srgb, var(--ink) 6%, transparent)')}
-                      onMouseLeave={e => (e.currentTarget.style.background = reciter === r.value ? 'color-mix(in srgb, var(--ink) 8%, transparent)' : 'transparent')}
-                    >{r.label}</button>
-                  ))}
-                </motion.div>
+                <>
+                  {/* Invisible overlay to close on outside click */}
+                  <div className="fixed inset-0 z-[9998]" onClick={() => setReciterOpen(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    style={{ position: 'fixed', top: 52, right: 20, zIndex: 9999, minWidth: 130, background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)' }}
+                  >
+                    {RECITERS.map(r => (
+                      <button key={r.value} type="button"
+                        onClick={() => { stopAudio(); setReciter(r.value); setReciterOpen(false); }}
+                        className="w-full text-left font-mono-main cursor-pointer block"
+                        style={{ padding: '10px 14px', fontSize: 11, color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.07)', background: reciter === r.value ? '#000' : 'transparent' }}
+                        onMouseEnter={e => (e.currentTarget.style.background = reciter === r.value ? '#000' : 'rgba(255,255,255,0.06)')}
+                        onMouseLeave={e => (e.currentTarget.style.background = reciter === r.value ? '#000' : 'transparent')}
+                      >{r.label}</button>
+                    ))}
+                  </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>
         </div>
       </div>
 
-      {/* ── Quran content — fills screen, text centered ── */}
+      {/* ── Floating stop button — always visible while playing ── */}
+      <AnimatePresence>
+        {isPlaying && (
+          <div className="fixed z-50 flex justify-center" style={{ bottom: 72, left: 0, right: 0, pointerEvents: 'none' }}>
+            <motion.button
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85 }}
+              transition={{ duration: 0.15 }}
+              onClick={stopAudio}
+              className="flex items-center gap-2 cursor-pointer font-mono-main font-bold uppercase tracking-widest"
+              style={{ fontSize: 11, padding: '12px 24px', background: '#C0392B', color: '#fff', border: 'none', borderRadius: 0, boxShadow: '0 4px 20px rgba(0,0,0,0.4)', pointerEvents: 'auto' }}
+            >
+              <Square size={12} fill="white" />
+              Stop
+            </motion.button>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Quran content ── */}
       <div className="flex-1 overflow-y-auto flex items-center justify-center px-6">
         <div className="w-full max-w-[720px] py-16">
           {loading && (
@@ -251,8 +302,13 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
                     {group.ayahs.map(a => (
                       <span
                         key={a.number}
-                        onClick={() => playingIdx === a.localIdx ? stopAudio() : playAyah(a.localIdx, a.number)}
-                        className={`cursor-pointer transition-colors rounded-sm px-0.5 ${playingIdx === a.localIdx ? 'bg-sepia/20' : 'hover:bg-ink/5'}`}
+                        onClick={() => playingIdx === a.localIdx ? stopAudio() : playAyah(a.localIdx)}
+                        className="cursor-pointer transition-all duration-200 rounded-sm px-0.5"
+                        style={playingIdx === a.localIdx ? {
+                          background: 'color-mix(in srgb, var(--sepia) 30%, transparent)',
+                        } : {}}
+                        onMouseEnter={e => { if (playingIdx !== a.localIdx) (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--ink) 5%, transparent)'; }}
+                        onMouseLeave={e => { if (playingIdx !== a.localIdx) (e.currentTarget as HTMLElement).style.background = ''; }}
                       >
                         {a.text}{' '}
                         <span className="text-sepia text-[1.1rem] select-none">﴿{toArabicNum(a.numberInSurah)}﴾</span>{' '}

@@ -12,10 +12,11 @@ export const usePrayer = () => {
   const [hijri, setHijri] = useState<string>(() => {
     return localStorage.getItem('prayer_hijri') || '';
   });
-  const [loading, setLoading] = useState(() => !localStorage.getItem('prayer_times'));
+  const [loading, setLoading] = useState(true);
   const [nextPrayer, setNextPrayer] = useState<{ name: string, time: string, countdown: string, remainingMinutes: number } | null>(null);
 
   const fetchPrayerTimes = async () => {
+    setLoading(true);
     try {
       const d = new Date();
       const dateStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;

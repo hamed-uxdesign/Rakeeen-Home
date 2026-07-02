@@ -291,14 +291,16 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [newDebtNotes, setNewDebtNotes] = useState('');
 
   const [newDepositAmount, setNewDepositAmount] = useState('');
-  const [newDepositBank, setNewDepositBank] = useState<keyof FinanceBanks>('cib');
+  const [newDepositBank, setNewDepositBank] = useState<keyof FinanceBanks | null>(null);
   const [newDepositCategory, setNewDepositCategory] = useState<'Salary' | 'Freelance'>('Salary');
   const [depositMode, setDepositMode] = useState<'split' | 'manual'>('split');
-  const [manualTarget, setManualTarget] = useState<{ type: 'bank' | 'bucket'; key: string }>({ type: 'bucket', key: 'mustaqbal' });
+  const [manualBucketKey, setManualBucketKey] = useState<keyof FinanceBuckets | null>(null);
+  const [manualBankKey, setManualBankKey] = useState<keyof FinanceBanks | null>(null);
 
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawTarget, setWithdrawTarget] = useState<{ type: 'bank' | 'bucket'; key: string }>({ type: 'bucket', key: 'mustaqbal' });
+  const [withdrawBucketKey, setWithdrawBucketKey] = useState<keyof FinanceBuckets | null>(null);
+  const [withdrawBankKey, setWithdrawBankKey] = useState<keyof FinanceBanks | null>(null);
 
   React.useEffect(() => { document.title = 'Rakeeen — Finance'; }, []);
 
@@ -311,34 +313,41 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     return () => { document.body.style.overflow = ''; };
   }, [showAddDepositModal, showWithdrawModal]);
 
-  // Fetch Gold Prices from backend cache (updated 3x/day by the backend bot)
+  // Fetch Gold Prices directly from goldapi.io with localStorage rate limiting (max 3x/day = ~90/month)
   useEffect(() => {
     if (activeTab !== 'gold') return;
 
-    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const API_KEY = import.meta.env.VITE_GOLD_API_KEY || '';
     const LS_KEY = 'gold_prices_cache';
+    const EIGHT_HOURS = 8 * 60 * 60 * 1000;
 
-    const fetchPrices = (showLoader = false) => {
-      if (showLoader) setLoadingGold(true);
-      fetch(`${BACKEND_URL}/api/gold-prices`, { signal: AbortSignal.timeout(4000) })
-        .then(res => { if (res.ok) return res.json(); throw new Error('offline'); })
-        .then(data => {
-          if (data.price24 && data.price21) {
-            setGoldPrices({ price24: data.price24, price21: data.price21 });
-            localStorage.setItem(LS_KEY, JSON.stringify({ price24: data.price24, price21: data.price21 }));
-          }
-        })
-        .catch(() => {
-          // Backend offline — use localStorage cache
-          try {
-            const cached = JSON.parse(localStorage.getItem(LS_KEY) || '');
-            if (cached?.price24) setGoldPrices(cached);
-          } catch {}
-        })
-        .finally(() => { if (showLoader) setLoadingGold(false); });
-    };
+    // Load cached prices immediately (even if stale — will be updated below if needed)
+    try {
+      const cached = JSON.parse(localStorage.getItem(LS_KEY) || '');
+      if (cached?.price24) setGoldPrices({ price24: cached.price24, price21: cached.price21 });
+    } catch {}
 
-    fetchPrices(true);
+    // Only hit the API if cache is older than 8 hours
+    try {
+      const cached = JSON.parse(localStorage.getItem(LS_KEY) || '');
+      if (cached?.lastUpdated && Date.now() - cached.lastUpdated < EIGHT_HOURS) return;
+    } catch {}
+
+    setLoadingGold(true);
+    fetch('https://www.goldapi.io/api/XAU/EGP', {
+      headers: { 'x-access-token': API_KEY, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    })
+      .then(res => { if (res.ok) return res.json(); throw new Error('api_error'); })
+      .then(data => {
+        if (data.price_gram_24k && data.price_gram_21k) {
+          const prices = { price24: Math.round(data.price_gram_24k), price21: Math.round(data.price_gram_21k), lastUpdated: Date.now() };
+          setGoldPrices({ price24: prices.price24, price21: prices.price21 });
+          localStorage.setItem(LS_KEY, JSON.stringify(prices));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingGold(false));
   }, [activeTab]);
 
   const openClassify = (item: PendingItem) => {
@@ -492,6 +501,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     if (!amount || amount <= 0) return;
 
     if (depositMode === 'split') {
+      if (!newDepositBank) return;
       const split = newDepositCategory === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
       await updateBankBalance(newDepositBank, (banks?.[newDepositBank] || 0) + amount);
       for (const [key, pct] of Object.entries(split)) {
@@ -501,36 +511,35 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         }
       }
     } else {
-      if (manualTarget.type === 'bank') {
-        const k = manualTarget.key as keyof FinanceBanks;
-        await updateBankBalance(k, (banks?.[k] || 0) + amount);
-      } else {
-        const k = manualTarget.key as keyof FinanceBuckets;
-        await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) + amount) * 100) / 100);
-      }
+      if (!manualBucketKey || !manualBankKey) return;
+      await Promise.all([
+        updateBucketBalance(manualBucketKey, Math.round(((buckets?.[manualBucketKey] || 0) + amount) * 100) / 100),
+        updateBankBalance(manualBankKey, Math.round(((banks?.[manualBankKey] || 0) + amount) * 100) / 100),
+      ]);
     }
 
     setNewDepositAmount('');
-    setNewDepositBank('cib');
+    setNewDepositBank(null);
     setNewDepositCategory('Salary');
     setDepositMode('split');
+    setManualBucketKey(null);
+    setManualBankKey(null);
     setShowAddDepositModal(false);
   };
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(withdrawAmount);
-    if (!amount || amount <= 0) return;
+    if (!amount || amount <= 0 || !withdrawBucketKey || !withdrawBankKey) return;
 
-    if (withdrawTarget.type === 'bank') {
-      const k = withdrawTarget.key as keyof FinanceBanks;
-      await updateBankBalance(k, Math.round(((banks?.[k] || 0) - amount) * 100) / 100);
-    } else {
-      const k = withdrawTarget.key as keyof FinanceBuckets;
-      await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) - amount) * 100) / 100);
-    }
+    await Promise.all([
+      updateBucketBalance(withdrawBucketKey, Math.round(((buckets?.[withdrawBucketKey] || 0) - amount) * 100) / 100),
+      updateBankBalance(withdrawBankKey, Math.round(((banks?.[withdrawBankKey] || 0) - amount) * 100) / 100),
+    ]);
 
     setWithdrawAmount('');
+    setWithdrawBucketKey(null);
+    setWithdrawBankKey(null);
     setShowWithdrawModal(false);
   };
 
@@ -1149,7 +1158,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark"
                     style={{ borderLeft: `3px solid var(--ink)`, opacity: debt.type === 'owed_by_me' ? 0.6 : 1 }}
                   >
-                    <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                    <div className="absolute top-4 right-4 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
                       <button onClick={() => openEditDebt(debt)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
                       <button onClick={() => handleRemoveDebt(debt.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
                     </div>
@@ -1578,53 +1587,55 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                       )}
                     </>)}
 
-                    {/* Manual mode: pick bucket or bank */}
-                    {depositMode === 'manual' && (
+                    {/* Manual mode: pick bucket AND bank (both required) */}
+                    {depositMode === 'manual' && (<>
                       <div>
-                        <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Destination</label>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginBottom: 4 }}>Buckets</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(Object.keys(BUCKET_META) as Array<keyof FinanceBuckets>).map(bk => (
-                              <button key={bk} type="button"
-                                onClick={() => setManualTarget({ type: 'bucket', key: bk })}
-                                className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
-                                style={{ fontSize: 11, padding: '12px 14px', border: manualTarget.type === 'bucket' && manualTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: manualTarget.type === 'bucket' && manualTarget.key === bk ? 'var(--ink)' : 'transparent', color: manualTarget.type === 'bucket' && manualTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
-                              >
-                                <span style={{ display: 'block', fontSize: 10 }}>{BUCKET_META[bk].en}</span>
-                                {buckets?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(buckets[bk])}</span>}
-                              </button>
-                            ))}
-                          </div>
-                          <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginTop: 8, marginBottom: 4 }}>Banks</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
-                              <button key={bk} type="button"
-                                onClick={() => setManualTarget({ type: 'bank', key: bk })}
-                                className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
-                                style={{ fontSize: 11, padding: '12px 14px', border: manualTarget.type === 'bank' && manualTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: manualTarget.type === 'bank' && manualTarget.key === bk ? 'var(--ink)' : 'transparent', color: manualTarget.type === 'bank' && manualTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
-                              >
-                                <span style={{ display: 'block', fontSize: 10 }}>{BANK_LABELS[bk]}</span>
-                                {banks?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(banks[bk])}</span>}
-                              </button>
-                            ))}
-                          </div>
+                        <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Bucket <span style={{ color: '#C0392B' }}>*</span></label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(Object.keys(BUCKET_META) as Array<keyof FinanceBuckets>).map(bk => (
+                            <button key={bk} type="button"
+                              onClick={() => setManualBucketKey(bk)}
+                              className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                              style={{ fontSize: 11, padding: '12px 14px', border: manualBucketKey === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: manualBucketKey === bk ? 'var(--ink)' : 'transparent', color: manualBucketKey === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                            >
+                              <span style={{ display: 'block', fontSize: 10 }}>{BUCKET_META[bk].en}</span>
+                              {buckets?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(buckets[bk])}</span>}
+                            </button>
+                          ))}
                         </div>
                       </div>
-                    )}
+                      <div>
+                        <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Bank Account <span style={{ color: '#C0392B' }}>*</span></label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                            <button key={bk} type="button"
+                              onClick={() => setManualBankKey(bk)}
+                              className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                              style={{ fontSize: 11, padding: '12px 14px', border: manualBankKey === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: manualBankKey === bk ? 'var(--ink)' : 'transparent', color: manualBankKey === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                            >
+                              <span style={{ display: 'block', fontSize: 10 }}>{BANK_LABELS[bk]}</span>
+                              {banks?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(banks[bk])}</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>)}
                   </div>
 
                   {/* Footer — Confirm only */}
                   <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                    <button
-                      type="submit"
-                      className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
-                      style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }}
-                      onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')}
-                      onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
-                    >
-                      Confirm Deposit
-                    </button>
+                    {(() => {
+                      const disabled = depositMode === 'split' ? !newDepositBank : (!manualBucketKey || !manualBankKey);
+                      const label = depositMode === 'split'
+                        ? (!newDepositBank ? 'Select a Bank First' : 'Confirm Deposit')
+                        : (!manualBucketKey ? 'Select a Bucket First' : !manualBankKey ? 'Select a Bank First' : 'Confirm Deposit');
+                      return (
+                        <button type="submit" disabled={disabled}
+                          className="w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                          style={{ fontSize: 13, padding: '20px 0', background: disabled ? 'color-mix(in srgb, var(--ink) 10%, transparent)' : '#7A9E1A', color: disabled ? 'color-mix(in srgb, var(--ink) 30%, transparent)' : '#000', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer' }}
+                        >{label}</button>
+                      );
+                    })()}
                   </div>
                 </form>
               </motion.div>
@@ -1669,45 +1680,48 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     </div>
                   </div>
 
-                  {/* From */}
+                  {/* Bucket */}
                   <div>
-                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>From</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginBottom: 4 }}>Buckets</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(Object.keys(BUCKET_META) as Array<keyof FinanceBuckets>).map(bk => (
-                          <button key={bk} type="button"
-                            onClick={() => setWithdrawTarget({ type: 'bucket', key: bk })}
-                            className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
-                            style={{ fontSize: 11, padding: '12px 14px', border: withdrawTarget.type === 'bucket' && withdrawTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: withdrawTarget.type === 'bucket' && withdrawTarget.key === bk ? 'var(--ink)' : 'transparent', color: withdrawTarget.type === 'bucket' && withdrawTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
-                          >
-                            <span style={{ display: 'block', fontSize: 10 }}>{BUCKET_META[bk].en}</span>
-                            {buckets?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(buckets[bk])}</span>}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="font-mono-main uppercase tracking-widest" style={{ fontSize: 9, color: 'color-mix(in srgb, var(--ink) 25%, transparent)', marginTop: 8, marginBottom: 4 }}>Banks</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
-                          <button key={bk} type="button"
-                            onClick={() => setWithdrawTarget({ type: 'bank', key: bk })}
-                            className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
-                            style={{ fontSize: 11, padding: '12px 14px', border: withdrawTarget.type === 'bank' && withdrawTarget.key === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: withdrawTarget.type === 'bank' && withdrawTarget.key === bk ? 'var(--ink)' : 'transparent', color: withdrawTarget.type === 'bank' && withdrawTarget.key === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
-                          >
-                            <span style={{ display: 'block', fontSize: 10 }}>{BANK_LABELS[bk]}</span>
-                            {banks?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(banks[bk])}</span>}
-                          </button>
-                        ))}
-                      </div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Bucket <span style={{ color: '#C0392B' }}>*</span></label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(BUCKET_META) as Array<keyof FinanceBuckets>).map(bk => (
+                        <button key={bk} type="button"
+                          onClick={() => setWithdrawBucketKey(bk)}
+                          className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                          style={{ fontSize: 11, padding: '12px 14px', border: withdrawBucketKey === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: withdrawBucketKey === bk ? 'var(--ink)' : 'transparent', color: withdrawBucketKey === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                        >
+                          <span style={{ display: 'block', fontSize: 10 }}>{BUCKET_META[bk].en}</span>
+                          {buckets?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(buckets[bk])}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bank */}
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Bank Account <span style={{ color: '#C0392B' }}>*</span></label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).map(bk => (
+                        <button key={bk} type="button"
+                          onClick={() => setWithdrawBankKey(bk)}
+                          className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors text-left"
+                          style={{ fontSize: 11, padding: '12px 14px', border: withdrawBankKey === bk ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: withdrawBankKey === bk ? 'var(--ink)' : 'transparent', color: withdrawBankKey === bk ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 40%, transparent)' }}
+                        >
+                          <span style={{ display: 'block', fontSize: 10 }}>{BANK_LABELS[bk]}</span>
+                          {banks?.[bk] !== undefined && <span style={{ fontSize: 9, opacity: 0.6 }}>{formatEGP(banks[bk])}</span>}
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
 
                 <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                  <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide transition-colors"
-                    style={{ fontSize: 13, padding: '20px 0', background: 'var(--rust)', color: 'var(--paper)', border: 'none' }}
+                  <button type="submit"
+                    disabled={!withdrawBucketKey || !withdrawBankKey}
+                    className="w-full font-sans-main font-black uppercase tracking-wide transition-colors"
+                    style={{ fontSize: 13, padding: '20px 0', background: (!withdrawBucketKey || !withdrawBankKey) ? 'color-mix(in srgb, var(--ink) 10%, transparent)' : 'var(--rust)', color: (!withdrawBucketKey || !withdrawBankKey) ? 'color-mix(in srgb, var(--ink) 30%, transparent)' : 'var(--paper)', border: 'none', cursor: (!withdrawBucketKey || !withdrawBankKey) ? 'not-allowed' : 'pointer' }}
                   >
-                    Confirm Withdrawal
+                    {!withdrawBucketKey ? 'Select a Bucket First' : !withdrawBankKey ? 'Select a Bank First' : 'Confirm Withdrawal'}
                   </button>
                 </div>
               </form>

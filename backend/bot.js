@@ -76,17 +76,7 @@ client.once('ready', async () => {
   // Seed subscriptions on startup
   await seedSubscriptions();
 
-  // Fetch gold prices on startup (if cache is older than 8 hours)
-  const eightHours = 8 * 60 * 60 * 1000;
-  if (!cachedGoldPrices.lastUpdated || (Date.now() - cachedGoldPrices.lastUpdated > eightHours)) {
-    await fetchGoldPrices();
-  }
-
-  // Fetch gold prices 3x/day: 11:00 AM, 6:00 PM, 11:00 PM (Cairo)
-  cron.schedule('0 11 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
-  cron.schedule('0 18 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
-  cron.schedule('0 23 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
-  console.log('💰 Gold price cron scheduled (11:00, 18:00, 23:00 Cairo — 3 calls/day, ~90/month)');
+  // (gold price scheduling moved to app.listen startup block)
 
   // --- TEST MESSAGE (Runs immediately upon starting) ---
   try {
@@ -471,4 +461,16 @@ app.post('/api/subscriptions/sync', (req, res) => {
 
 app.listen(WEBHOOK_PORT, () => {
   console.log(`🌐 Finance webhook server running on port ${WEBHOOK_PORT}`);
+
+  // Schedule gold price fetches 3x/day independent of Discord connection
+  cron.schedule('0 11 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
+  cron.schedule('0 18 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
+  cron.schedule('0 23 * * *', () => fetchGoldPrices(), { timezone: 'Africa/Cairo' });
+  console.log('💰 Gold price cron scheduled (11:00, 18:00, 23:00 Cairo — 3 calls/day, ~90/month)');
+
+  // Fetch on startup if cache is older than 8 hours
+  const eightHours = 8 * 60 * 60 * 1000;
+  if (!cachedGoldPrices.lastUpdated || (Date.now() - cachedGoldPrices.lastUpdated > eightHours)) {
+    fetchGoldPrices().catch(console.error);
+  }
 });
