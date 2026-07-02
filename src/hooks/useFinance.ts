@@ -51,6 +51,17 @@ export interface Subscription {
   bank: string;
 }
 
+export interface FinanceLog {
+  id: string;
+  type: 'deposit' | 'withdraw';
+  amount: number;
+  bank: string;
+  bucket?: string;
+  mode?: 'split' | 'manual';
+  category?: string; // 'Salary' | 'Freelance' for split deposits
+  timestamp: string; // ISO date string
+}
+
 export interface Debt {
   id: string;
   personName: string;
@@ -86,6 +97,7 @@ export function useFinance() {
   const [gold, setGold] = useFirebaseSync<GoldAsset[]>('finance_gold', []);
   const [subscriptions, setSubscriptionsRaw] = useFirebaseSync<Subscription[]>('finance_subscriptions', []);
   const [debts, setDebts] = useFirebaseSync<Debt[]>('finance_debts', []);
+  const [logs, setLogs] = useFirebaseSync<FinanceLog[]>('finance_logs', []);
 
   const [pendingItems, setPendingItemsLocal] = useState<PendingItem[]>([]);
   const [backendOnline, setBackendOnline] = useState(false);
@@ -215,6 +227,15 @@ export function useFinance() {
     await setBuckets({ ...buckets, [bucketKey]: amount });
   };
 
+  const addLog = async (entry: Omit<FinanceLog, 'id' | 'timestamp'>) => {
+    const log: FinanceLog = {
+      ...entry,
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+    };
+    await setLogs(prev => [log, ...(prev || [])]);
+  };
+
   return {
     banks,
     buckets,
@@ -233,5 +254,7 @@ export function useFinance() {
     ignorePending,
     updateBankBalance,
     updateBucketBalance,
+    logs,
+    addLog,
   };
 }
