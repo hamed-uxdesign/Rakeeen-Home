@@ -503,33 +503,35 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     const amount = parseFloat(newDepositAmount);
     if (!amount || amount <= 0) return;
 
-    if (depositMode === 'split') {
-      if (!newDepositBank) return;
-      const split = newDepositCategory === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
-      await updateBankBalance(newDepositBank, (banks?.[newDepositBank] || 0) + amount);
-      for (const [key, pct] of Object.entries(split)) {
-        if (pct > 0) {
-          const k = key as keyof FinanceBuckets;
-          await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) + amount * pct) * 100) / 100);
+    try {
+      if (depositMode === 'split') {
+        if (!newDepositBank) return;
+        const split = newDepositCategory === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
+        await updateBankBalance(newDepositBank, (banks?.[newDepositBank] || 0) + amount);
+        for (const [key, pct] of Object.entries(split)) {
+          if (pct > 0) {
+            const k = key as keyof FinanceBuckets;
+            await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) + amount * pct) * 100) / 100);
+          }
         }
+        await addLog({ type: 'deposit', amount, bank: BANK_LABELS[newDepositBank], mode: 'split', category: newDepositCategory });
+      } else {
+        if (!manualBucketKey || !manualBankKey) return;
+        await Promise.all([
+          updateBucketBalance(manualBucketKey, Math.round(((buckets?.[manualBucketKey] || 0) + amount) * 100) / 100),
+          updateBankBalance(manualBankKey, Math.round(((banks?.[manualBankKey] || 0) + amount) * 100) / 100),
+        ]);
+        await addLog({ type: 'deposit', amount, bank: BANK_LABELS[manualBankKey], bucket: BUCKET_META[manualBucketKey].en, mode: 'manual' });
       }
-      await addLog({ type: 'deposit', amount, bank: BANK_LABELS[newDepositBank], mode: 'split', category: newDepositCategory });
-    } else {
-      if (!manualBucketKey || !manualBankKey) return;
-      await Promise.all([
-        updateBucketBalance(manualBucketKey, Math.round(((buckets?.[manualBucketKey] || 0) + amount) * 100) / 100),
-        updateBankBalance(manualBankKey, Math.round(((banks?.[manualBankKey] || 0) + amount) * 100) / 100),
-      ]);
-      await addLog({ type: 'deposit', amount, bank: BANK_LABELS[manualBankKey], bucket: BUCKET_META[manualBucketKey].en, mode: 'manual' });
+    } finally {
+      setNewDepositAmount('');
+      setNewDepositBank(null);
+      setNewDepositCategory('Salary');
+      setDepositMode('split');
+      setManualBucketKey(null);
+      setManualBankKey(null);
+      setShowAddDepositModal(false);
     }
-
-    setNewDepositAmount('');
-    setNewDepositBank(null);
-    setNewDepositCategory('Salary');
-    setDepositMode('split');
-    setManualBucketKey(null);
-    setManualBankKey(null);
-    setShowAddDepositModal(false);
   };
 
   const handleWithdraw = async (e: React.FormEvent) => {
@@ -537,16 +539,18 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0 || !withdrawBucketKey || !withdrawBankKey) return;
 
-    await Promise.all([
-      updateBucketBalance(withdrawBucketKey, Math.round(((buckets?.[withdrawBucketKey] || 0) - amount) * 100) / 100),
-      updateBankBalance(withdrawBankKey, Math.round(((banks?.[withdrawBankKey] || 0) - amount) * 100) / 100),
-    ]);
-    await addLog({ type: 'withdraw', amount, bank: BANK_LABELS[withdrawBankKey], bucket: BUCKET_META[withdrawBucketKey].en });
-
-    setWithdrawAmount('');
-    setWithdrawBucketKey(null);
-    setWithdrawBankKey(null);
-    setShowWithdrawModal(false);
+    try {
+      await Promise.all([
+        updateBucketBalance(withdrawBucketKey, Math.round(((buckets?.[withdrawBucketKey] || 0) - amount) * 100) / 100),
+        updateBankBalance(withdrawBankKey, Math.round(((banks?.[withdrawBankKey] || 0) - amount) * 100) / 100),
+      ]);
+      await addLog({ type: 'withdraw', amount, bank: BANK_LABELS[withdrawBankKey], bucket: BUCKET_META[withdrawBucketKey].en });
+    } finally {
+      setWithdrawAmount('');
+      setWithdrawBucketKey(null);
+      setWithdrawBankKey(null);
+      setShowWithdrawModal(false);
+    }
   };
 
   // Calculate valuations
