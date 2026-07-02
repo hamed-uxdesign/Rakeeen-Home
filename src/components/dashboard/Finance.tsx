@@ -11,6 +11,7 @@ import {
   GoldAsset,
   Subscription,
   Debt,
+  FinanceLog,
 } from '../../hooks/useFinance';
 
 interface FinanceProps {
@@ -231,9 +232,11 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     debts, setDebts,
     classifyDeposit, ignorePending,
     updateBankBalance, updateBucketBalance,
+    logs, addLog,
   } = useFinance();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts' | 'logs'>('overview');
+  const [logFilter, setLogFilter] = useState<'day' | 'month' | 'year'>('day');
   const [classifyState, setClassifyState] = useState<ClassifyState | null>(null);
   const [privacyMode, setPrivacyMode] = useState(true);
 
@@ -510,12 +513,14 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
           await updateBucketBalance(k, Math.round(((buckets?.[k] || 0) + amount * pct) * 100) / 100);
         }
       }
+      await addLog({ type: 'deposit', amount, bank: BANK_LABELS[newDepositBank], mode: 'split', category: newDepositCategory });
     } else {
       if (!manualBucketKey || !manualBankKey) return;
       await Promise.all([
         updateBucketBalance(manualBucketKey, Math.round(((buckets?.[manualBucketKey] || 0) + amount) * 100) / 100),
         updateBankBalance(manualBankKey, Math.round(((banks?.[manualBankKey] || 0) + amount) * 100) / 100),
       ]);
+      await addLog({ type: 'deposit', amount, bank: BANK_LABELS[manualBankKey], bucket: BUCKET_META[manualBucketKey].en, mode: 'manual' });
     }
 
     setNewDepositAmount('');
@@ -536,6 +541,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       updateBucketBalance(withdrawBucketKey, Math.round(((buckets?.[withdrawBucketKey] || 0) - amount) * 100) / 100),
       updateBankBalance(withdrawBankKey, Math.round(((banks?.[withdrawBankKey] || 0) - amount) * 100) / 100),
     ]);
+    await addLog({ type: 'withdraw', amount, bank: BANK_LABELS[withdrawBankKey], bucket: BUCKET_META[withdrawBucketKey].en });
 
     setWithdrawAmount('');
     setWithdrawBucketKey(null);
@@ -602,7 +608,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       {/* TABS SWITCHER + ACTION BUTTONS in one row */}
       <div className="w-full max-w-[1400px] mx-auto mb-8 flex items-center justify-between">
         <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)] w-fit">
-          {(['overview', 'buckets', 'gold', 'subscriptions', 'debts'] as const).map(tab => (
+          {(['overview', 'buckets', 'gold', 'subscriptions', 'debts', 'logs'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => { setActiveTab(tab); setClassifyState(null); }}
@@ -623,20 +629,22 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowWithdrawModal(true)}
-            className="flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer border border-ink/30 text-ink/60 hover:text-ink hover:border-ink transition-colors bg-transparent"
-          >
-            <Minus size={11} /> Withdraw
-          </button>
-          <button
-            onClick={() => setShowAddDepositModal(true)}
-            className="btn-brutalist flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer"
-          >
-            <Plus size={11} /> Add Deposit
-          </button>
-        </div>
+        {(activeTab === 'overview' || activeTab === 'buckets') && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowWithdrawModal(true)}
+              className="flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer border border-ink/30 text-ink/60 hover:text-ink hover:border-ink transition-colors bg-transparent"
+            >
+              <Minus size={11} /> Withdraw
+            </button>
+            <button
+              onClick={() => setShowAddDepositModal(true)}
+              className="btn-brutalist flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer"
+            >
+              <Plus size={11} /> Add Deposit
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="w-full max-w-[1400px] mx-auto space-y-12">
@@ -1020,30 +1028,28 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   const purchasedTotal = g.purchasePrice ? g.purchasePrice * g.quantity : null;
                   const pnl = purchasedTotal !== null ? currentVal - purchasedTotal : null;
                   return (
-                    <div key={g.id} className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark">
+                    <div key={g.id} className="brutalist-card no-lift flex items-center justify-between group relative bg-paper-dark" style={{ padding: '22px 28px' }}>
                       <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => openEditGold(g)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
-                        <button onClick={() => handleRemoveGold(g.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
+                        <button onClick={() => openEditGold(g)} className="text-ink/20 hover:text-ink transition-colors cursor-pointer"><Pencil size={13} /></button>
+                        <button onClick={() => handleRemoveGold(g.id)} className="text-ink/20 hover:text-rust transition-colors cursor-pointer"><Trash2 size={13} /></button>
                       </div>
 
                       {/* Left: weight + carat + notes */}
                       <div className="flex items-baseline gap-3">
-                        <span className="font-mono-main text-2xl font-black text-ink">{g.quantity}g</span>
-                        <span className="font-mono-main text-xs font-bold text-ink/35 border border-ink/15 px-1.5 py-0.5">{g.carat}K</span>
-                        {g.notes && <span className="font-mono-main text-[10px] text-ink/40 italic">{g.notes}</span>}
+                        <span className="font-mono-main font-black text-ink" style={{ fontSize: 24 }}>{g.quantity}g</span>
+                        <span className="font-mono-main font-bold text-ink/35 border border-ink/15 px-1.5 py-0.5" style={{ fontSize: 12 }}>{g.carat}K</span>
+                        {g.notes && <span className="font-mono-main text-ink/40 italic" style={{ fontSize: 11 }}>{g.notes}</span>}
                       </div>
 
                       {/* Right: current value + optional P&L */}
-                      <div className="text-right space-y-0.5 pr-6">
+                      <div className="text-right pr-8" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {purchasedTotal !== null && (
-                          <p className="font-mono-main text-[10px] text-ink/35">
-                            Paid <MaskedValue disabled={!privacyMode}>{formatEGP(purchasedTotal)}</MaskedValue>
-                          </p>
+                          <p className="font-mono-main text-ink/35" style={{ fontSize: 11 }}>Paid {formatEGP(purchasedTotal)}</p>
                         )}
-                        <p className="font-mono-main text-sm font-black text-ink"><MaskedValue disabled={!privacyMode}>{formatEGP(currentVal)}</MaskedValue></p>
+                        <p className="font-mono-main font-black text-ink" style={{ fontSize: 20 }}>{formatEGP(currentVal)}</p>
                         {pnl !== null && (
-                          <p className="font-mono-main text-[10px] font-bold" style={{ color: pnl >= 0 ? 'var(--forest)' : '#C0392B' }}>
-                            {pnl >= 0 ? '+' : ''}<MaskedValue disabled={!privacyMode}>{formatEGP(pnl)}</MaskedValue>
+                          <p className="font-mono-main font-bold" style={{ fontSize: 11, color: pnl >= 0 ? 'var(--forest)' : '#C0392B' }}>
+                            {pnl >= 0 ? '+' : ''}{formatEGP(pnl)}
                           </p>
                         )}
                       </div>
@@ -1092,24 +1098,22 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   const daysLeft = sub.renewalDay >= today ? sub.renewalDay - today : 30 - today + sub.renewalDay;
                   const soon = daysLeft <= 5;
                   return (
-                    <div key={sub.id} className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark">
+                    <div key={sub.id} className="brutalist-card no-lift flex items-center justify-between group relative bg-paper-dark" style={{ padding: '22px 28px' }}>
                       <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => openEditSub(sub)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
-                        <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
+                        <button onClick={() => openEditSub(sub)} className="text-ink/20 hover:text-ink transition-colors cursor-pointer"><Pencil size={13} /></button>
+                        <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/20 hover:text-rust transition-colors cursor-pointer"><Trash2 size={13} /></button>
                       </div>
 
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="font-sans-main text-sm font-black text-ink">{sub.name}</p>
-                          <p className="font-mono-main text-[10px] text-ink/35 mt-0.5">{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''}</p>
-                        </div>
-                      </div>
-
-                      <div className="text-right pr-6">
-                        <p className="font-mono-main text-base font-black text-rust">-<MaskedValue disabled={!privacyMode}>{formatEGP(sub.cost)}</MaskedValue></p>
-                        <p className="font-mono-main text-[10px] mt-0.5" style={{ color: soon ? 'var(--rust)' : 'var(--ink)', opacity: soon ? 1 : 0.3 }}>
+                      <div>
+                        <p className="font-sans-main font-black text-ink" style={{ fontSize: 16 }}>{sub.name}</p>
+                        <p className="font-mono-main text-ink/35 mt-1" style={{ fontSize: 11 }}>{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''}</p>
+                        <p className="font-mono-main font-bold mt-1" style={{ fontSize: 11, color: soon ? 'var(--rust)' : 'var(--ink)', opacity: soon ? 1 : 0.35 }}>
                           {daysLeft === 0 ? 'Today' : `in ${daysLeft}d`}
                         </p>
+                      </div>
+
+                      <div className="text-right pr-8">
+                        <p className="font-mono-main font-black text-rust" style={{ fontSize: 20 }}>−{formatEGP(sub.cost)}</p>
                       </div>
                     </div>
                   );
@@ -1155,26 +1159,24 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 {debts.map(debt => (
                   <div
                     key={debt.id}
-                    className="brutalist-card no-lift p-5 flex items-center justify-between group relative bg-paper-dark"
-                    style={{ borderLeft: `3px solid var(--ink)`, opacity: debt.type === 'owed_by_me' ? 0.6 : 1 }}
+                    className="brutalist-card no-lift flex items-center justify-between group relative bg-paper-dark"
+                    style={{ padding: '22px 28px', opacity: debt.type === 'owed_by_me' ? 0.6 : 1 }}
                   >
                     <div className="absolute top-4 right-4 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => openEditDebt(debt)} className="text-ink/25 hover:text-ink transition-colors cursor-pointer"><Pencil /></button>
-                      <button onClick={() => handleRemoveDebt(debt.id)} className="text-ink/25 hover:text-rust transition-colors cursor-pointer"><Trash2 /></button>
+                      <button onClick={() => openEditDebt(debt)} className="text-ink/20 hover:text-ink transition-colors cursor-pointer"><Pencil size={13} /></button>
+                      <button onClick={() => handleRemoveDebt(debt.id)} className="text-ink/20 hover:text-rust transition-colors cursor-pointer"><Trash2 size={13} /></button>
                     </div>
 
                     <div>
-                      <p className="font-sans-main text-sm font-black text-ink">{debt.personName}</p>
-                      {debt.notes && <p className="font-mono-main text-[10px] text-ink/35 mt-0.5 italic">{debt.notes}</p>}
-                    </div>
-
-                    <div className="text-right pr-6">
-                      <p className="font-mono-main text-base font-black text-ink">
-                        {debt.type === 'owed_to_me' ? '+' : '−'}<MaskedValue disabled={!privacyMode}>{formatEGP(debt.amount)}</MaskedValue>
-                      </p>
-                      <p className="font-mono-main text-[9px] text-ink/25 mt-0.5 uppercase tracking-widest">
+                      <p className="font-sans-main font-black text-ink" style={{ fontSize: 16 }}>{debt.personName}</p>
+                      {debt.notes && <p className="font-mono-main text-ink/35 mt-1 italic" style={{ fontSize: 11 }}>{debt.notes}</p>}
+                      <p className="font-mono-main text-ink/25 mt-1 uppercase tracking-widest" style={{ fontSize: 10 }}>
                         {debt.type === 'owed_to_me' ? 'Receivable' : 'Payable'}
                       </p>
+                    </div>
+
+                    <div className="text-right pr-8">
+                      <p className="font-mono-main font-black text-ink" style={{ fontSize: 20 }}>{formatEGP(debt.amount)}</p>
                     </div>
                   </div>
                 ))}
@@ -1183,7 +1185,89 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
           </div>
         )}
 
-        {/* ANALYSIS TAB */}
+        {/* LOGS TAB */}
+        {activeTab === 'logs' && (() => {
+          const now = new Date();
+          const filteredLogs = (logs || []).filter((log: FinanceLog) => {
+            const d = new Date(log.timestamp);
+            if (logFilter === 'day') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+            if (logFilter === 'month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+            return d.getFullYear() === now.getFullYear();
+          });
+          return (
+            <div>
+              {/* Header + filter */}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-sans-main font-black uppercase tracking-wide text-ink" style={{ fontSize: 13 }}>Transaction Logs</h2>
+                <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)]">
+                  {(['day', 'month', 'year'] as const).map(f => (
+                    <button key={f} onClick={() => setLogFilter(f)}
+                      className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-4 py-2 cursor-pointer transition-colors duration-200"
+                      style={{ color: logFilter === f ? 'var(--paper)' : 'var(--ink)' }}>
+                      {logFilter === f && (
+                        <motion.div layoutId="logFilterBg" className="absolute inset-0 bg-[var(--ink)]"
+                          transition={{ type: 'spring', stiffness: 450, damping: 36 }} style={{ zIndex: 0 }} />
+                      )}
+                      <span className="relative z-10">{f}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {filteredLogs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 gap-3">
+                  <div style={{ width: 40, height: 40, border: '1.5px solid color-mix(in srgb, var(--ink) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Banknote size={18} style={{ color: 'color-mix(in srgb, var(--ink) 20%, transparent)' }} />
+                  </div>
+                  <p className="font-mono-main text-[11px] uppercase tracking-widest text-ink/25">No transactions</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredLogs.map((log: FinanceLog) => {
+                    const isDeposit = log.type === 'deposit';
+                    const date = new Date(log.timestamp);
+                    const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                    return (
+                      <div key={log.id} className="brutalist-card no-lift bg-paper-dark" style={{ padding: '22px 28px' }}>
+                        <div className="flex items-center justify-between gap-4">
+                          {/* Left: details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="font-sans-main font-black uppercase tracking-widest text-ink" style={{ fontSize: 14 }}>
+                                {isDeposit ? 'Deposit' : 'Withdraw'}
+                              </span>
+                              {log.mode && (
+                                <span className="font-mono-main uppercase tracking-widest text-ink/25" style={{ fontSize: 10 }}>
+                                  · {log.mode}{log.category ? ` · ${log.category}` : ''}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1">
+                              <span className="font-mono-main text-ink/40" style={{ fontSize: 11 }}>
+                                <span style={{ opacity: 0.5 }}>Bank · </span>{log.bank}
+                              </span>
+                              {log.bucket && (
+                                <span className="font-mono-main text-ink/40" style={{ fontSize: 11 }}>
+                                  <span style={{ opacity: 0.5 }}>Bucket · </span>{log.bucket}
+                                </span>
+                              )}
+                            </div>
+                            <p className="font-mono-main text-ink/20 mt-2" style={{ fontSize: 10 }}>{dateStr}</p>
+                          </div>
+
+                          {/* Right: amount */}
+                          <p className="font-mono-main font-black text-ink shrink-0" style={{ fontSize: 20 }}>
+                            {formatEGP(log.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       </div>
 
