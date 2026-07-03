@@ -227,6 +227,10 @@ export function useFinance() {
     await setBuckets({ ...buckets, [bucketKey]: amount });
   };
 
+  const removeLog = async (id: string) => {
+    await setLogs(prev => (prev || []).filter(l => l.id !== id));
+  };
+
   const addLog = async (entry: Omit<FinanceLog, 'id' | 'timestamp'>) => {
     const log: FinanceLog = {
       ...entry,
@@ -256,5 +260,6 @@ export function useFinance() {
     updateBucketBalance,
     logs,
     addLog,
+    removeLog,
   };
 }

@@ -232,7 +232,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     debts, setDebts,
     classifyDeposit, ignorePending,
     updateBankBalance, updateBucketBalance,
-    logs, addLog,
+    logs, addLog, removeLog,
   } = useFinance();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts' | 'logs'>('overview');
@@ -304,6 +304,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawBucketKey, setWithdrawBucketKey] = useState<keyof FinanceBuckets | null>(null);
   const [withdrawBankKey, setWithdrawBankKey] = useState<keyof FinanceBanks | null>(null);
+
 
   React.useEffect(() => { document.title = 'Rakeeen — Finance'; }, []);
 
@@ -531,6 +532,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       setManualBucketKey(null);
       setManualBankKey(null);
       setShowAddDepositModal(false);
+
     }
   };
 
@@ -545,6 +547,17 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         updateBankBalance(withdrawBankKey, Math.round(((banks?.[withdrawBankKey] || 0) - amount) * 100) / 100),
       ]);
       await addLog({ type: 'withdraw', amount, bank: BANK_LABELS[withdrawBankKey], bucket: BUCKET_META[withdrawBucketKey].en });
+
+      if (withdrawBucketKey === 'tawarr2') {
+        const debt: Debt = {
+          id: crypto.randomUUID(),
+          personName: 'Emergency',
+          amount,
+          type: 'owed_by_me',
+          notes: `Borrowed from Emergency bucket on ${new Date().toLocaleDateString('en-GB')}`,
+        };
+        await setDebts(prev => [...(prev || []), debt]);
+      }
     } finally {
       setWithdrawAmount('');
       setWithdrawBucketKey(null);
@@ -1232,7 +1245,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     const date = new Date(log.timestamp);
                     const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
                     return (
-                      <div key={log.id} className="brutalist-card no-lift bg-paper-dark" style={{ padding: '22px 28px' }}>
+                      <div key={log.id} className="brutalist-card no-lift bg-paper-dark group" style={{ padding: '22px 28px' }}>
                         <div className="flex items-center justify-between gap-4">
                           {/* Left: details */}
                           <div className="flex-1 min-w-0">
@@ -1259,10 +1272,18 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                             <p className="font-mono-main text-ink/20 mt-2" style={{ fontSize: 10 }}>{dateStr}</p>
                           </div>
 
-                          {/* Right: amount */}
-                          <p className="font-mono-main font-black text-ink shrink-0" style={{ fontSize: 20 }}>
-                            {formatEGP(log.amount)}
-                          </p>
+                          {/* Right: amount + delete */}
+                          <div className="flex items-center gap-3 shrink-0">
+                            <p className="font-mono-main font-black text-ink" style={{ fontSize: 20 }}>
+                              {formatEGP(log.amount)}
+                            </p>
+                            <button
+                              onClick={() => removeLog(log.id)}
+                              className="text-ink/20 hover:text-rust transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

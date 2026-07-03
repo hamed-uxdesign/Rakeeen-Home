@@ -13,9 +13,28 @@ import { DotMatrixText } from '../ui/DotMatrixText';
 import { DMTimer, WavyProgressBar } from '../ui/TimerComponents';
 import { useFinance } from '../../hooks/useFinance';
 
+function getMoonPhase(date: Date): { illumination: number; r: number; g: number; b: number } {
+  const knownNewMoon = new Date('2000-01-06T18:14:00Z');
+  const lunation = 29.53058867;
+  const elapsed = (date.getTime() - knownNewMoon.getTime()) / 86400000;
+  const phase = ((elapsed % lunation) + lunation) % lunation;
+  const illumination = 0.5 * (1 - Math.cos(2 * Math.PI * phase / lunation));
+  // Purkinje shift: crescent = more blue (dimmer = more rod vision = bluer)
+  //                 full moon = brighter = more silver-white, less shift
+  // At crescent: rgb(175, 195, 245) — deep blue-silver
+  // At full:     rgb(210, 218, 238) — silver-white with faint blue
+  const r = Math.round(175 + 35 * illumination);
+  const g = Math.round(195 + 23 * illumination);
+  const b = Math.round(245 - 7  * illumination);
+  return { illumination, r, g, b };
+}
+
 interface HomeProps {
   navigate: (to: string) => void;
 }
+
+// Persists across Home remounts — glow only animates in ONCE per night
+let _moonGlowPersisted = false;
 
 const MaskedValue: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => {
   const [revealed, setRevealed] = useState(false);
@@ -358,51 +377,111 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   }, []);
 
 
-  const NAMES = ['Hamid', 'Ghorab', 'Shaheen', 'Boomy', 'Rakeen'];
-  const [greetingName] = useState(() => NAMES[Math.floor(Math.random() * NAMES.length)]);
-
-  const getGreeting = (h: number): string => {
-    const name = greetingName;
-    if (h >= 4 && h < 6) {
-      return Math.random() < 0.5
-        ? `Up before the world, ${name}.`
-        : `Early or never slept, ${name}?`;
-    } else if (h >= 6 && h < 10) {
-      return Math.random() < 0.5
-        ? `Morning, ${name}.`
-        : `Day's open, ${name}.`;
-    } else if (h >= 10 && h < 12) {
-      return Math.random() < 0.5
-        ? `You're in it now, ${name}.`
-        : `Best hours, ${name}. Use them.`;
-    } else if (h >= 12 && h < 15) {
-      return Math.random() < 0.5
-        ? `Halfway, ${name}.`
-        : `Noon already, ${name}.`;
-    } else if (h >= 15 && h < 18) {
-      return Math.random() < 0.5
-        ? `Still time, ${name}.`
-        : `Afternoon. What's left?`;
-    } else if (h >= 18 && h < 19) {
-      return Math.random() < 0.5
-        ? `Golden hour, ${name}.`
-        : `This light doesn't repeat, ${name}.`;
-    } else if (h >= 19 && h < 22) {
-      return Math.random() < 0.5
-        ? `Evening, ${name}.`
-        : `How'd today go, ${name}?`;
-    } else if (h >= 22 && h < 24) {
-      return Math.random() < 0.5
-        ? `Still going, ${name}?`
-        : `Night mode, ${name}.`;
+  // Moon glow
+  const moonData = getMoonPhase(now);
+  const isNight = now.getHours() >= 20 || now.getHours() < 6;
+  const [moonGlowVisible, setMoonGlowVisible] = useState(() => _moonGlowPersisted && isNight);
+  const [moonTransition, setMoonTransition] = useState(() =>
+    _moonGlowPersisted && isNight ? 'none' : 'opacity 8s ease-in'
+  );
+  useEffect(() => {
+    if (isNight) {
+      if (_moonGlowPersisted) {
+        setMoonTransition('none');
+        setMoonGlowVisible(true);
+      } else {
+        setMoonTransition('opacity 8s ease-in');
+        const t = setTimeout(() => {
+          setMoonGlowVisible(true);
+          _moonGlowPersisted = true;
+        }, 100);
+        return () => clearTimeout(t);
+      }
     } else {
-      return Math.random() < 0.5
-        ? `Past midnight, ${name}.`
-        : `Whatever's keeping you up — worth it?`;
+      setMoonGlowVisible(false);
+      _moonGlowPersisted = false;
     }
+  }, [isNight]);
+
+  // Nature mode: each card has a random offset within the 15-min cycle, active for 150s
+  const [cardOffsets] = useState<Record<string, number>>(() => {
+    const cards = ['water', 'pomodoro', 'fitness', 'prayer', 'calendar', 'finance'];
+    const slots = [0, 150, 300, 450, 600, 750];
+    const shuffled = [...slots].sort(() => Math.random() - 0.5);
+    return Object.fromEntries(cards.map((c, i) => [c, shuffled[i]]));
+  });
+
+  const isNatureCard = (cardId: string): boolean => {
+    const offset = cardOffsets[cardId] ?? 0;
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+    const cyclePos = (m % 15) * 60 + s;
+    return (cyclePos - offset + 900) % 900 < 150;
   };
 
-  const [greeting] = useState(() => getGreeting(new Date().getHours()));
+  const natureMode = isNatureCard('water');
+
+  const NATURE_TITLES: Record<string, Record<number, string>> = {
+    water:    { 0:'RIVER RUNS SILENT', 4:'DEW IS FORMING', 5:'MORNING DEW RISES', 11:'RIVERS ARE FULL', 13:'DESERT FINDS WATER', 17:'TIDE IS TURNING', 19:'OCEAN GLOWS NOW', 20:'FROGS CALL THE RAIN', 22:'WELLS RUN DEEP' },
+    pomodoro: { 0:'OWL HUNTS AT NIGHT', 4:'WORLD SHIFTS BEFORE DAWN', 5:'BEES ARE ALREADY OUT', 11:'BEES DON\'T QUESTION', 13:'CRICKET NEVER STOPS', 17:'BIRDS HEADING BACK', 19:'GOLDEN LIGHT WON\'T WAIT', 20:'FIREFLIES NEED NO REASON', 22:'OWL SHIFT STARTS NOW' },
+    calendar: { 0:'TIME MOVES IN DARK', 4:'NEW DAY IS NEAR', 5:'SUN WAITS FOR NO ONE', 11:'DAY IS READY', 13:'SUN STILL HIGH', 17:'SHADOWS GET LONGER', 19:'DAY BOWS OUT', 20:'NIGHT SETTLES IN', 22:'MOON KEEPS ITS TIME' },
+    prayer:   { 0:'STARS HAVE ALWAYS KNOWN', 4:'SKY HOLDS ITS BREATH', 5:'BIRDS SANG FAJR EARLY', 11:'OAK STARTS SLOW TOO', 13:'TREES LEAN TO LIGHT', 17:'FOREST SHIFTS AT DUSK', 19:'SKY IS SPEAKING', 20:'CRICKETS TOOK OVER', 22:'NIGHT SKY IS FULL' },
+    fitness:  { 0:'WOLF MOVES AT NIGHT', 4:'PREDAWN BELONGS TO YOU', 5:'FOREST MOVED SINCE DAWN', 11:'LION STRETCHES FIRST', 13:'HAWK NEVER STOPS', 17:'HUNT IS ALMOST DONE', 19:'GAZELLE MOVES IN GOLD', 20:'NIGHT ANIMALS WAKE', 22:'WOLF DOESN\'T SLEEP EARLY' },
+    finance:  { 0:'ANT NEVER FORGETS', 4:'ROOTS WORK ALL NIGHT', 5:'MARKET OPENED WITHOUT YOU', 11:'HARVEST STARTS EARLY', 13:'RIVER CARVES SLOW', 17:'BEE RETURNS TO HIVE', 19:'SUNSET COSTS NOTHING', 20:'FOREST COUNTS ITS OWN', 22:'TIDE WORKS WHILE YOU REST' },
+  };
+
+  const getNatureTitle = (id: string, h: number): string => {
+    const map = NATURE_TITLES[id];
+    if (!map) return '';
+    const slots = [22, 20, 19, 17, 13, 11, 5, 4, 0];
+    const slot = slots.find(s => h >= s) ?? 0;
+    return map[slot] ?? '';
+  };
+
+  const NAMES = ['Hamed', 'Ghorab', 'Bommy', 'Shahyn', 'Rakeeen'];
+  const [greetingName] = useState(() => NAMES[Math.floor(Math.random() * NAMES.length)]);
+
+  // Schedule: works until 4am, sleeps 5am–11am, golden hour Egypt summer ~7–8pm
+  const getGreeting = (h: number): { before: string; name: string; after: string } => {
+    const n = greetingName.toUpperCase();
+    // Data-aware: check most notable condition first
+    const waterLow = typeof glasses === 'number' && glasses < 3 && h >= 14 && h < 22;
+    const noFocus = focusMinutes === 0 && !pomodoroRunning && h >= 13 && h < 19;
+    const isWorkoutDay = [0, 3].includes(now.getDay()); // Sunday=0, Wednesday=3
+    const noWorkout = isWorkoutDay && workoutMinsToday === 0 && h >= 18 && h < 23;
+    const hasPending = pendingItems.length > 0 && h >= 11 && h < 23;
+
+    let before = '';
+    if (waterLow)       before = 'RIVER IS LOW TODAY ... DRINK UP ';
+    else if (noFocus)   before = 'HAWK HASN\'T MOVED YET ... ';
+    else if (hasPending) before = 'SOMETHING IS WAITING ... ';
+    else if (noWorkout) before = 'LION DIDN\'T HUNT TODAY ... ';
+    else if (h >= 0 && h < 4)        before = 'OWLS ARE OUT ... AND SO ARE YOU ';
+    else if (h >= 4 && h < 5)        before = 'BIRDS ALMOST READY ... ARE YOU ';
+    else if (h >= 5 && h < 11)       before = 'TREES ARE WORKING ... REST UP ';
+    else if (h >= 11 && h < 13)      before = 'BEES BEEN OUT FOR HOURS ... YOUR TURN ';
+    else if (h >= 13 && h < 17)      before = 'PUSH WHILE THE SUN\'S STILL UP ... ';
+    else if (h >= 17 && h < 19)      before = 'BIRDS HEADING HOME ... WRAP IT UP ';
+    else if (h >= 19 && h < 20)      before = 'GOLDEN HOUR ... CATCH THE LIGHT ';
+    else if (h >= 20 && h < 22)      before = 'FROGS ARE LOUD ... SLOW DOWN ';
+    else                              before = 'NIGHT SETTLING IN ... OWL MODE ';
+    return { before, name: n, after: '' };
+  };
+
+  const greetingParts = getGreeting(now.getHours());
+
+  const [displayedGreeting, setDisplayedGreeting] = useState(greetingParts);
+  const [greetingVisible, setGreetingVisible] = useState(true);
+  useEffect(() => {
+    if (greetingParts.before !== displayedGreeting.before) {
+      setGreetingVisible(false);
+      const t = setTimeout(() => {
+        setDisplayedGreeting(greetingParts);
+        setGreetingVisible(true);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [greetingParts.before, glasses, focusMinutes, workoutMinsToday, pendingItems.length]);
 
   const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const [timeOnly, amPm] = timeString.split(' ');
@@ -515,20 +594,26 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col justify-between transition-colors duration-300">
+    <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col justify-between transition-colors duration-300 relative overflow-x-hidden">
+      {/* Moon glow — rises slowly at night, fades at dawn */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          background: `radial-gradient(ellipse at 100% 0%, rgba(${moonData.r}, ${moonData.g}, ${moonData.b}, ${(moonData.illumination * 0.18).toFixed(3)}) 0%, rgba(${moonData.r - 20}, ${moonData.g - 15}, ${moonData.b}, ${(moonData.illumination * 0.07).toFixed(3)}) 40%, transparent 68%)`,
+          opacity: moonGlowVisible ? 1 : 0,
+          transition: moonTransition,
+          zIndex: 0,
+        }}
+      />
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
 
       {/* 1. HEADER SECTION */}
       <header className="w-full max-w-[1400px] mx-auto mb-16 flex flex-row items-center justify-between gap-4 border-b border-ink/10 pb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-mono-main text-[11px] md:text-[12px] font-bold tracking-[0.25em] text-ink/50 uppercase select-none">
-              Rakeeen Home
-            </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-sepia animate-pulse"></span>
-          </div>
-          <h1 className="font-sans-main text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black uppercase tracking-tight text-ink select-none">
-            {greeting.toUpperCase()}
+          <h1 className="font-sans-main text-lg sm:text-xl md:text-2xl tracking-tight select-none" style={{ color: 'color-mix(in srgb, var(--ink) 55%, transparent)', opacity: greetingVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}>
+            <span className="font-light">{displayedGreeting.before}</span>
+            <span className="font-medium">{displayedGreeting.name}</span>
+            <span className="font-light">{displayedGreeting.after}</span>
           </h1>
         </div>
 
@@ -604,7 +689,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
           {([
             {
               id: 'water',
-              title: 'Water Intake',
+              title: 'Water',
               Vector: WaterVector,
               route: 'water',
               isRunning: false,
@@ -613,7 +698,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
             },
             {
               id: 'pomodoro',
-              title: 'Focus Time',
+              title: 'Your Focus',
               Vector: FocusVector,
               route: 'pomodoro',
               isRunning: false,
@@ -633,7 +718,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
             },
             {
               id: 'prayer',
-              title: 'Prayer',
+              title: 'Devotion',
               Vector: PrayerVector,
               route: 'prayer',
               isRunning: cardPrayer.info === 'ACTIVE NOW',
@@ -733,8 +818,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">WATER INTAKE</h2>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">{isNatureCard('water') ? getNatureTitle('water', now.getHours()) : 'WATER'}</h2>
                     </div>
                     <div className="text-ink opacity-60">
                       <WaterVector size={36} />
@@ -804,8 +888,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                     <>
                       <div className="flex justify-between items-start">
                         <div>
-                          <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
-                          <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">FOCUS TIME</h2>
+                              <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">{isNatureCard('pomodoro') ? getNatureTitle('pomodoro', now.getHours()) : 'YOUR FOCUS'}</h2>
                         </div>
                         <div className="text-ink opacity-60">
                           <FocusVector size={36} />
@@ -840,8 +923,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">TRAINING</h2>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">{isNatureCard('fitness') ? getNatureTitle('fitness', now.getHours()) : 'TRAINING'}</h2>
                     </div>
                     <div className="text-ink">
                       <FitnessVector size={36} />
@@ -862,8 +944,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">PRAYER</h2>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">{isNatureCard('prayer') ? getNatureTitle('prayer', now.getHours()) : 'DEVOTION'}</h2>
                     </div>
                     <div className="text-ink">
                       <PrayerVector size={36} />
@@ -880,8 +961,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">CALENDAR</h2>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">{isNatureCard('calendar') ? getNatureTitle('calendar', now.getHours()) : 'CALENDAR'}</h2>
                     </div>
                     <div className="text-ink">
                       <CalendarVector size={36} />
@@ -903,8 +983,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <span className="font-mono-main text-[10px] font-bold tracking-[0.25em] text-ink/40 uppercase">STAGE: ACTIVE</span>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">FINANCE</h2>
+                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1">{isNatureCard('finance') ? getNatureTitle('finance', now.getHours()) : 'FINANCE'}</h2>
                     </div>
                     <div className="text-ink opacity-60">
                       <FinanceVector size={36} />
