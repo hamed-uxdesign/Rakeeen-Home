@@ -358,6 +358,52 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   }, []);
 
 
+  const NAMES = ['Hamid', 'Ghorab', 'Shaheen', 'Boomy', 'Rakeen'];
+  const [greetingName] = useState(() => NAMES[Math.floor(Math.random() * NAMES.length)]);
+
+  const getGreeting = (h: number): string => {
+    const name = greetingName;
+    if (h >= 4 && h < 6) {
+      return Math.random() < 0.5
+        ? `Up before the world, ${name}.`
+        : `Early or never slept, ${name}?`;
+    } else if (h >= 6 && h < 10) {
+      return Math.random() < 0.5
+        ? `Morning, ${name}.`
+        : `Day's open, ${name}.`;
+    } else if (h >= 10 && h < 12) {
+      return Math.random() < 0.5
+        ? `You're in it now, ${name}.`
+        : `Best hours, ${name}. Use them.`;
+    } else if (h >= 12 && h < 15) {
+      return Math.random() < 0.5
+        ? `Halfway, ${name}.`
+        : `Noon already, ${name}.`;
+    } else if (h >= 15 && h < 18) {
+      return Math.random() < 0.5
+        ? `Still time, ${name}.`
+        : `Afternoon. What's left?`;
+    } else if (h >= 18 && h < 19) {
+      return Math.random() < 0.5
+        ? `Golden hour, ${name}.`
+        : `This light doesn't repeat, ${name}.`;
+    } else if (h >= 19 && h < 22) {
+      return Math.random() < 0.5
+        ? `Evening, ${name}.`
+        : `How'd today go, ${name}?`;
+    } else if (h >= 22 && h < 24) {
+      return Math.random() < 0.5
+        ? `Still going, ${name}?`
+        : `Night mode, ${name}.`;
+    } else {
+      return Math.random() < 0.5
+        ? `Past midnight, ${name}.`
+        : `Whatever's keeping you up — worth it?`;
+    }
+  };
+
+  const [greeting] = useState(() => getGreeting(new Date().getHours()));
+
   const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const [timeOnly, amPm] = timeString.split(' ');
   
@@ -482,7 +528,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
             <span className="h-1.5 w-1.5 rounded-full bg-sepia animate-pulse"></span>
           </div>
           <h1 className="font-sans-main text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black uppercase tracking-tight text-ink select-none">
-            WELCOME BACK, <span className="font-bold" style={{ color: 'var(--ghorab-color)' }}>GHORAB</span>
+            {greeting.toUpperCase()}
           </h1>
         </div>
 
