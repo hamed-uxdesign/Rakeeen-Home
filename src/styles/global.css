@@ -333,6 +333,11 @@ html {
   }
 }
 
+@keyframes journalOpen {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes vectorFade {
   0%, 100% { opacity: 0.18; }
   50% { opacity: 1; }

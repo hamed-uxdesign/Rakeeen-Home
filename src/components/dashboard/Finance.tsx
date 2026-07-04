@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Inbox, X, Banknote, Wallet, Trash2, Plus, Minus, Pencil } from 'lucide-react';
+import { ArrowLeft, Inbox, Banknote, Wallet, Trash2, Plus, Minus, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AppModal } from '../ui/AppModal';
 import {
   useFinance,
   PendingItem,
@@ -1301,27 +1302,9 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       {/* ============================================================ */}
 
       {/* ADD GOLD MODAL */}
-      <AnimatePresence>
-        {showAddGoldModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddGoldModal(false)} />
-            <motion.div
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 16, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10"
-              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
-            >
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Add Gold Asset</h3>
-                <button onClick={() => setShowAddGoldModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X strokeWidth={2} />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddGold}>
-                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <AppModal isOpen={showAddGoldModal} onClose={() => setShowAddGoldModal(false)} title="Add Gold Asset" raw maxWidth="max-w-sm">
+        <form onSubmit={handleAddGold}>
+          <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                   <div>
                     <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Weight in Grams</label>
                     <input type="number" step="0.001" placeholder="e.g. 10.500" value={newGoldQty} onChange={e => setNewGoldQty(e.target.value)} required autoFocus
@@ -1379,34 +1362,13 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
                   >Add Asset</button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
       {/* ADD SUBSCRIPTION MODAL */}
-      <AnimatePresence>
-        {showAddSubModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddSubModal(false)} />
-            <motion.div
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 16, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10"
-              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
-            >
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Add Subscription</h3>
-                <button onClick={() => setShowAddSubModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X strokeWidth={2} />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddSub}>
-                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <AppModal isOpen={showAddSubModal} onClose={() => setShowAddSubModal(false)} title="Add Subscription" raw maxWidth="max-w-sm">
+        <form onSubmit={handleAddSub}>
+          <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                   <div>
                     <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Name</label>
                     <input type="text" placeholder="e.g. Netflix, Spotify" value={newSubName} onChange={e => setNewSubName(e.target.value)} required autoFocus
@@ -1484,34 +1446,13 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
                   >Add Subscription</button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
       {/* ADD DEBT ENTRY MODAL */}
-      <AnimatePresence>
-        {showAddDebtModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddDebtModal(false)} />
-            <motion.div
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 16, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10"
-              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
-            >
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Log Debt</h3>
-                <button onClick={() => setShowAddDebtModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X strokeWidth={2} />
-                </button>
-              </div>
-
-              <form onSubmit={handleAddDebt}>
-                <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <AppModal isOpen={showAddDebtModal} onClose={() => setShowAddDebtModal(false)} title="Log Debt" raw maxWidth="max-w-sm">
+        <form onSubmit={handleAddDebt}>
+          <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                   {/* Type toggle */}
                   <div>
                     <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Type</label>
@@ -1563,46 +1504,17 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}
                   >Log Debt</button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
       {/* ADD DEPOSIT MODAL */}
-      <AnimatePresence>
-        {showAddDepositModal && (() => {
+      <AppModal isOpen={showAddDepositModal} onClose={() => setShowAddDepositModal(false)} title="Add Deposit" raw maxWidth="max-w-sm">
+        {(() => {
           const split = newDepositCategory === 'Salary' ? SALARY_SPLIT : FREELANCE_SPLIT;
           const amt = parseFloat(newDepositAmount) || 0;
           const totalPct = Object.values(split).reduce((a, b) => a + b, 0);
           return (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5" style={{ overflow: 'hidden' }}>
-              <div className="absolute inset-0 bg-black/90" onClick={() => setShowAddDepositModal(false)} />
-              <motion.div
-                initial={{ y: 16, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 16, opacity: 0 }}
-                transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                className="relative w-full max-w-sm z-10"
-                style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
-              >
-                {/* Header */}
-                <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                  <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>
-                    Add Deposit
-                  </h3>
-                  <button
-                    onClick={() => setShowAddDepositModal(false)}
-                    className="cursor-pointer transition-opacity"
-                    style={{ color: 'var(--ink)', opacity: 0.35 }}
-                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                    onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}
-                  >
-                    <X strokeWidth={2} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleAddDeposit}>
+            <form onSubmit={handleAddDeposit}>
                   <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
                     {/* Mode toggle: Split / Manual */}
@@ -1746,34 +1658,14 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                       );
                     })()}
                   </div>
-                </form>
-              </motion.div>
-            </div>
+            </form>
           );
         })()}
-      </AnimatePresence>
+      </AppModal>
 
       {/* WITHDRAW MODAL */}
-      <AnimatePresence>
-        {showWithdrawModal && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setShowWithdrawModal(false)} />
-            <motion.div
-              initial={{ y: 16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 16, opacity: 0 }}
-              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10"
-              style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}
-            >
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Withdraw</h3>
-                <button onClick={() => setShowWithdrawModal(false)} className="cursor-pointer transition-opacity" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}>
-                  <X strokeWidth={2} />
-                </button>
-              </div>
-
-              <form onSubmit={handleWithdraw}>
+      <AppModal isOpen={showWithdrawModal} onClose={() => setShowWithdrawModal(false)} title="Withdraw" raw maxWidth="max-w-sm">
+        <form onSubmit={handleWithdraw}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
                   {/* Amount */}
                   <div>
@@ -1833,24 +1725,12 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     {!withdrawBucketKey ? 'Select a Bucket First' : !withdrawBankKey ? 'Select a Bank First' : 'Confirm Withdrawal'}
                   </button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
       {/* EDIT GOLD MODAL */}
-      <AnimatePresence>
-        {editingGold && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setEditingGold(null)} />
-            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Gold</h3>
-                <button onClick={() => setEditingGold(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X strokeWidth={2} /></button>
-              </div>
-              <form onSubmit={handleSaveGold}>
+      <AppModal isOpen={!!editingGold} onClose={() => setEditingGold(null)} title="Edit Gold" raw maxWidth="max-w-sm">
+        <form onSubmit={handleSaveGold}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
                   <div>
                     <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Weight (g)</label>
@@ -1876,24 +1756,12 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                   <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')} onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}>Save Changes</button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
       {/* EDIT SUBSCRIPTION MODAL */}
-      <AnimatePresence>
-        {editingSub && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setEditingSub(null)} />
-            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Subscription</h3>
-                <button onClick={() => setEditingSub(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X strokeWidth={2} /></button>
-              </div>
-              <form onSubmit={handleSaveSub}>
+      <AppModal isOpen={!!editingSub} onClose={() => setEditingSub(null)} title="Edit Subscription" raw maxWidth="max-w-sm">
+        <form onSubmit={handleSaveSub}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
                   <div>
                     <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Name</label>
@@ -1925,24 +1793,12 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                   <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')} onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}>Save Changes</button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
       {/* EDIT DEBT MODAL */}
-      <AnimatePresence>
-        {editingDebt && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-5">
-            <div className="absolute inset-0 bg-black/90" onClick={() => setEditingDebt(null)} />
-            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-              className="relative w-full max-w-sm z-10" style={{ background: 'var(--paper-dark)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
-              <div className="flex items-center justify-between px-8 pt-8 pb-7" style={{ borderBottom: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
-                <h3 className="font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 14, color: 'var(--ink)' }}>Edit Debt</h3>
-                <button onClick={() => setEditingDebt(null)} className="cursor-pointer" style={{ color: 'var(--ink)', opacity: 0.35 }} onMouseEnter={e => (e.currentTarget.style.opacity = '1')} onMouseLeave={e => (e.currentTarget.style.opacity = '0.35')}><X strokeWidth={2} /></button>
-              </div>
-              <form onSubmit={handleSaveDebt}>
+      <AppModal isOpen={!!editingDebt} onClose={() => setEditingDebt(null)} title="Edit Debt" raw maxWidth="max-w-sm">
+        <form onSubmit={handleSaveDebt}>
                 <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
                   <div>
                     <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Type</label>
@@ -1968,11 +1824,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                 <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                   <button type="submit" className="cursor-pointer w-full font-sans-main font-black uppercase tracking-wide" style={{ fontSize: 13, padding: '20px 0', background: '#7A9E1A', color: '#000', border: 'none' }} onMouseEnter={e => (e.currentTarget.style.background = '#8BB520')} onMouseLeave={e => (e.currentTarget.style.background = '#7A9E1A')}>Save Changes</button>
                 </div>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+        </form>
+      </AppModal>
 
     </div>
   );
