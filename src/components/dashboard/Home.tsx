@@ -842,7 +842,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   };
 
   return (
-    <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col justify-between transition-colors duration-300 relative overflow-x-hidden">
+    <div className="min-h-screen bg-bg text-ink py-6 md:py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col justify-between transition-colors duration-300 relative">
       {/* Moon glow — rises slowly at night, fades at dawn */}
       <div
         className="fixed inset-0 pointer-events-none"
@@ -858,7 +858,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
 
       {/* 1. HEADER SECTION */}
-      <header className="w-full max-w-[1400px] mx-auto mb-16 flex flex-row items-center justify-between gap-4 border-b border-ink/10 pb-6">
+      <header className="w-full max-w-[1400px] mx-auto mb-6 md:mb-12 lg:mb-16 flex flex-row items-center justify-between gap-4 border-b border-ink/10 pb-4 md:pb-6">
         <div>
           <h1 className="font-sans-main text-lg sm:text-xl md:text-2xl tracking-tight select-none" style={{ color: 'color-mix(in srgb, var(--ink) 55%, transparent)', opacity: greetingVisible ? 1 : 0, transition: 'opacity 0.5s ease' }}>
             {journalEntry
@@ -937,10 +937,10 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
       </header>
 
       {/* 2. STAGE MANAGER TWO-COLUMN LAYOUT */}
-      <main className="w-full max-w-[1400px] mx-auto flex-1 flex flex-col lg:flex-row gap-8 mb-16 items-stretch">
+      <main className="w-full max-w-[1400px] mx-auto flex-1 flex flex-col lg:flex-row gap-4 md:gap-6 lg:gap-8 mb-6 lg:mb-16 items-stretch">
         
         {/* Left stack (Stage Manager dock) */}
-        <div className="flex lg:flex-col gap-4 overflow-x-auto lg:overflow-visible pb-4 lg:pb-0 shrink-0 lg:w-[230px] scrollbar-none px-2 lg:px-0">
+        <div className="flex lg:flex-col gap-3 lg:gap-4 overflow-x-auto lg:overflow-visible pb-3 lg:pb-0 shrink-0 lg:w-[230px] scrollbar-none -mx-6 px-6 lg:mx-0 lg:px-0">
           {([
             {
               id: 'water',
@@ -1073,7 +1073,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         </div>
 
         {/* Active Stage (Center/Right) */}
-        <div className="flex-1 flex flex-col items-stretch lg:h-[740px]">
+        <div className="flex-1 flex flex-col items-stretch min-h-[280px] lg:min-h-0 lg:h-[740px]">
           <div
             onClick={() => {
               const found = [
@@ -1086,7 +1086,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               ].find(c => c.id === activeCardId);
               if (found) navigate(found.route);
             }}
-            className="flex-1 flex flex-col justify-between brutalist-card bg-paper p-8 lg:p-10 relative group cursor-pointer"
+            className="flex-1 flex flex-col justify-between brutalist-card bg-paper p-5 sm:p-8 lg:p-10 relative group cursor-pointer"
           >
               {/* Active Card Body Renderer */}
               <div className="flex-1 flex flex-col" style={{ opacity: bigCardVisible ? 1 : 0, transition: 'opacity 0.2s ease' }}>
@@ -1094,7 +1094,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`WATER`}</h2>
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`WATER`}</h2>
                     </div>
                     <div className="text-ink opacity-60">
                       <WaterVector size={36} fillLevel={waterFillLevel} />
@@ -1164,7 +1164,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                     <>
                       <div className="flex justify-between items-start">
                         <div>
-                              <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`YOUR FOCUS`}</h2>
+                              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`YOUR FOCUS`}</h2>
                         </div>
                         <div className="text-ink opacity-60">
                           <FocusVector size={36} paused={focusPaused} />
@@ -1173,7 +1173,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
                       <div className="flex items-end justify-between gap-4">
                         <div className="flex items-baseline gap-2">
-                          <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                          <span className="font-mono-main text-5xl sm:text-7xl lg:text-8xl font-black text-ink leading-none">
                             {focusMinutes > 0 ? focusHours : '0'}
                           </span>
                           <span className="font-mono-main text-3xl font-bold text-ink/40">h</span>
@@ -1199,7 +1199,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`TRAINING`}</h2>
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`TRAINING`}</h2>
                     </div>
                     <div className="text-ink">
                       <FitnessVector size={36} paused={fitnessPaused} />
@@ -1207,7 +1207,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                   </div>
 
                   <div className="flex items-baseline gap-2">
-                    <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                    <span className="font-mono-main text-5xl sm:text-7xl lg:text-8xl font-black text-ink leading-none">
                       {workoutMinsToday}
                     </span>
                     <span className="font-mono-main text-3xl font-bold text-ink/40">m</span>
@@ -1220,14 +1220,14 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`DEVOTION`}</h2>
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`DEVOTION`}</h2>
                     </div>
                     <div className="text-ink">
                       <PrayerVector size={36} paused={prayerPaused} />
                     </div>
                   </div>
 
-                  <span className="font-sans-main text-5xl sm:text-6xl font-black text-ink uppercase tracking-tight">
+                  <span className="font-sans-main text-4xl sm:text-5xl lg:text-6xl font-black text-ink uppercase tracking-tight">
                     {cardPrayer.name}
                   </span>
                 </div>
@@ -1237,7 +1237,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`CALENDAR`}</h2>
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`CALENDAR`}</h2>
                     </div>
                     <div className="text-ink">
                       <CalendarVector size={36} />
@@ -1245,7 +1245,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                   </div>
 
                   <div className="flex items-baseline gap-2">
-                    <span className="font-mono-main text-7xl sm:text-8xl font-black text-ink leading-none">
+                    <span className="font-mono-main text-5xl sm:text-7xl lg:text-8xl font-black text-ink leading-none">
                       {now.getDate()}
                     </span>
                     <span className="font-sans-main text-3xl font-bold text-ink/50 uppercase tracking-widest">
@@ -1259,7 +1259,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`FINANCE`}</h2>
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight mt-1" >{`FINANCE`}</h2>
                     </div>
                     <div className="text-ink opacity-60">
                       <FinanceVector size={36} />
@@ -1268,7 +1268,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
                   <div className="flex items-end gap-4">
                     <div className="flex items-baseline gap-2">
-                      <span className="font-mono-main text-5xl sm:text-6xl font-black text-ink leading-none">
+                      <span className="font-mono-main text-4xl sm:text-5xl lg:text-6xl font-black text-ink leading-none">
                         {totalPhysical > 0
                           ? <MaskedValue>{Math.round(totalPhysical).toLocaleString()}</MaskedValue>
                           : '—'}

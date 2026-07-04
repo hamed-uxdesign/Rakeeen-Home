@@ -100,15 +100,17 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
     };
   }, []);
 
-  // Mouse proximity for header/footer
+  // On touch devices always show header/footer; on desktop use mouse proximity
+  const isTouchDevice = 'ontouchstart' in window;
   useEffect(() => {
+    if (isTouchDevice) { setShowHeader(true); setShowFooter(true); return; }
     const onMove = (e: MouseEvent) => {
       setShowHeader(e.clientY < TRIGGER_ZONE);
       setShowFooter(e.clientY > window.innerHeight - TRIGGER_ZONE);
     };
     window.addEventListener('mousemove', onMove);
     return () => window.removeEventListener('mousemove', onMove);
-  }, []);
+  }, [isTouchDevice]);
 
   // Fetch page
   useEffect(() => {
@@ -265,8 +267,8 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
       </AnimatePresence>
 
       {/* ── Quran content ── */}
-      <div className="flex-1 overflow-y-auto flex items-center justify-center px-6">
-        <div className="w-full max-w-[720px] py-16">
+      <div className="flex-1 overflow-y-auto flex items-center justify-center px-4 md:px-6">
+        <div className="w-full max-w-[720px] py-8 md:py-16">
           {loading && (
             <div className="flex items-center justify-center py-32">
               <div className="w-6 h-6 border-2 border-ink/20 border-t-ink rounded-full animate-spin" />

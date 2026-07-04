@@ -587,10 +587,10 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const splitRows = classifyState ? getSplitRows(classifyState.item.amount, classifyState.category) : null;
 
   return (
-    <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main transition-colors duration-300">
+    <div className="min-h-screen bg-bg text-ink py-6 md:py-12 px-6 md:px-12 lg:px-20 font-sans-main transition-colors duration-300">
 
       {/* HEADER */}
-      <header className="w-full max-w-[1400px] mx-auto mb-8 border-b border-ink/10 pb-6 flex items-center gap-5">
+      <header className="w-full max-w-[1400px] mx-auto mb-5 md:mb-8 border-b border-ink/10 pb-4 md:pb-6 flex items-center gap-5">
         <button
           onClick={() => navigate('home')}
           className="w-10 h-10 border border-ink flex items-center justify-center text-ink hover:bg-ink/5 transition-colors cursor-pointer"
@@ -624,8 +624,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       </header>
 
       {/* TABS SWITCHER + ACTION BUTTONS in one row */}
-      <div className="w-full max-w-[1400px] mx-auto mb-8 flex items-center justify-between">
-        <div className="flex border border-ink/20 overflow-hidden self-start relative bg-[var(--paper-dark)] w-fit">
+      <div className="w-full max-w-[1400px] mx-auto mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex border border-ink/20 overflow-x-auto self-start relative bg-[var(--paper-dark)] w-full md:w-fit scrollbar-none">
           {(['overview', 'buckets', 'gold', 'subscriptions', 'debts', 'logs'] as const).map(tab => (
             <button
               key={tab}

@@ -315,7 +315,7 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
   });
 
   return (
-    <div className="min-h-screen bg-bg text-ink py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300">
+    <div className="min-h-screen bg-bg text-ink py-6 md:py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300">
       
       {/* HEADER */}
       <header className="w-full max-w-[1000px] mx-auto mb-12">
