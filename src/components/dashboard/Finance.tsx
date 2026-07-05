@@ -543,14 +543,17 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     const amount = parseFloat(withdrawAmount);
-    if (!amount || amount <= 0 || !withdrawBucketKey || !withdrawBankKey) return;
+    if (!amount || amount <= 0 || !withdrawBankKey) return;
 
     try {
-      await Promise.all([
-        updateBucketBalance(withdrawBucketKey, Math.round(((buckets?.[withdrawBucketKey] || 0) - amount) * 100) / 100),
+      const ops: Promise<void>[] = [
         updateBankBalance(withdrawBankKey, Math.round(((banks?.[withdrawBankKey] || 0) - amount) * 100) / 100),
-      ]);
-      await addLog({ type: 'withdraw', amount, bank: BANK_LABELS[withdrawBankKey], bucket: BUCKET_META[withdrawBucketKey].en });
+      ];
+      if (withdrawBucketKey) {
+        ops.push(updateBucketBalance(withdrawBucketKey, Math.round(((buckets?.[withdrawBucketKey] || 0) - amount) * 100) / 100));
+      }
+      await Promise.all(ops);
+      await addLog({ type: 'withdraw', amount, bank: BANK_LABELS[withdrawBankKey], ...(withdrawBucketKey ? { bucket: BUCKET_META[withdrawBucketKey].en } : {}), mode: 'manual' });
 
       if (withdrawBucketKey === 'tawarr2') {
         const debt: Debt = {
@@ -1719,11 +1722,11 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
                 <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                   <button type="submit"
-                    disabled={!withdrawBucketKey || !withdrawBankKey}
+                    disabled={!withdrawBankKey}
                     className="w-full font-sans-main font-black uppercase tracking-wide transition-colors"
-                    style={{ fontSize: 13, padding: '20px 0', background: (!withdrawBucketKey || !withdrawBankKey) ? 'color-mix(in srgb, var(--ink) 10%, transparent)' : 'var(--rust)', color: (!withdrawBucketKey || !withdrawBankKey) ? 'color-mix(in srgb, var(--ink) 30%, transparent)' : 'var(--paper)', border: 'none', cursor: (!withdrawBucketKey || !withdrawBankKey) ? 'not-allowed' : 'pointer' }}
+                    style={{ fontSize: 13, padding: '20px 0', background: !withdrawBankKey ? 'color-mix(in srgb, var(--ink) 10%, transparent)' : 'var(--rust)', color: !withdrawBankKey ? 'color-mix(in srgb, var(--ink) 30%, transparent)' : 'var(--paper)', border: 'none', cursor: !withdrawBankKey ? 'not-allowed' : 'pointer' }}
                   >
-                    {!withdrawBucketKey ? 'Select a Bucket First' : !withdrawBankKey ? 'Select a Bank First' : 'Confirm Withdrawal'}
+                    {!withdrawBankKey ? 'Select a Bank First' : 'Confirm Withdrawal'}
                   </button>
                 </div>
         </form>
