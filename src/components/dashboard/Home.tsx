@@ -413,10 +413,17 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const todayKey = getLogicalDate().toISOString().slice(0, 10);
   useEffect(() => {
     if (glasses === 0 && focusMinutes === 0 && workoutMinsToday === 0) return;
-    setDailyHistory(prev => ({
-      ...prev,
-      [todayKey]: { water: glasses || 0, focus: focusMinutes, workout: workoutMinsToday },
-    }));
+    setDailyHistory(prev => {
+      const existing = prev[todayKey] ?? { water: 0, focus: 0, workout: 0 };
+      return {
+        ...prev,
+        [todayKey]: {
+          water: Math.max(existing.water, glasses || 0),
+          focus: Math.max(existing.focus, focusMinutes),
+          workout: Math.max(existing.workout, workoutMinsToday),
+        },
+      };
+    });
   }, [glasses, focusMinutes, workoutMinsToday]);
 
   // Compute 7-day pattern for emotional greeting awareness
