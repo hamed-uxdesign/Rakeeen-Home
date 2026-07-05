@@ -518,12 +518,15 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         }
         await addLog({ type: 'deposit', amount, bank: BANK_LABELS[newDepositBank], mode: 'split', category: newDepositCategory });
       } else {
-        if (!manualBucketKey || !manualBankKey) return;
-        await Promise.all([
-          updateBucketBalance(manualBucketKey, Math.round(((buckets?.[manualBucketKey] || 0) + amount) * 100) / 100),
+        if (!manualBankKey) return;
+        const ops: Promise<void>[] = [
           updateBankBalance(manualBankKey, Math.round(((banks?.[manualBankKey] || 0) + amount) * 100) / 100),
-        ]);
-        await addLog({ type: 'deposit', amount, bank: BANK_LABELS[manualBankKey], bucket: BUCKET_META[manualBucketKey].en, mode: 'manual' });
+        ];
+        if (manualBucketKey) {
+          ops.push(updateBucketBalance(manualBucketKey, Math.round(((buckets?.[manualBucketKey] || 0) + amount) * 100) / 100));
+        }
+        await Promise.all(ops);
+        await addLog({ type: 'deposit', amount, bank: BANK_LABELS[manualBankKey], ...(manualBucketKey ? { bucket: BUCKET_META[manualBucketKey].en } : {}), mode: 'manual' });
       }
     } finally {
       setNewDepositAmount('');
@@ -625,7 +628,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
       {/* TABS SWITCHER + ACTION BUTTONS in one row */}
       <div className="w-full max-w-[1400px] mx-auto mb-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex border border-ink/20 overflow-x-auto self-start relative bg-[var(--paper-dark)] w-full md:w-fit scrollbar-none">
+        <div className="flex border border-ink/20 overflow-x-auto self-start relative bg-[var(--paper-dark)] w-full md:w-fit" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {(['overview', 'buckets', 'gold', 'subscriptions', 'debts', 'logs'] as const).map(tab => (
             <button
               key={tab}
@@ -1646,10 +1649,8 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   {/* Footer — Confirm only */}
                   <div style={{ borderTop: '1px solid color-mix(in srgb, var(--ink) 10%, transparent)' }}>
                     {(() => {
-                      const disabled = depositMode === 'split' ? !newDepositBank : (!manualBucketKey || !manualBankKey);
-                      const label = depositMode === 'split'
-                        ? (!newDepositBank ? 'Select a Bank First' : 'Confirm Deposit')
-                        : (!manualBucketKey ? 'Select a Bucket First' : !manualBankKey ? 'Select a Bank First' : 'Confirm Deposit');
+                      const disabled = depositMode === 'split' ? !newDepositBank : !manualBankKey;
+                      const label = !disabled ? 'Confirm Deposit' : 'Select a Bank First';
                       return (
                         <button type="submit" disabled={disabled}
                           className="w-full font-sans-main font-black uppercase tracking-wide transition-colors"

@@ -159,6 +159,9 @@
     transition: background-color 5000s ease-in-out 0s;
   }
 
+  /* === HIDE SCROLLBAR UTILITY === */
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
   /* === CUSTOM SCROLLBAR (branded) === */
   ::-webkit-scrollbar {
     width: 4px;
