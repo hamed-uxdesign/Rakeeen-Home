@@ -49,6 +49,7 @@ export interface Subscription {
   renewalDay: number;
   reminderTime: string; // "HH:MM" e.g. "09:00"
   bank: string;
+  intervalMonths: number; // 1=monthly, 2=every 2m, 3=every 3m, 12=yearly
 }
 
 export interface FinanceLog {

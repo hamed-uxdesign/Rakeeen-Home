@@ -263,6 +263,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [editingSubDay, setEditingSubDay] = useState('');
   const [editingSubTime, setEditingSubTime] = useState('09:00');
   const [editingSubBank, setEditingSubBank] = useState<keyof FinanceBanks>('cib');
+  const [editingSubInterval, setEditingSubInterval] = useState(1);
 
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [editingDebtName, setEditingDebtName] = useState('');
@@ -288,6 +289,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [newSubDay, setNewSubDay] = useState('');
   const [newSubTime, setNewSubTime] = useState('09:00');
   const [newSubBank, setNewSubBank] = useState<keyof FinanceBanks>('cib');
+  const [newSubInterval, setNewSubInterval] = useState(1);
 
   const [newDebtName, setNewDebtName] = useState('');
   const [newDebtAmount, setNewDebtAmount] = useState('');
@@ -429,11 +431,12 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
     setEditingSubTime(sub.reminderTime || '09:00');
     const bankKey = (Object.keys(BANK_LABELS) as Array<keyof FinanceBanks>).find(k => BANK_LABELS[k] === sub.bank) || 'cib';
     setEditingSubBank(bankKey);
+    setEditingSubInterval(sub.intervalMonths ?? 1);
   };
   const handleSaveSub = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSub) return;
-    const updated: Subscription = { ...editingSub, name: editingSubName.trim(), cost: parseFloat(editingSubCost), renewalDay: parseInt(editingSubDay), reminderTime: editingSubTime, bank: BANK_LABELS[editingSubBank] };
+    const updated: Subscription = { ...editingSub, name: editingSubName.trim(), cost: parseFloat(editingSubCost), renewalDay: parseInt(editingSubDay), reminderTime: editingSubTime, bank: BANK_LABELS[editingSubBank], intervalMonths: editingSubInterval };
     await setSubscriptions((subscriptions || []).map(s => s.id === editingSub.id ? updated : s));
     setEditingSub(null);
   };
@@ -463,13 +466,15 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       cost: parseFloat(newSubCost),
       renewalDay: parseInt(newSubDay),
       reminderTime: newSubTime || '09:00',
-      bank: BANK_LABELS[newSubBank]
+      bank: BANK_LABELS[newSubBank],
+      intervalMonths: newSubInterval,
     };
     await setSubscriptions([...(subscriptions || []), sub]);
     setNewSubName('');
     setNewSubCost('');
     setNewSubDay('');
     setNewSubTime('09:00');
+    setNewSubInterval(1);
     setShowAddSubModal(false);
   };
 
@@ -1092,9 +1097,9 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
             {subscriptions && subscriptions.length > 0 && (
               <div className="brutalist-card no-lift p-5 flex items-baseline justify-between">
                 <div>
-                  <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Monthly Total</p>
+                  <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Monthly Equivalent</p>
                   <p className="font-mono-main text-2xl font-black text-rust">
-                    -<MaskedValue disabled={!privacyMode}>{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost, 0))}</MaskedValue>
+                    -<MaskedValue disabled={!privacyMode}>{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost / (sub.intervalMonths ?? 1), 0))}</MaskedValue>
                   </p>
                 </div>
                 <p className="font-mono-main text-xs text-ink/30">{subscriptions.length} subscriptions</p>
@@ -1130,7 +1135,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
                       <div>
                         <p className="font-sans-main font-black text-ink" style={{ fontSize: 16 }}>{sub.name}</p>
-                        <p className="font-mono-main text-ink/35 mt-1" style={{ fontSize: 11 }}>{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''}</p>
+                        <p className="font-mono-main text-ink/35 mt-1" style={{ fontSize: 11 }}>{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''} · {(() => { const i = sub.intervalMonths ?? 1; return i === 1 ? 'Monthly' : i === 12 ? 'Yearly' : `Every ${i}m`; })()}</p>
                         <p className="font-mono-main font-bold mt-1" style={{ fontSize: 11, color: soon ? 'var(--rust)' : 'var(--ink)', opacity: soon ? 1 : 0.35 }}>
                           {daysLeft === 0 ? 'Today' : `in ${daysLeft}d`}
                         </p>
@@ -1413,6 +1418,18 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                         onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')}
                         onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')}
                       />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Billing Cycle</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {([1, 2, 3, 12] as const).map(iv => (
+                        <button key={iv} type="button" onClick={() => setNewSubInterval(iv)}
+                          className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors"
+                          style={{ fontSize: 11, padding: '11px 0', border: newSubInterval === iv ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: newSubInterval === iv ? 'var(--ink)' : 'transparent', color: newSubInterval === iv ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                        >{iv === 1 ? 'Monthly' : iv === 12 ? 'Yearly' : `${iv}m`}</button>
+                      ))}
                     </div>
                   </div>
 
@@ -1783,6 +1800,17 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     <div>
                       <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Time</label>
                       <input type="time" value={editingSubTime} onChange={e => setEditingSubTime(e.target.value)} required className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 14px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Billing Cycle</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {([1, 2, 3, 12] as const).map(iv => (
+                        <button key={iv} type="button" onClick={() => setEditingSubInterval(iv)}
+                          className="cursor-pointer font-sans-main font-bold uppercase tracking-wide transition-colors"
+                          style={{ fontSize: 11, padding: '11px 0', border: editingSubInterval === iv ? '1px solid color-mix(in srgb, var(--ink) 60%, transparent)' : '1px solid color-mix(in srgb, var(--ink) 12%, transparent)', background: editingSubInterval === iv ? 'var(--ink)' : 'transparent', color: editingSubInterval === iv ? 'var(--paper)' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
+                        >{iv === 1 ? 'Monthly' : iv === 12 ? 'Yearly' : `${iv}m`}</button>
+                      ))}
                     </div>
                   </div>
                   <div>
