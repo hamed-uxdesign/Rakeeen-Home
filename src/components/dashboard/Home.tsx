@@ -628,13 +628,14 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   // Fade intensity when moon is near/below horizon
   const horizonFade = moonPos.altitude < 5 ? Math.max(0, moonPos.altitude / 5) : 1;
   const moonIntensity = moonData.illumination * nightDarkness * horizonFade;
-  const isNight = now.getHours() >= 20 || now.getHours() < 6;
-  const [moonGlowVisible, setMoonGlowVisible] = useState(() => _moonGlowPersisted && isNight);
+  // Glow visible when moon is physically above the horizon (real coordinates)
+  const moonAboveHorizon = moonPos.altitude > 0;
+  const [moonGlowVisible, setMoonGlowVisible] = useState(() => _moonGlowPersisted && moonAboveHorizon);
   const [moonTransition, setMoonTransition] = useState(() =>
-    _moonGlowPersisted && isNight ? 'none' : 'opacity 8s ease-in'
+    _moonGlowPersisted && moonAboveHorizon ? 'none' : 'opacity 8s ease-in'
   );
   useEffect(() => {
-    if (isNight) {
+    if (moonAboveHorizon) {
       if (_moonGlowPersisted) {
         setMoonTransition('none');
         setMoonGlowVisible(true);
@@ -650,7 +651,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
       setMoonGlowVisible(false);
       _moonGlowPersisted = false;
     }
-  }, [isNight]);
+  }, [moonAboveHorizon]);
 
   const [greetingName, setGreetingName] = useState(() => _persistedGreetingName);
 
@@ -837,9 +838,9 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   // Quick action function to increment water glasses
   // Vector emotional states
   const waterFillLevel = Math.min(1, (glasses || 0) / 14);
-  const focusPaused = focusMinutes === 0 && !pomodoroRunning;
+  const focusPaused = false;
   const fitnessPaused = workoutMinsToday > 0;
-  const prayerPaused = cardPrayer.info === 'ACTIVE NOW';
+  const prayerPaused = false;
 
   const addWaterCup = (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering card navigation

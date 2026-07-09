@@ -322,18 +322,22 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   }, [showAddDepositModal, showWithdrawModal]);
 
   // Fetch Gold Prices directly from goldapi.io with localStorage rate limiting (max 3x/day = ~90/month)
+  // Load cached gold prices on mount (so Vault tab shows gold value without visiting gold tab)
+  useEffect(() => {
+    const LS_KEY = 'gold_prices_cache';
+    try {
+      const cached = JSON.parse(localStorage.getItem(LS_KEY) || '');
+      if (cached?.price24) setGoldPrices({ price24: cached.price24, price21: cached.price21 });
+    } catch {}
+  }, []);
+
+  // Refresh gold prices from API only when on gold tab
   useEffect(() => {
     if (activeTab !== 'gold') return;
 
     const API_KEY = import.meta.env.VITE_GOLD_API_KEY || '';
     const LS_KEY = 'gold_prices_cache';
     const EIGHT_HOURS = 8 * 60 * 60 * 1000;
-
-    // Load cached prices immediately (even if stale — will be updated below if needed)
-    try {
-      const cached = JSON.parse(localStorage.getItem(LS_KEY) || '');
-      if (cached?.price24) setGoldPrices({ price24: cached.price24, price21: cached.price21 });
-    } catch {}
 
     // Only hit the API if cache is older than 8 hours
     try {
@@ -656,7 +660,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   style={{ zIndex: 0 }}
                 />
               )}
-              <span className="relative z-10">{tab === 'buckets' ? 'pockets' : tab}</span>
+              <span className="relative z-10">{tab === 'buckets' ? 'safe' : tab}</span>
             </button>
           ))}
         </div>
@@ -1106,17 +1110,42 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
         {activeTab === 'subscriptions' && (
           <div className="space-y-6">
             {/* Summary bar */}
-            {subscriptions && subscriptions.length > 0 && (
-              <div className="brutalist-card no-lift p-5 flex items-baseline justify-between">
-                <div>
-                  <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Total Subscriptions</p>
-                  <p className="font-mono-main text-2xl font-black text-rust">
-                    -<MaskedValue disabled={!privacyMode}>{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost, 0))}</MaskedValue>
-                  </p>
+            {subscriptions && subscriptions.length > 0 && (() => {
+              const now = new Date();
+              const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              const getNextRenewalForTotal = (sub: Subscription): Date => {
+                const interval = sub.intervalMonths ?? 1;
+                const start = sub.startDate ? new Date(sub.startDate) : todayStart;
+                const startMonthIdx = start.getFullYear() * 12 + start.getMonth();
+                const [rh, rm] = (sub.reminderTime || '09:00').split(':').map(Number);
+                for (let offset = 0; offset <= 24; offset++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() + offset, sub.renewalDay, rh, rm, 0);
+                  const monthsFromStart = (d.getFullYear() * 12 + d.getMonth()) - startMonthIdx;
+                  if (monthsFromStart >= 0 && monthsFromStart % interval === 0 && d >= now) return d;
+                }
+                return new Date(now.getFullYear(), now.getMonth() + (sub.intervalMonths ?? 1), sub.renewalDay);
+              };
+              const todaySubs = subscriptions.filter(sub => {
+                const next = getNextRenewalForTotal(sub);
+                return next.getFullYear() === now.getFullYear() && next.getMonth() === now.getMonth() && next.getDate() === now.getDate();
+              });
+              const showTodayTotal = subFilter === 'day' && todaySubs.length > 0;
+              const displayedTotal = showTodayTotal
+                ? todaySubs.reduce((s, sub) => s + sub.cost, 0)
+                : subscriptions.reduce((s, sub) => s + sub.cost, 0);
+              const totalLabel = showTodayTotal ? "Today's Due" : 'Total Subscriptions';
+              return (
+                <div className="brutalist-card no-lift p-5 flex items-baseline justify-between">
+                  <div>
+                    <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">{totalLabel}</p>
+                    <p className="font-mono-main text-2xl font-black text-rust">
+                      -<MaskedValue disabled={!privacyMode}>{formatEGP(displayedTotal)}</MaskedValue>
+                    </p>
+                  </div>
+                  <p className="font-mono-main text-xs text-ink/30">{showTodayTotal ? `${todaySubs.length} due today` : `${subscriptions.length} subscriptions`}</p>
                 </div>
-                <p className="font-mono-main text-xs text-ink/30">{subscriptions.length} subscriptions</p>
-              </div>
-            )}
+              );
+            })()}
 
             <div className="flex items-center justify-between">
               <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)]">
