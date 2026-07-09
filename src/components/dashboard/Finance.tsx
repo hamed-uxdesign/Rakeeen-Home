@@ -173,8 +173,8 @@ const BANK_VECTORS: Record<keyof FinanceBanks, React.ComponentType> = {
 };
 
 const BUCKET_META: Record<keyof FinanceBuckets, { en: string; pct: string; accent: string }> = {
-  tawarr2:  { en: 'Emergency', pct: '10%', accent: 'var(--rust)' },
-  mustaqbal:{ en: 'Future',    pct: '90%', accent: 'var(--forest)' },
+  tawarr2:  { en: 'Urgent',   pct: '10%', accent: 'var(--rust)' },
+  mustaqbal:{ en: 'Deferred', pct: '90%', accent: 'var(--forest)' },
   basmala:  { en: 'Basmala',   pct: '—',   accent: 'var(--ink-faded)' },
   sadaqa:   { en: 'Sadaqa',    pct: '—',   accent: '#B89228' },
 };
@@ -238,6 +238,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts' | 'logs'>('overview');
   const [logFilter, setLogFilter] = useState<'day' | 'month' | 'year'>('day');
+  const [subFilter, setSubFilter] = useState<'day' | 'month' | 'year'>('month');
   const [classifyState, setClassifyState] = useState<ClassifyState | null>(null);
   const [privacyMode, setPrivacyMode] = useState(true);
 
@@ -468,6 +469,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       reminderTime: newSubTime || '09:00',
       bank: BANK_LABELS[newSubBank],
       intervalMonths: newSubInterval,
+      startDate: new Date().toISOString().slice(0, 10),
     };
     await setSubscriptions([...(subscriptions || []), sub]);
     setNewSubName('');
@@ -563,10 +565,10 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       if (withdrawBucketKey === 'tawarr2') {
         const debt: Debt = {
           id: crypto.randomUUID(),
-          personName: 'Emergency',
+          personName: 'Urgent',
           amount,
           type: 'owed_by_me',
-          notes: `Borrowed from Emergency bucket on ${new Date().toLocaleDateString('en-GB')}`,
+          notes: `Borrowed from Urgent bucket on ${new Date().toLocaleDateString('en-GB')}`,
         };
         await setDebts(prev => [...(prev || []), debt]);
       }
@@ -654,7 +656,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   style={{ zIndex: 0 }}
                 />
               )}
-              <span className="relative z-10">{tab}</span>
+              <span className="relative z-10">{tab === 'buckets' ? 'pockets' : tab}</span>
             </button>
           ))}
         </div>
@@ -884,11 +886,11 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
             <p className="font-mono-main text-[11px] font-bold tracking-[0.25em] uppercase text-ink/40 mb-4">VIRTUAL BUCKETS</p>
             
             <div className="flex flex-col gap-6">
-              {/* 1. MUSTAQBAL (Future) - FULL WIDTH */}
+              {/* 1. MUSTAQBAL (Vault) - FULL WIDTH */}
               {(() => {
                 const key = 'mustaqbal';
                 const meta = BUCKET_META[key];
-                const value = buckets[key] || 0;
+                const value = (buckets[key] || 0) + totalGoldValuation;
                 const percentOfTotal = totalVirtual > 0 ? (value / totalVirtual) * 100 : 0;
                 const activeDots = Math.max(0, Math.min(10, Math.round(percentOfTotal / 10)));
                 return (
@@ -907,6 +909,16 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                         <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink">
                           {formatEGP(value)}
                         </MaskedValue>
+                        {totalGoldValuation > 0 && (
+                          <div className="flex gap-4 mt-2">
+                            <span className="font-mono-main text-[10px] text-ink/35">
+                              Cash <span className="text-ink/55">{formatEGP(buckets['mustaqbal'] || 0)}</span>
+                            </span>
+                            <span className="font-mono-main text-[10px] text-ink/35">
+                              Gold <span style={{ color: '#B89228' }}>{formatEGP(totalGoldValuation)}</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* 10-Dot Matrix Loader */}
@@ -1097,17 +1109,29 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
             {subscriptions && subscriptions.length > 0 && (
               <div className="brutalist-card no-lift p-5 flex items-baseline justify-between">
                 <div>
-                  <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Monthly Equivalent</p>
+                  <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30 mb-1">Total Subscriptions</p>
                   <p className="font-mono-main text-2xl font-black text-rust">
-                    -<MaskedValue disabled={!privacyMode}>{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost / (sub.intervalMonths ?? 1), 0))}</MaskedValue>
+                    -<MaskedValue disabled={!privacyMode}>{formatEGP(subscriptions.reduce((s, sub) => s + sub.cost, 0))}</MaskedValue>
                   </p>
                 </div>
                 <p className="font-mono-main text-xs text-ink/30">{subscriptions.length} subscriptions</p>
               </div>
             )}
 
-            <div className="flex justify-between items-center">
-              <p className="font-mono-main text-[9px] uppercase tracking-[0.25em] text-ink/30">Subscriptions</p>
+            <div className="flex items-center justify-between">
+              <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)]">
+                {(['day', 'month', 'year'] as const).map(f => (
+                  <button key={f} onClick={() => setSubFilter(f)}
+                    className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-4 py-2 cursor-pointer transition-colors duration-200"
+                    style={{ color: subFilter === f ? 'var(--paper)' : 'var(--ink)' }}>
+                    {subFilter === f && (
+                      <motion.div layoutId="subFilterBg" className="absolute inset-0 bg-[var(--ink)]"
+                        transition={{ type: 'spring', stiffness: 450, damping: 36 }} style={{ zIndex: 0 }} />
+                    )}
+                    <span className="relative z-10">{f}</span>
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={() => setShowAddSubModal(true)}
                 className="btn-brutalist flex items-center gap-2 font-mono-main text-xs uppercase py-2 px-4 cursor-pointer"
@@ -1120,35 +1144,78 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
               <div className="border border-dashed border-ink/15 py-12 text-center">
                 <p className="font-mono-main text-xs text-ink/25">No subscriptions added yet.</p>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {subscriptions.map(sub => {
-                  const today = new Date().getDate();
-                  const daysLeft = sub.renewalDay >= today ? sub.renewalDay - today : 30 - today + sub.renewalDay;
-                  const soon = daysLeft <= 5;
-                  return (
-                    <div key={sub.id} className="brutalist-card no-lift flex items-center justify-between group relative bg-paper-dark" style={{ padding: '22px 28px' }}>
-                      <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => openEditSub(sub)} className="text-ink/20 hover:text-ink transition-colors cursor-pointer"><Pencil size={13} /></button>
-                        <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/20 hover:text-rust transition-colors cursor-pointer"><Trash2 size={13} /></button>
-                      </div>
+            ) : (() => {
+              const now = new Date();
+              const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-                      <div>
-                        <p className="font-sans-main font-black text-ink" style={{ fontSize: 16 }}>{sub.name}</p>
-                        <p className="font-mono-main text-ink/35 mt-1" style={{ fontSize: 11 }}>{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''} · {(() => { const i = sub.intervalMonths ?? 1; return i === 1 ? 'Monthly' : i === 12 ? 'Yearly' : `Every ${i}m`; })()}</p>
-                        <p className="font-mono-main font-bold mt-1" style={{ fontSize: 11, color: soon ? 'var(--rust)' : 'var(--ink)', opacity: soon ? 1 : 0.35 }}>
-                          {daysLeft === 0 ? 'Today' : `in ${daysLeft}d`}
-                        </p>
-                      </div>
+              const getNextRenewal = (sub: Subscription): Date => {
+                const interval = sub.intervalMonths ?? 1;
+                const start = sub.startDate ? new Date(sub.startDate) : todayStart;
+                const startMonthIdx = start.getFullYear() * 12 + start.getMonth();
+                const [rh, rm] = (sub.reminderTime || '09:00').split(':').map(Number);
+                for (let offset = 0; offset <= 24; offset++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() + offset, sub.renewalDay, rh, rm, 0);
+                  const monthIdx = d.getFullYear() * 12 + d.getMonth();
+                  const monthsFromStart = monthIdx - startMonthIdx;
+                  if (monthsFromStart >= 0 && monthsFromStart % interval === 0 && d >= now) {
+                    return d;
+                  }
+                }
+                return new Date(now.getFullYear(), now.getMonth() + (sub.intervalMonths ?? 1), sub.renewalDay);
+              };
 
-                      <div className="text-right pr-8">
-                        <p className="font-mono-main font-black text-rust" style={{ fontSize: 20 }}>−{formatEGP(sub.cost)}</p>
+              const withNext = (subscriptions as Subscription[]).map(sub => ({ sub, next: getNextRenewal(sub) }));
+
+              const filtered = withNext.filter(({ next }) => {
+                if (subFilter === 'day') return next.getFullYear() === now.getFullYear() && next.getMonth() === now.getMonth() && next.getDate() === now.getDate();
+                if (subFilter === 'month') return next.getFullYear() === now.getFullYear() && next.getMonth() === now.getMonth();
+                return next.getFullYear() === now.getFullYear();
+              });
+
+              const sorted = [...filtered].sort((a, b) => a.next.getTime() - b.next.getTime());
+
+              return sorted.length === 0 ? (
+                <div className="border border-dashed border-ink/15 py-12 text-center">
+                  <p className="font-mono-main text-xs text-ink/25">No subscriptions due this {subFilter === 'day' ? 'today' : subFilter}.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sorted.map(({ sub, next }) => {
+                    const interval = sub.intervalMonths ?? 1;
+                    const cycleLabel = interval === 1 ? 'Monthly' : interval === 12 ? 'Yearly' : `Every ${interval}m`;
+                    const msLeft = next.getTime() - now.getTime();
+                    const daysLeft = Math.ceil(msLeft / (1000 * 60 * 60 * 24));
+                    const isToday = next.getDate() === now.getDate() && next.getMonth() === now.getMonth() && next.getFullYear() === now.getFullYear();
+                    const soon = daysLeft <= 5;
+                    const countdownLabel = isToday ? 'Today' : daysLeft >= 60 ? `in ${Math.round(daysLeft / 30)}mo` : `in ${daysLeft}d`;
+
+                    return (
+                      <div key={sub.id} className="brutalist-card no-lift flex items-center justify-between group relative bg-paper-dark" style={{ padding: '22px 28px' }}>
+                        <div className="absolute inset-y-0 right-4 flex flex-col items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-all">
+                          <button onClick={() => openEditSub(sub)} className="text-ink/20 hover:text-ink transition-colors cursor-pointer"><Pencil size={13} /></button>
+                          <button onClick={() => handleRemoveSub(sub.id)} className="text-ink/20 hover:text-rust transition-colors cursor-pointer"><Trash2 size={13} /></button>
+                        </div>
+
+                        <div>
+                          <p className="font-sans-main font-black text-ink" style={{ fontSize: 16 }}>{sub.name}</p>
+                          <p className="font-mono-main text-ink/35 mt-1" style={{ fontSize: 11 }}>{sub.bank} · Day {sub.renewalDay}{sub.reminderTime ? ` · ${sub.reminderTime}` : ''} · {cycleLabel}</p>
+                          <p className="font-mono-main font-bold mt-1" style={{ fontSize: 11, color: soon ? 'var(--rust)' : 'var(--ink)', opacity: soon ? 1 : 0.35 }}>
+                            {countdownLabel}
+                          </p>
+                        </div>
+
+                        <div className="text-right pr-8">
+                          <p className="font-mono-main font-black text-rust" style={{ fontSize: 20 }}>−{formatEGP(sub.cost)}</p>
+                          {interval > 1 && (
+                            <p className="font-mono-main text-ink/30 mt-0.5" style={{ fontSize: 10 }}>≈ {formatEGP(Math.round(sub.cost / interval))} /mo</p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1391,7 +1458,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   </div>
 
                   <div>
-                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Monthly Cost — EGP</label>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Cost — EGP</label>
                     <input type="number" step="0.01" placeholder="e.g. 250" value={newSubCost} onChange={e => setNewSubCost(e.target.value)} required
                       className="w-full font-mono-main font-bold outline-none transition-colors"
                       style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }}
@@ -1789,7 +1856,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                     <input type="text" value={editingSubName} onChange={e => setEditingSubName(e.target.value)} required autoFocus className="w-full font-mono-main outline-none transition-colors" style={{ padding: '12px 16px', fontSize: 15, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
                   </div>
                   <div>
-                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Monthly Cost — EGP</label>
+                    <label className="font-sans-main uppercase tracking-widest block mb-3" style={{ fontSize: 10, fontWeight: 600, color: 'color-mix(in srgb, var(--ink) 40%, transparent)' }}>Cost — EGP</label>
                     <input type="number" step="0.01" value={editingSubCost} onChange={e => setEditingSubCost(e.target.value)} required className="w-full font-mono-main font-bold outline-none transition-colors" style={{ padding: '14px 16px', fontSize: 22, background: 'color-mix(in srgb, var(--ink) 4%, transparent)', border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)', color: 'var(--ink)' }} onFocus={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 50%, transparent)')} onBlur={e => (e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--ink) 15%, transparent)')} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">

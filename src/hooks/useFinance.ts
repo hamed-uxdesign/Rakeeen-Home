@@ -50,6 +50,7 @@ export interface Subscription {
   reminderTime: string; // "HH:MM" e.g. "09:00"
   bank: string;
   intervalMonths: number; // 1=monthly, 2=every 2m, 3=every 3m, 12=yearly
+  startDate?: string; // "YYYY-MM-DD" — the date the subscription started, used to calculate next renewal
 }
 
 export interface FinanceLog {
