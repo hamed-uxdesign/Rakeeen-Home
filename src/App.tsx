@@ -83,7 +83,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/water" element={<AnimatedPage><Water navigate={nav} /></AnimatedPage>} />
           <Route path="/calendar" element={<AnimatedPage><Calendar navigate={nav} /></AnimatedPage>} />
           <Route path="/pomodoro" element={<AnimatedPage><Pomodoro navigate={nav} /></AnimatedPage>} />
-          <Route path="/prayer" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
+          <Route path="/devotion" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
           <Route path="/quran" element={<AnimatedPage><QuranReader navigate={nav} /></AnimatedPage>} />
           <Route path="/fitness" element={<AnimatedPage><Fitness navigate={nav} /></AnimatedPage>} />
           <Route path="/finance" element={<AnimatedPage><Finance navigate={nav} /></AnimatedPage>} />

@@ -1,10 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { POMODORO_WEEKLY_MOCK } from '../../constants/mockData';
 
-const ICAL_URL = 'https://calendar.google.com/calendar/ical/9ce9f7279f0afeef711ae5c21eb29f4f087e8cb74aef36a9bbd0d58751e61587%40group.calendar.google.com/private-8496d29b04f57f4c8452f99dd5dbe203/basic.ics';
+const ICAL_URL = 'https://calendar.google.com/calendar/ical/hamed.rakeeen%40gmail.com/private-aa7a61a1272c8a39e1d8c9e1d8ecba50/basic.ics';
 
 export const CalendarResetManager: React.FC = () => {
+  // Guards against double-firing when Firebase hasn't confirmed lastResetDate yet
+  const firedResetMarkerRef = useRef<string>('');
+  const firedPomoMarkerRef  = useRef<string>('');
+
   // Sync states for resetting
   const [glasses, setGlasses, glassesReady] = useFirebaseSync<number>('hydration_glasses', 0);
   const [, setLog, logReady] = useFirebaseSync<any[]>('hydration_log', []);
@@ -70,7 +74,10 @@ export const CalendarResetManager: React.FC = () => {
       const pomoLogicalYesterdayDate = new Date(pomoLogicalToday.getTime() - 24 * 60 * 60 * 1000);
       const resetMarker = pomoLogicalYesterdayDate.toDateString(); // The day we need to reset/save to history
 
-      if (lastPomoResetDate !== resetMarker) {
+      if (lastPomoResetDate !== resetMarker && firedPomoMarkerRef.current !== resetMarker) {
+        firedPomoMarkerRef.current = resetMarker;
+        window.localStorage.setItem('system_last_pomo_reset_date', JSON.stringify(resetMarker));
+        window.localStorage.setItem('system_last_pomo_reset_date_updatedAt', new Date().toISOString());
         console.log(`[CalendarResetManager] Triggering Pomodoro reset for logical day: ${resetMarker}`);
         
         // Save to history
@@ -101,14 +108,48 @@ export const CalendarResetManager: React.FC = () => {
       }
     };
 
-    const checkCalendar = async () => {
+    // Fixed schedule: sleep at 21:00 → reset trigger is 3h earlier, at 18:00.
+    // Computed purely from the wall clock — no network fetch in the critical path,
+    // so a page refresh can never race an in-flight calendar request.
+    const SLEEP_HOUR = 21;
+    const RESET_HOUR = SLEEP_HOUR - 3; // 18:00
+
+    const checkReset = () => {
+      const now = new Date();
+      // "Today's logical day" ends at RESET_HOUR. Before that time we're still
+      // finishing yesterday's logical day; at/after it we've crossed into today's.
+      const resetDateBase = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (now.getHours() < RESET_HOUR) {
+        resetDateBase.setDate(resetDateBase.getDate() - 1);
+      }
+      const resetMarker = resetDateBase.toDateString();
+
+      if (lastResetDate !== resetMarker && firedResetMarkerRef.current !== resetMarker) {
+        firedResetMarkerRef.current = resetMarker;
+        // Write value + updatedAt synchronously (mirrors useFirebaseSync's setValue) so a
+        // refresh mid-reset sees the marker AND the Firestore listener won't clobber it
+        // back with the stale server value once it connects.
+        const nowIso = new Date().toISOString();
+        window.localStorage.setItem('system_last_reset_date', JSON.stringify(resetMarker));
+        window.localStorage.setItem('system_last_reset_date_updatedAt', nowIso);
+        console.log(`[CalendarResetManager] Triggering reset for logical day: ${resetMarker}`);
+        const sleepMoment = new Date(resetDateBase);
+        sleepMoment.setHours(SLEEP_HOUR, 0, 0, 0);
+        performReset(sleepMoment);
+        setLastResetDate(resetMarker);
+      }
+    };
+
+    // Best-effort calendar fetch — purely informational (used only to cache the next
+    // sleep time), never gates the reset decision above.
+    const fetchNextSleepTime = async () => {
       try {
         const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(ICAL_URL)}`);
         if (!res.ok) throw new Error('Failed to fetch calendar');
         const text = await res.text();
         const unfoldedText = text.replace(/\r?\n[ \t]/g, '');
         const lines = unfoldedText.split(/\r?\n/);
-        
+
         let curr: any = { rrule: '' };
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -168,68 +209,21 @@ export const CalendarResetManager: React.FC = () => {
           else if (line.startsWith('RRULE:')) curr.rrule = line;
         }
 
-        // If no sleep events are found in the calendar, default to 5:00 AM to 11:00 AM sleep time (reset at 2:00 AM)
-        if (parsedEvents.length === 0) {
-          const fallbackSleepToday = new Date(today);
-          fallbackSleepToday.setHours(5, 0, 0, 0); // 5:00 AM today
-
-          const fallbackSleepYesterday = new Date(today);
-          fallbackSleepYesterday.setDate(fallbackSleepYesterday.getDate() - 1);
-          fallbackSleepYesterday.setHours(5, 0, 0, 0); // 5:00 AM yesterday
-
-          const fallbackSleepTomorrow = new Date(today);
-          fallbackSleepTomorrow.setDate(fallbackSleepTomorrow.getDate() + 1);
-          fallbackSleepTomorrow.setHours(5, 0, 0, 0); // 5:00 AM tomorrow
-
-          parsedEvents.push({ start: fallbackSleepYesterday, summary: 'Fallback Sleep' });
-          parsedEvents.push({ start: fallbackSleepToday, summary: 'Fallback Sleep' });
-          parsedEvents.push({ start: fallbackSleepTomorrow, summary: 'Fallback Sleep' });
-        }
-
-        // Sort events by start time
         parsedEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-        // Find and cache the next upcoming sleep event
-        const upcomingEvent = parsedEvents.find(e => {
-          const resetTime = new Date(e.start.getTime() - 3 * 60 * 60 * 1000);
-          return resetTime > now;
-        });
+        const upcomingEvent = parsedEvents.find(e => e.start > now);
         if (upcomingEvent) {
           localStorage.setItem('system_next_sleep_time', upcomingEvent.start.toISOString());
         }
-
-        // Find the most relevant sleep event that HAS ALREADY PASSED its reset time
-        let targetEvent = null;
-        for (let i = parsedEvents.length - 1; i >= 0; i--) {
-          const resetTime = new Date(parsedEvents[i].start.getTime() - 3 * 60 * 60 * 1000);
-          if (now >= resetTime) {
-            targetEvent = parsedEvents[i];
-            break;
-          }
-        }
-
-        if (targetEvent) {
-          const resetTime = new Date(targetEvent.start.getTime() - 3 * 60 * 60 * 1000);
-          // Use the date of the reset time itself as the unique marker
-          const resetMarker = resetTime.toDateString(); 
-
-          if (lastResetDate !== resetMarker) {
-            console.log(`[CalendarResetManager] Triggering reset for sleep at ${targetEvent.start.toLocaleString()} (Reset was due at ${resetTime.toLocaleString()})`);
-            await performReset(targetEvent.start);
-            setLastResetDate(resetMarker);
-          }
-        } else {
-          console.log(`[CalendarResetManager] Waiting for upcoming sleep event reset time...`);
-        }
-
       } catch (e) {
-        console.error('CalendarResetManager error:', e);
+        console.error('CalendarResetManager fetch error:', e);
       }
     };
 
     const runChecks = () => {
-      checkCalendar();
+      checkReset();
       checkPomoReset();
+      fetchNextSleepTime();
     };
 
     const interval = setInterval(runChecks, 2 * 60 * 1000); // Check every 2 minutes

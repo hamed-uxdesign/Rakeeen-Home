@@ -35,11 +35,11 @@ async function sendWebhookMessage(content) {
   }
 }
 
-// Mocking Calendar Data (This will be replaced by your actual database/calendar integration later)
-// Assume we fetch this daily to know when to stop and start
+// Fixed schedule: sleep 9:00 PM, wake 4:00 AM
+// DND = 3h before sleep (18:00) → 2h after wake (06:00)
 const MOCK_CALENDAR_TODAY = {
-  wakeUpTime: '11:00', // 24-hour format
-  sleepTime: '05:00'   // 5:00 AM
+  wakeUpTime: '04:00',
+  sleepTime:  '21:00'
 };
 
 /**

@@ -13,15 +13,15 @@ import { DotMatrixText } from '../ui/DotMatrixText';
 import { DMTimer, WavyProgressBar } from '../ui/TimerComponents';
 import { useFinance } from '../../hooks/useFinance';
 
-// Egypt summer: civil twilight ends ~8pm, astronomical dark ~9:30pm, pre-dawn ~3:30am
+// Egypt: astronomical dark ~21:30 (Isha), pre-dawn (Fajr) ~3:30–5am depending on season
 // Uses continuous time (h + m/60) for smooth per-minute gradation
 function getNightDarkness(h: number, m: number): number {
   const t = h + m / 60;
-  if (t >= 22 || t < 3)  return 1.0;
-  if (t >= 20 && t < 22) return 0.25 + 0.75 * ((t - 20) / 2);
-  if (t >= 19 && t < 20) return 0.1  + 0.15 * (t - 19);
-  if (t >= 3  && t < 5)  return 1.0  - 0.85 * ((t - 3) / 2);
-  if (t >= 5  && t < 6)  return 0.15 - 0.15 * (t - 5);
+  if (t >= 21 || t < 3.5)  return 1.0;
+  if (t >= 19.5 && t < 21) return 0.25 + 0.75 * ((t - 19.5) / 1.5);
+  if (t >= 18.5 && t < 19.5) return 0.1 + 0.15 * (t - 18.5);
+  if (t >= 3.5 && t < 5)   return 1.0  - 0.85 * ((t - 3.5) / 1.5);
+  if (t >= 5   && t < 6)   return 0.15 - 0.15 * (t - 5);
   return 0;
 }
 
@@ -97,7 +97,7 @@ interface HomeProps {
 // Persists across Home remounts — glow only animates in ONCE per night
 let _moonGlowPersisted = false;
 // Persists last active card so remount starts on the correct card instantly
-let _lastActiveCardId: 'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | 'finance' = 'water';
+let _lastActiveCardId: 'water' | 'pomodoro' | 'fitness' | 'devotion' | 'calendar' | 'finance' = 'water';
 // Persists greeting name so it doesn't change on every remount
 const _NAMES = ['Hamed', 'Ghorab', 'Bommy', 'Shahyn', 'Rakeeen'];
 let _persistedGreetingName = _NAMES[Math.floor(Math.random() * _NAMES.length)];
@@ -374,13 +374,13 @@ const MonthFingerprint: React.FC<{
 };
 
 export const Home: React.FC<HomeProps> = ({ navigate }) => {
-  const [activeCardId, setActiveCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | 'finance'>(() => _lastActiveCardId);
-  const [displayedCardId, setDisplayedCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | 'finance'>(() => _lastActiveCardId);
+  const [activeCardId, setActiveCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'devotion' | 'calendar' | 'finance'>(() => _lastActiveCardId);
+  const [displayedCardId, setDisplayedCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'devotion' | 'calendar' | 'finance'>(() => _lastActiveCardId);
   const [bigCardVisible, setBigCardVisible] = useState(false);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [lastManualClickTime, setLastManualClickTime] = useState<number>(0);
   // systemCardId tracks which card has system priority — independent of what user is viewing
-  const [systemCardId, setSystemCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'prayer' | 'calendar' | 'finance' | null>(null);
+  const [systemCardId, setSystemCardId] = useState<'water' | 'pomodoro' | 'fitness' | 'devotion' | 'calendar' | 'finance' | null>(null);
   const [avatarUrl, setAvatarUrl] = useFirebaseSync<string | null>('avatar_url', null);
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
   const [workouts] = useFirebaseSync<any[]>('fitness_workouts', []);
@@ -578,8 +578,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Show yesterday's journal entry automatically from 2:00 AM to 2:30 AM
-  const isJournalTime = now.getHours() === 2 && now.getMinutes() < 30;
+  // Show today's journal summary before Isha/sleep (20:00–21:30)
+  const isJournalTime = now.getHours() >= 20 && now.getHours() < 22;
   // Build yesterday's key from local date components to avoid UTC offset issues
   const journalYesterdayKey = (() => {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
@@ -655,18 +655,17 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
   const [greetingName, setGreetingName] = useState(() => _persistedGreetingName);
 
-  // Schedule: works until 4am, sleeps 5am–11am, golden hour Egypt summer ~7–8pm
+  // Schedule: Fajr wake (~4:30am), workout 9am (daily except Fri/Sat), Isha sleep (~21:30)
   const getGreeting = (h: number): { before: string; name: string; after: string } => {
     const n = greetingName.toUpperCase();
     // Data-aware: check most notable condition first
-    const waterLow = typeof glasses === 'number' && glasses < 3 && h >= 14 && h < 22;
+    const waterLow = typeof glasses === 'number' && glasses < 3 && h >= 10 && h < 21;
     const noFocus = focusMinutes === 0 && !pomodoroRunning && h >= 13 && h < 19;
-    const isWorkoutDay = [0, 3].includes(now.getDay()); // Sunday=0, Wednesday=3
-    const noWorkout = isWorkoutDay && workoutMinsToday === 0 && h >= 18 && h < 23;
-    const hasPending = false; // removed from greeting — too unstable with API retries
+    const isWorkoutDay = ![5, 6].includes(now.getDay()); // every day except Fri(5) and Sat(6)
+    const noWorkout = isWorkoutDay && workoutMinsToday === 0 && h >= 9 && h < 14;
+    const hasPending = false;
 
     let before = '';
-    // Pattern-aware phrases take priority over today-only conditions
     if (weekPattern === 'momentum')     before = 'THREE DAYS LOCKED IN ... KEEP THE RIVER MOVING ';
     else if (weekPattern === 'slump')   before = 'THE RIVER HAS BEEN LOW ALL WEEK ... ';
     else if (weekPattern === 'rising')  before = 'SOMETHING IS SHIFTING ... DON\'T STOP NOW ';
@@ -675,15 +674,16 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     else if (noFocus)        before = 'HAWK HASN\'T MOVED YET ... ';
     else if (hasPending)     before = 'SOMETHING IS WAITING ... ';
     else if (noWorkout)      before = 'LION DIDN\'T HUNT TODAY ... ';
-    else if (h >= 0 && h < 4)        before = 'OWLS ARE OUT ... AND SO ARE YOU ';
-    else if (h >= 4 && h < 5)        before = 'BIRDS ALMOST READY ... ARE YOU ';
-    else if (h >= 5 && h < 11)       before = 'TREES ARE WORKING ... REST UP ';
-    else if (h >= 11 && h < 13)      before = 'BEES BEEN OUT FOR HOURS ... YOUR TURN ';
-    else if (h >= 13 && h < 17)      before = 'PUSH WHILE THE SUN\'S STILL UP ... ';
-    else if (h >= 17 && h < 19)      before = 'BIRDS HEADING HOME ... WRAP IT UP ';
-    else if (h >= 19 && h < 20)      before = 'GOLDEN HOUR ... CATCH THE LIGHT ';
-    else if (h >= 20 && h < 22)      before = 'FROGS ARE LOUD ... SLOW DOWN ';
-    else                              before = 'NIGHT SETTLING IN ... OWL MODE ';
+    else if (h >= 0  && h < 4)  before = 'DEEP NIGHT ... REST WELL ';
+    else if (h >= 4  && h < 5)  before = 'FAJR HOUR ... THE BEST START ';
+    else if (h >= 5  && h < 9)  before = 'MORNING LOCKED IN ... BUILD IT ';
+    else if (h >= 9  && h < 11) before = 'THE LION IS HUNTING ... KEEP MOVING ';
+    else if (h >= 11 && h < 13) before = 'BEES BEEN OUT FOR HOURS ... YOUR TURN ';
+    else if (h >= 13 && h < 17) before = 'PUSH WHILE THE SUN\'S STILL UP ... ';
+    else if (h >= 17 && h < 19) before = 'BIRDS HEADING HOME ... WRAP IT UP ';
+    else if (h >= 19 && h < 20) before = 'GOLDEN HOUR ... CATCH THE LIGHT ';
+    else if (h >= 20 && h < 21) before = 'ISHA IS NEAR ... WIND DOWN ';
+    else                        before = 'NIGHT SETTLED ... REST WELL ';
     return { before, name: n, after: '' };
   };
 
@@ -795,11 +795,11 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     const isPrayerActiveOrClose = cardPrayer.info === 'ACTIVE NOW' || getNextPrayerCloseness();
 
     // Determine which card has real system priority (not just default)
-    let priorityCardId: 'pomodoro' | 'prayer' | null = null;
+    let priorityCardId: 'pomodoro' | 'devotion' | null = null;
     if (pomodoroRunning || pomodoroOvertime) {
       priorityCardId = 'pomodoro';
     } else if (isPrayerActiveOrClose) {
-      priorityCardId = 'prayer';
+      priorityCardId = 'devotion';
     }
 
     // systemCardId tracks the priority card — always updated, user interaction doesn't clear it
@@ -980,10 +980,10 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               subText: now.toLocaleDateString('en-US', { weekday: 'long' }),
             },
             {
-              id: 'prayer',
+              id: 'devotion',
               title: 'Devotion',
               Vector: PrayerVector,
-              route: 'prayer',
+              route: 'devotion',
               isRunning: cardPrayer.info === 'ACTIVE NOW',
               metric: cardPrayer.name,
               subText: cardPrayer.info,
@@ -1058,7 +1058,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                         {...(card.id === 'water' ? { fillLevel: waterFillLevel } : {})}
                         {...(card.id === 'pomodoro' ? { paused: focusPaused } : {})}
                         {...(card.id === 'fitness' ? { paused: fitnessPaused } : {})}
-                        {...(card.id === 'prayer' ? { paused: prayerPaused } : {})}
+                        {...(card.id === 'devotion' ? { paused: prayerPaused } : {})}
                       />
                     </div>
                   )}
@@ -1088,7 +1088,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 { id: 'pomodoro', route: 'pomodoro' },
                 { id: 'water', route: 'water' },
                 { id: 'fitness', route: 'fitness' },
-                { id: 'prayer', route: 'prayer' },
+                { id: 'devotion', route: 'devotion' },
                 { id: 'calendar', route: 'calendar' },
                 { id: 'finance', route: 'finance' },
               ].find(c => c.id === activeCardId);
@@ -1224,7 +1224,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                 </div>
               )}
 
-              {displayedCardId === 'prayer' && (
+              {displayedCardId === 'devotion' && (
                 <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>

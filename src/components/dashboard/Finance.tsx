@@ -238,7 +238,28 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'buckets' | 'gold' | 'subscriptions' | 'debts' | 'logs'>('overview');
   const [logFilter, setLogFilter] = useState<'day' | 'month' | 'year'>('day');
-  const [subFilter, setSubFilter] = useState<'day' | 'month' | 'year'>('month');
+  // Default to "day" only if something is actually due today — otherwise "month" is more useful
+  const [subFilter, setSubFilter] = useState<'day' | 'month' | 'year'>(() => {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const getNextRenewalForDefault = (sub: Subscription): Date => {
+      const interval = sub.intervalMonths ?? 1;
+      const start = sub.startDate ? new Date(sub.startDate) : todayStart;
+      const startMonthIdx = start.getFullYear() * 12 + start.getMonth();
+      const [rh, rm] = (sub.reminderTime || '09:00').split(':').map(Number);
+      for (let offset = 0; offset <= 24; offset++) {
+        const d = new Date(now.getFullYear(), now.getMonth() + offset, sub.renewalDay, rh, rm, 0);
+        const monthsFromStart = (d.getFullYear() * 12 + d.getMonth()) - startMonthIdx;
+        if (monthsFromStart >= 0 && monthsFromStart % interval === 0 && d >= now) return d;
+      }
+      return new Date(now.getFullYear(), now.getMonth() + interval, sub.renewalDay);
+    };
+    const hasDueToday = (subscriptions || []).some(sub => {
+      const next = getNextRenewalForDefault(sub);
+      return next.getFullYear() === now.getFullYear() && next.getMonth() === now.getMonth() && next.getDate() === now.getDate();
+    });
+    return hasDueToday ? 'day' : 'month';
+  });
   const [classifyState, setClassifyState] = useState<ClassifyState | null>(null);
   const [privacyMode, setPrivacyMode] = useState(true);
 

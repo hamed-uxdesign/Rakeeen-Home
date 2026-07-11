@@ -192,9 +192,9 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
         className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-5 py-3 border-b transition-all duration-300"
         style={{ ...barStyle, overflow: 'visible', opacity: headerVisible ? 1 : 0, pointerEvents: headerVisible ? 'auto' : 'none', transform: headerVisible ? 'translateY(0)' : 'translateY(-8px)' }}
       >
-        <button onClick={() => { stopAudio(); navigate('prayer'); }} className="flex items-center gap-2 text-ink/40 hover:text-ink transition-colors group">
+        <button onClick={() => { stopAudio(); navigate('devotion'); }} className="flex items-center gap-2 text-ink/40 hover:text-ink transition-colors group">
           <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-          <span className="font-mono-main text-[10px] uppercase tracking-[0.25em] font-bold">Prayer</span>
+          <span className="font-mono-main text-[10px] uppercase tracking-[0.25em] font-bold">Devotion</span>
         </button>
 
         <span />

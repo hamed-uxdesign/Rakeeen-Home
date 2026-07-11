@@ -13,29 +13,9 @@ export function addMinutes(timeStr: string, mins: number): string {
 
 export function getLogicalDate(): Date {
   const now = new Date();
-  const nextSleepStr = localStorage.getItem('system_next_sleep_time');
-  if (nextSleepStr) {
-    try {
-      const nextSleep = new Date(nextSleepStr);
-      if (!isNaN(nextSleep.getTime())) {
-        const resetTime = new Date(nextSleep.getTime() - 3 * 60 * 60 * 1000);
-        // Only subtract 24 hours if we are on the same calendar day as the sleep event
-        // but we haven't reached the reset time yet (i.e., early morning before sleeping).
-        if (now.toDateString() === nextSleep.toDateString() && now < resetTime) {
-          const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-          return logical;
-        }
-        return now;
-      }
-    } catch (e) {
-      console.error('Error parsing next sleep time', e);
-    }
-  }
-
-  // Fallback to 2:00 AM reset
-  if (now.getHours() < 2) {
-    const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    return logical;
+  // Fajr-Isha schedule: midnight–4am is still the previous logical day
+  if (now.getHours() < 4) {
+    return new Date(now.getTime() - 24 * 60 * 60 * 1000);
   }
   return now;
 }
