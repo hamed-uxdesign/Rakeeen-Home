@@ -22,7 +22,19 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     document.title = 'Rakeeen - Water';
   }, []);
 
+  // Day is archived/reset at 18:00 (6 PM, 3h before sleep) and reopens at 4:00 AM (Fajr).
+  // Locking adds during this window prevents new water from being misattributed to the
+  // day that was just closed out.
+  const [now, setNow] = useState(() => new Date());
+  React.useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+  const hour = now.getHours();
+  const isLocked = hour >= 18 || hour < 4;
+
   const addGlass = () => {
+    if (isLocked) return;
     const now = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     setLog([...log, now]);
     setGlasses(glasses + 1);
@@ -143,11 +155,17 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
           <div className="flex flex-col gap-3 min-w-[180px]">
             <button
               onClick={addGlass}
-              className="btn-brutalist flex items-center justify-center gap-2 w-full py-4 text-sm"
+              disabled={isLocked}
+              className="btn-brutalist flex items-center justify-center gap-2 w-full py-4 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <Plus size={16} strokeWidth={3} />
               Add Glass
             </button>
+            {isLocked && (
+              <span className="font-mono-main text-[9px] uppercase tracking-widest text-ink/30 text-center">
+                Day closed — reopens at Fajr (4:00 AM)
+              </span>
+            )}
             <div
               className={`flex gap-2 transition-all duration-200 ${glasses > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none invisible'}`}
               style={{ visibility: glasses > 0 ? 'visible' : 'hidden' }}

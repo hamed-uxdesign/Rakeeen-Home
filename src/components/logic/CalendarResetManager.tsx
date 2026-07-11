@@ -44,20 +44,33 @@ export const CalendarResetManager: React.FC = () => {
 
     const performReset = async (sleepDate: Date) => {
       // We calculate the logical "yesterday" relative to the sleep date
-      const lastDateStr = new Date(sleepDate.getTime() - 12 * 60 * 60 * 1000).toDateString(); 
+      const lastDateStr = new Date(sleepDate.getTime() - 12 * 60 * 60 * 1000).toDateString();
 
       console.log(`[CalendarResetManager] Recording history and resetting for: ${lastDateStr}`);
 
+      // Read the freshest values straight from localStorage instead of the closure's
+      // `glasses`/`meals` state, which can lag behind what Water.tsx/Fitness just wrote
+      // (React state updates from a Firestore listener aren't guaranteed to have flushed
+      // into this closure yet), causing the archived tally to be recorded as 0.
+      const currentGlasses = (() => {
+        try { return Number(JSON.parse(window.localStorage.getItem('hydration_glasses') || '0')) || 0; }
+        catch { return glasses; }
+      })();
+      const currentMeals = (() => {
+        try { return JSON.parse(window.localStorage.getItem('fitness_meals') || 'null') ?? meals; }
+        catch { return meals; }
+      })();
+
       // 1. Water History
-      if (glasses > 0) {
-        const newHistory = { ...history, [lastDateStr]: glasses };
+      if (currentGlasses > 0) {
+        const newHistory = { ...history, [lastDateStr]: currentGlasses };
         setHistory(newHistory);
       }
       setGlasses(0);
       setLog([]);
-      
+
       // 2. Fitness History
-      const totalCalories = Object.values(meals).flat().reduce((sum, item) => sum + (item.kcal || 0), 0);
+      const totalCalories = Object.values(currentMeals).flat().reduce((sum: number, item: any) => sum + (item.kcal || 0), 0);
       if (totalCalories > 0) {
         const newFitHistory = { ...fitHistory, [lastDateStr]: totalCalories };
         setFitHistory(newFitHistory);
