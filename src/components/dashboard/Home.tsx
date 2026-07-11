@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { uploadImage } from '../../utils/cloudinary';
-import { Sun, Plus, Camera, MoreVertical, LogOut, Moon } from 'lucide-react';
+import { Sun, Plus, Camera, MoreVertical, LogOut, Moon, Maximize, Minimize } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
 import { usePomodoro } from '../../hooks/usePomodoro';
@@ -521,6 +521,21 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Fullscreen — hides the browser chrome (address bar, tabs) like a native app
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
+
   const toggleTheme = () => {
     if (isDark) {
       document.body.classList.remove('dark-theme');
@@ -932,6 +947,15 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                     title={isDark ? 'Switch to Light' : 'Switch to Dark'}
                   >
                     {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                  </button>
+
+                  {/* Fullscreen Button */}
+                  <button
+                    onClick={toggleFullscreen}
+                    className="w-10 h-10 border border-ink flex items-center justify-center text-ink hover:bg-ink/5 transition-colors cursor-pointer"
+                    title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+                  >
+                    {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
                   </button>
 
                   {/* Logout Button */}
