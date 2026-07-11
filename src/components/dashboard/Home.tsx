@@ -842,8 +842,13 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const fitnessPaused = workoutMinsToday > 0;
   const prayerPaused = false;
 
+  // Day is archived/reset at 18:00 (6pm) and reopens at 4:00 AM (Fajr) — locked in between
+  const waterHour = now.getHours();
+  const waterLocked = waterHour >= 18 || waterHour < 4;
+
   const addWaterCup = (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering card navigation
+    if (waterLocked) return;
     if (glasses < 14) {
       setGlasses(glasses + 1);
     }
@@ -1122,12 +1127,13 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                       <span className="font-sans-main text-sm font-bold uppercase tracking-wider text-ink/60 ml-2 leading-none">glasses today</span>
                     </div>
 
-                    <button 
+                    <button
                       onClick={addWaterCup}
-                      className="btn-brutalist flex items-center gap-2 font-mono-main py-3 px-6 text-sm"
+                      disabled={waterLocked}
+                      className="btn-brutalist flex items-center gap-2 font-mono-main py-3 px-6 text-sm disabled:opacity-30 disabled:cursor-not-allowed"
                     >
                       <Plus size={18} strokeWidth={3} />
-                      Add Glass
+                      {waterLocked ? 'Reopens at Fajr' : 'Add Glass'}
                     </button>
                   </div>
                 </div>
