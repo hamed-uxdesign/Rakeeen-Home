@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
+import { usePrayer } from '../../hooks/usePrayer';
 import { ChartTooltip } from '../ui/UIComponents';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from 'recharts';
 import { RotateCcw, Undo2, Plus, ArrowLeft, ChevronRight } from 'lucide-react';
@@ -22,16 +23,21 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     document.title = 'Rakeeen - Water';
   }, []);
 
-  // Day is archived/reset at 18:00 (6 PM, 3h before sleep) and reopens at 4:00 AM (Fajr).
-  // Locking adds during this window prevents new water from being misattributed to the
-  // day that was just closed out.
+  // Day is archived/reset at 18:00 (6 PM, 3h before sleep) and reopens at the real Fajr
+  // time (from the prayer API, refreshed daily). Locking adds during this window prevents
+  // new water from being misattributed to the day that was just closed out.
+  const { times } = usePrayer();
   const [now, setNow] = useState(() => new Date());
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
-  const hour = now.getHours();
-  const isLocked = hour >= 18 || hour < 4;
+  const [fajrH, fajrM] = (times?.Fajr || '04:00').split(':').map(Number);
+  const todayFajr = new Date(now);
+  todayFajr.setHours(fajrH, fajrM, 0, 0);
+  const todaySixPm = new Date(now);
+  todaySixPm.setHours(18, 0, 0, 0);
+  const isLocked = now >= todaySixPm || now < todayFajr;
 
   const addGlass = () => {
     if (isLocked) return;
@@ -41,11 +47,13 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   };
 
   const reset = () => {
+    if (isLocked) return;
     setGlasses(0);
     setLog([]);
   };
 
   const undo = () => {
+    if (isLocked) return;
     if (glasses <= 0) return;
     setGlasses(glasses - 1);
     setLog(log.slice(0, -1));
@@ -58,10 +66,15 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
 
+    // Once the 6pm reset archives today's tally into history and zeroes the live counter,
+    // "today" needs the higher of the two — otherwise the chart shows 0 for the rest of
+    // the night even though the day's data is safely archived.
+    const todayEffective = Math.max(history[todayStr] || 0, glasses);
+
     const getStartOfWeek = (d: Date): Date => {
       const date = new Date(d);
       const day = date.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
-      const diff = (day + 1) % 7; 
+      const diff = (day + 1) % 7;
       date.setDate(date.getDate() - diff);
       date.setHours(0, 0, 0, 0);
       return date;
@@ -75,7 +88,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
       const dateStr = date.toDateString();
       const isFuture = date > now && dateStr !== todayStr;
       if (isFuture) return { name, glasses: 0 };
-      if (dateStr === todayStr) return { name, glasses };
+      if (dateStr === todayStr) return { name, glasses: todayEffective };
       return { name, glasses: history[dateStr] || 0 };
     });
 
@@ -91,7 +104,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
       }
     });
     const todayWeekIdx = Math.min(Math.floor((now.getDate() - 1) / 7), 3);
-    monthData[todayWeekIdx].glasses += glasses;
+    monthData[todayWeekIdx].glasses += todayEffective;
 
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const yearData = monthNames.map(name => ({ name, glasses: 0 }));
@@ -101,7 +114,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
         yearData[d.getMonth()].glasses += val;
       }
     });
-    yearData[currentMonth].glasses += glasses;
+    yearData[currentMonth].glasses += todayEffective;
 
     return { week: weekData, month: monthData, year: yearData };
   };
@@ -161,25 +174,22 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
               <Plus size={16} strokeWidth={3} />
               Add Glass
             </button>
-            {isLocked && (
-              <span className="font-mono-main text-[9px] uppercase tracking-widest text-ink/30 text-center">
-                Day closed — reopens at Fajr (4:00 AM)
-              </span>
-            )}
             <div
               className={`flex gap-2 transition-all duration-200 ${glasses > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none invisible'}`}
               style={{ visibility: glasses > 0 ? 'visible' : 'hidden' }}
             >
               <button
                 onClick={undo}
-                className="flex-1 flex items-center justify-center gap-2 py-3 border border-ink/20 text-ink/40 hover:text-ink hover:border-ink transition-all font-mono-main text-[10px] uppercase tracking-widest font-bold"
+                disabled={isLocked}
+                className="flex-1 flex items-center justify-center gap-2 py-3 border border-ink/20 text-ink/40 hover:text-ink hover:border-ink transition-all font-mono-main text-[10px] uppercase tracking-widest font-bold disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-ink/40 disabled:hover:border-ink/20"
               >
                 <Undo2 size={14} />
                 Undo
               </button>
               <button
                 onClick={reset}
-                className="flex-1 flex items-center justify-center gap-2 py-3 border border-ink/10 text-ink/20 hover:text-ink/60 hover:border-ink/40 transition-all font-mono-main text-[10px] uppercase tracking-widest font-bold"
+                disabled={isLocked}
+                className="flex-1 flex items-center justify-center gap-2 py-3 border border-ink/10 text-ink/20 hover:text-ink/60 hover:border-ink/40 transition-all font-mono-main text-[10px] uppercase tracking-widest font-bold disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-ink/20 disabled:hover:border-ink/10"
               >
                 <RotateCcw size={14} />
                 Reset

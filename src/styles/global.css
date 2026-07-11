@@ -292,7 +292,7 @@ body:not(.dark-theme) [class*="border-ink/"] {
 
 html {
   scrollbar-gutter: stable;
-  overflow-y: scroll;
+  overflow-y: auto;
 }
 
 /* Brutalist Custom Range Slider */

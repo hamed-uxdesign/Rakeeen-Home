@@ -13,7 +13,7 @@ export const ChartTooltip: React.FC<ChartTooltipProps> = ({ active, payload, lab
     const val = payload[0].value;
     return (
       <div 
-        className="border-2 border-forest shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)] p-6 rounded-none animate-scale-in" 
+        className="border-2 border-ink shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)] p-6 rounded-none animate-scale-in"
         style={{ backgroundColor: 'var(--paper)', opacity: 1 }}
       >
         <p className="text-ink font-black text-3xl mb-1">{label}</p>
