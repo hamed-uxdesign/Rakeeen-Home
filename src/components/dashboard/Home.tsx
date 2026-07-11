@@ -90,12 +90,51 @@ function getMoonAltAz(date: Date): { altitude: number; azimuth: number } {
   return { altitude, azimuth };
 }
 
+// Real-time sun position in the sky — azimuth (°) and altitude (°)
+// Observer: Egypt, Mansoura (lat 31.0379°, lon 31.3815°) — same structure as getMoonAltAz
+function getSunAltAz(date: Date): { altitude: number; azimuth: number } {
+  const LAT = 31.0379;
+  const LON = 31.3815;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const toDeg = (r: number) => r * 180 / Math.PI;
+
+  const jd = date.getTime() / 86400000 + 2440587.5;
+  const d = jd - 2451545.0;
+
+  // Sun's orbital elements
+  const g = toRad(((357.529 + 0.98560028 * d) % 360 + 360) % 360);
+  const q = ((280.459 + 0.98564736 * d) % 360 + 360) % 360;
+  const L = toRad((q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g) + 360) % 360);
+  const eps = toRad(23.439 - 0.00000036 * d);
+
+  const ra = Math.atan2(Math.cos(eps) * Math.sin(L), Math.cos(L));
+  const dec = Math.asin(Math.sin(eps) * Math.sin(L));
+
+  const T = d / 36525;
+  const gmst = ((280.46061837 + 360.98564736629 * d + 0.000387933 * T * T) % 360 + 360) % 360;
+  const lst = toRad((gmst + LON + 360) % 360);
+
+  let ha = lst - ra;
+
+  const latRad = toRad(LAT);
+  const sinAlt = Math.sin(latRad) * Math.sin(dec) + Math.cos(latRad) * Math.cos(dec) * Math.cos(ha);
+  const altitude = toDeg(Math.asin(Math.max(-1, Math.min(1, sinAlt))));
+
+  const cosAz = (Math.sin(dec) - Math.sin(latRad) * sinAlt) / (Math.cos(latRad) * Math.cos(Math.asin(sinAlt)));
+  let azimuth = toDeg(Math.acos(Math.max(-1, Math.min(1, cosAz))));
+  if (Math.sin(ha) > 0) azimuth = 360 - azimuth;
+
+  return { altitude, azimuth };
+}
+
 interface HomeProps {
   navigate: (to: string) => void;
 }
 
 // Persists across Home remounts — glow only animates in ONCE per night
 let _moonGlowPersisted = false;
+// Same persistence pattern as the moon, for the daytime sun glow
+let _sunGlowPersisted = false;
 // Persists last active card so remount starts on the correct card instantly
 let _lastActiveCardId: 'water' | 'pomodoro' | 'fitness' | 'devotion' | 'calendar' | 'finance' = 'water';
 // Persists greeting name so it doesn't change on every remount
@@ -579,24 +618,24 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     return () => clearInterval(timer);
   }, []);
 
-  // Show today's journal summary before Isha/sleep (20:00–21:30)
-  const isJournalTime = now.getHours() >= 20 && now.getHours() < 22;
-  // Build yesterday's key from local date components to avoid UTC offset issues
-  const journalYesterdayKey = (() => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  // Show today's journal summary for a 30-minute window before Isha/sleep (20:00–20:30)
+  const isJournalTime = now.getHours() === 20 && now.getMinutes() < 30;
+  // Build today's key from local date components to avoid UTC offset issues
+  const journalTodayKey = (() => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
   const journalEntry = React.useMemo(() => {
     if (!isJournalTime) return null;
     // Saved entry
-    if (dailyJournal[journalYesterdayKey]) return dailyJournal[journalYesterdayKey];
+    if (dailyJournal[journalTodayKey]) return dailyJournal[journalTodayKey];
     // Generate on-the-fly from history if not yet saved
-    const snap = dailyHistory[journalYesterdayKey];
+    const snap = dailyHistory[journalTodayKey];
     if (snap && (snap.water > 0 || snap.focus > 0 || snap.workout > 0)) {
-      return generateJournalEntry(journalYesterdayKey, snap);
+      return generateJournalEntry(journalTodayKey, snap);
     }
     return null;
-  }, [isJournalTime, dailyJournal, dailyHistory, journalYesterdayKey]);
+  }, [isJournalTime, dailyJournal, dailyHistory, journalTodayKey]);
 
   // Tracks whether the initial reveal has happened — set by auto-select once prayer data is ready
   const firstRevealDoneRef = useRef(false);
@@ -654,13 +693,54 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     }
   }, [moonAboveHorizon]);
 
+  // Sun glow — same mechanics as the moon, mirrored for daylight. dayBrightness is the
+  // exact inverse of nightDarkness, so the two glows are mathematically mutually
+  // exclusive — whichever is up gets the light, never both at once.
+  const dayBrightness = 1 - nightDarkness;
+  const sunPos = getSunAltAz(now);
+  const sunGradX = Math.max(0, Math.min(100, 100 - (sunPos.azimuth - 90) / 180 * 100)).toFixed(1);
+  const sunGradY = sunPos.altitude > 0
+    ? Math.max(0, Math.min(25, (1 - sunPos.altitude / 75) * 25)).toFixed(1)
+    : '30';
+  const sunHorizonFade = sunPos.altitude < 5 ? Math.max(0, sunPos.altitude / 5) : 1;
+  // Warm shift near the horizon (sunrise/sunset orange) → brighter gold high in the sky
+  const sunR = Math.round(255 - 0 * sunHorizonFade);
+  const sunG = Math.round(140 + 80 * sunHorizonFade);
+  const sunB = Math.round(60 + 100 * sunHorizonFade);
+  const sunIntensity = dayBrightness * sunHorizonFade;
+  const sunAboveHorizon = sunPos.altitude > 0;
+  const [sunGlowVisible, setSunGlowVisible] = useState(() => _sunGlowPersisted && sunAboveHorizon);
+  const [sunTransition, setSunTransition] = useState(() =>
+    _sunGlowPersisted && sunAboveHorizon ? 'none' : 'opacity 8s ease-in'
+  );
+  useEffect(() => {
+    if (sunAboveHorizon) {
+      if (_sunGlowPersisted) {
+        setSunTransition('none');
+        setSunGlowVisible(true);
+      } else {
+        setSunTransition('opacity 8s ease-in');
+        const t = setTimeout(() => {
+          setSunGlowVisible(true);
+          _sunGlowPersisted = true;
+        }, 100);
+        return () => clearTimeout(t);
+      }
+    } else {
+      setSunGlowVisible(false);
+      _sunGlowPersisted = false;
+    }
+  }, [sunAboveHorizon]);
+
   const [greetingName, setGreetingName] = useState(() => _persistedGreetingName);
 
   // Schedule: Fajr wake (~4:30am), workout 9am (daily except Fri/Sat), Isha sleep (~21:30)
   const getGreeting = (h: number): { before: string; name: string; after: string } => {
     const n = greetingName.toUpperCase();
     // Data-aware: check most notable condition first
-    const waterLow = typeof glasses === 'number' && glasses < 3 && h >= 10 && h < 21;
+    // Water tracking is closed 18:00-Fajr (locked, counter reset) — nagging about low
+    // water in that window makes no sense since adding more isn't even possible.
+    const waterLow = typeof glasses === 'number' && glasses < 3 && h >= 10 && h < 18;
     const noFocus = focusMinutes === 0 && !pomodoroRunning && h >= 13 && h < 19;
     const isWorkoutDay = ![5, 6].includes(now.getDay()); // every day except Fri(5) and Sat(6)
     const noWorkout = isWorkoutDay && workoutMinsToday === 0 && h >= 9 && h < 14;
@@ -693,33 +773,39 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [displayedGreeting, setDisplayedGreeting] = useState(greetingParts);
   const [greetingVisible, setGreetingVisible] = useState(true);
 
-  // Fade transition when journal window opens or closes
-  const prevJournalEntryRef = useRef<string | null>(null);
+  // Single fade controller for the header line — whether it's showing the journal
+  // summary or the greeting phrase, both changes go through the SAME timeout, so a new
+  // trigger always cancels any pending one first. (Previously two separate effects each
+  // had their own timeout racing to set the same flag, which could leave it stuck hidden
+  // if both fired close together.)
+  const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayKeyRef = useRef<string>(journalEntry ?? greetingParts.before);
   useEffect(() => {
-    const prev = prevJournalEntryRef.current;
-    const curr = journalEntry;
-    if (prev === curr) return;
-    prevJournalEntryRef.current = curr;
+    const nextKey = journalEntry ?? greetingParts.before;
+    if (displayKeyRef.current === nextKey) return;
+    displayKeyRef.current = nextKey;
+
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
     setGreetingVisible(false);
-    const t = setTimeout(() => setGreetingVisible(true), 600);
-    return () => clearTimeout(t);
-  }, [journalEntry]);
-  useEffect(() => {
-    if (greetingParts.before !== displayedGreeting.before) {
-      setGreetingVisible(false);
-      const nextName = (() => {
-        const others = _NAMES.filter(n => n.toUpperCase() !== displayedGreeting.name);
-        return others[Math.floor(Math.random() * others.length)];
-      })();
-      const t = setTimeout(() => {
-        _persistedGreetingName = nextName;
-        setGreetingName(nextName);
-        setDisplayedGreeting({ before: greetingParts.before, name: nextName.toUpperCase(), after: '' });
-        setGreetingVisible(true);
-      }, 500);
-      return () => clearTimeout(t);
-    }
-  }, [greetingParts.before]);
+    fadeTimeoutRef.current = setTimeout(() => {
+      if (!journalEntry) {
+        setDisplayedGreeting(prev => {
+          if (prev.before === greetingParts.before) return prev;
+          const others = _NAMES.filter(n => n.toUpperCase() !== prev.name);
+          const nextName = others[Math.floor(Math.random() * others.length)];
+          _persistedGreetingName = nextName;
+          setGreetingName(nextName);
+          return { before: greetingParts.before, name: nextName.toUpperCase(), after: '' };
+        });
+      }
+      setGreetingVisible(true);
+      fadeTimeoutRef.current = null;
+    }, 550);
+
+    return () => {
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    };
+  }, [journalEntry, greetingParts.before]);
 
   const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const [timeOnly, amPm] = timeString.split(' ');
@@ -872,6 +958,19 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
           transition: moonTransition === 'none'
             ? 'background 60s linear'
             : `${moonTransition}, background 60s linear`,
+          zIndex: 0,
+        }}
+      />
+      {/* Sun glow — rises slowly through the day, fades at dusk. Mutually exclusive with
+          the moon glow above since dayBrightness = 1 - nightDarkness. */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          background: `radial-gradient(ellipse at ${sunGradX}% ${sunGradY}%, rgba(${sunR}, ${sunG}, ${sunB}, ${(sunIntensity * 0.18).toFixed(3)}) 0%, rgba(${sunR}, ${sunG - 15}, ${sunB - 20}, ${(sunIntensity * 0.07).toFixed(3)}) 40%, transparent 68%)`,
+          opacity: sunGlowVisible ? 1 : 0,
+          transition: sunTransition === 'none'
+            ? 'background 60s linear'
+            : `${sunTransition}, background 60s linear`,
           zIndex: 0,
         }}
       />

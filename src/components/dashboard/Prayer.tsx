@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { WavyRing } from './Pomodoro';
@@ -15,10 +16,14 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
   const { times, nextPrayer, loading, hijri } = usePrayer();
   const [phase, setPhase] = useState(0);
   const [now, setNow] = useState(new Date());
-  
+
   const [isPlaying, setIsPlaying] = useFirebaseSync<boolean>('quran_radio_playing', false);
   const [volume, setVolume] = useState(() => quranRadioManager.getVolume());
-  const [prayerTab, setPrayerTab] = useState<'times' | 'radio' | 'quran'>('times');
+  const location = useLocation();
+  const initialTab = new URLSearchParams(location.search).get('tab');
+  const [prayerTab, setPrayerTab] = useState<'times' | 'radio' | 'quran'>(
+    initialTab === 'radio' || initialTab === 'quran' ? initialTab : 'times'
+  );
 
   const getCurrentPrayerName = () => {
     if (!times || Object.keys(times).length === 0) return '';
