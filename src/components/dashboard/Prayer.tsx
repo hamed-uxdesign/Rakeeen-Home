@@ -117,7 +117,9 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
     passed: 'text-ink/10' 
   };
 
-  const showTimer = nextPrayer && (nextPrayer as any).remainingMinutes <= 15;
+  // Exact 15:00 boundary — using totalRemainingSeconds instead of the floored
+  // remainingMinutes avoids showing the timer up to 59s early.
+  const showTimer = nextPrayer && (nextPrayer as any).totalRemainingSeconds <= 15 * 60;
 
   return (
     <div className="min-h-screen bg-bg text-ink py-6 md:py-12 px-6 md:px-12 lg:px-20 font-sans-main flex flex-col transition-colors duration-300">
@@ -177,9 +179,12 @@ export const Prayer: React.FC<PrayerProps> = ({ navigate }) => {
               Up Next: {nextPrayer.name} ({nextPrayer.time})
             </div>
             <div className="relative w-full max-w-[280px] aspect-square mx-auto flex items-center justify-center">
-              <WavyRing 
-                pct={Math.max(0, Math.min(100, ((nextPrayer as any).totalRemainingSeconds / (15 * 60)) * 100))} 
-                phase={phase} 
+              {/* Starts exactly 15 minutes before the prayer (see showTimer above) and fills
+                  forward as time elapses, same direction as the focus timer — not a
+                  countdown-style unfilling ring. */}
+              <WavyRing
+                pct={Math.max(0, Math.min(100, (1 - (nextPrayer as any).totalRemainingSeconds / (15 * 60)) * 100))}
+                phase={phase}
                 mode="focus" 
                 isOvertime={false} 
                 size={280} 

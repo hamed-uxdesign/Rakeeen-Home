@@ -107,10 +107,17 @@ export const WavyProgressBar: React.FC<{
   }, []);
 
   const W = 500; const H = 36; const midY = H / 2;
-  const amplitude = 9; const waves = 5; const pts = 220;
+  const amplitude = 9; const waves = 5;
 
-  const genPath = (limitPct: number) => {
-    const endX = W * (limitPct / 100);
+  // Wavy progress (elapsed) grows from the left; the straight remaining segment shrinks
+  // to match — same relationship as the ring version.
+  const genWavyPath = (endPct: number) => {
+    const endX = W * (Math.max(0, Math.min(100, endPct)) / 100);
+    // Resolution scales with wave CYCLES actually drawn, not with endPct directly —
+    // otherwise a flat minimum point count under-samples once enough cycles are
+    // squeezed into it, rendering as jagged kinks instead of a smooth curve.
+    const cyclesInPath = (endPct / 100) * waves;
+    const pts = Math.max(8, Math.ceil(cyclesInPath * 24));
     const out: string[] = [];
     for (let i = 0; i <= pts; i++) {
       const x = (i / pts) * endX;
@@ -120,16 +127,27 @@ export const WavyProgressBar: React.FC<{
     return out.join(' ');
   };
 
+  const genStraightPath = (fromPct: number, toPct: number) => {
+    const startX = W * (Math.max(0, Math.min(100, fromPct)) / 100);
+    const endX = W * (Math.max(0, Math.min(100, toPct)) / 100);
+    return `M ${startX.toFixed(2)} ${midY} L ${endX.toFixed(2)} ${midY}`;
+  };
+
   const strokeColor = isOvertime ? 'var(--pomo-overtime)' : mode === 'break' ? 'var(--pomo-break)' : 'var(--pomo-focus)';
+  const gapPct = 0.8; // tiny visual seam between the two segments
 
   return (
     <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none" shapeRendering="geometricPrecision" overflow="visible">
-      <path d={genPath(100)} fill="none" stroke="var(--ink)"
-        strokeWidth={3} strokeOpacity={0.07} strokeLinecap="round"
-        vectorEffect="non-scaling-stroke" />
+      {/* Straight remaining (time left) — shrinks as the wavy progress grows */}
+      {smoothPct < 100 - gapPct && (
+        <path d={genStraightPath(smoothPct + gapPct, 100)} fill="none" stroke="var(--ink)"
+          strokeWidth={3} strokeOpacity={0.12} strokeLinecap="round"
+          vectorEffect="non-scaling-stroke" />
+      )}
+      {/* Wavy progress (elapsed) */}
       {smoothPct > 0 && (
-        <path d={genPath(smoothPct)} fill="none" stroke={strokeColor}
+        <path d={genWavyPath(smoothPct)} fill="none" stroke={strokeColor}
           strokeWidth={4} strokeLinecap="round"
           vectorEffect="non-scaling-stroke" />
       )}

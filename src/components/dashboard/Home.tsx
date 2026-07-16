@@ -498,16 +498,15 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
 
   // Generate one-line journal entry for a given day's snapshot
-  const WORKOUT_DAYS = [0, 3]; // Sunday, Wednesday
+  // NOTE: Training/Fitness is temporarily hidden system-wide, so the workout mention
+  // (previously gated to Sun/Wed, which no longer matched the daily-except-Fri/Sat
+  // schedule anyway) is dropped from the summary entirely for now.
   const generateJournalEntry = (dateKey: string, data: { water: number; focus: number; workout: number }) => {
     const d = new Date(dateKey + 'T12:00:00');
     const dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
     const waterStr = data.water >= 10 ? 'water was strong' : data.water >= 6 ? 'water was decent' : data.water > 0 ? 'water was low' : 'no water logged';
     const focusStr = data.focus >= 60 ? `focus ran ${Math.round(data.focus / 60)}h` : data.focus > 0 ? `focus ran ${data.focus}m` : 'no focus';
     const parts = [waterStr, focusStr];
-    if (WORKOUT_DAYS.includes(d.getDay())) {
-      parts.push(data.workout > 0 ? `${data.workout}m workout` : 'no workout');
-    }
     return `${dateStr} — ${parts.join(', ')}.`;
   };
 
@@ -558,6 +557,29 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Big card height always matches the dock's rendered height — auto-adjusts whenever
+  // a small card is added or removed, no hardcoded pixel value to keep in sync by hand.
+  // (Only applied at the lg breakpoint, where the dock switches to a vertical column —
+  // below that it's a horizontal scroller and the big card uses its own min-height.)
+  const dockRef = useRef<HTMLDivElement>(null);
+  const [dockHeight, setDockHeight] = useState<number | null>(null);
+  const [isLgUp, setIsLgUp] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setIsLgUp(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  useEffect(() => {
+    const el = dockRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(entries => {
+      setDockHeight(entries[0].contentRect.height);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
 
@@ -742,8 +764,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     // water in that window makes no sense since adding more isn't even possible.
     const waterLow = typeof glasses === 'number' && glasses < 3 && h >= 10 && h < 18;
     const noFocus = focusMinutes === 0 && !pomodoroRunning && h >= 13 && h < 19;
-    const isWorkoutDay = ![5, 6].includes(now.getDay()); // every day except Fri(5) and Sat(6)
-    const noWorkout = isWorkoutDay && workoutMinsToday === 0 && h >= 9 && h < 14;
+    // Training/Fitness is temporarily hidden system-wide — this condition is disabled to match.
+    const noWorkout = false;
     const hasPending = false;
 
     let before = '';
@@ -1056,10 +1078,10 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
       </header>
 
       {/* 2. STAGE MANAGER TWO-COLUMN LAYOUT */}
-      <main className="w-full max-w-[1400px] mx-auto flex-1 flex flex-col lg:flex-row gap-4 md:gap-6 lg:gap-8 mb-6 lg:mb-16 items-stretch">
+      <main className="w-full max-w-[1400px] mx-auto flex-1 flex flex-col lg:flex-row gap-4 md:gap-6 lg:gap-8 mb-6 lg:mb-16 items-stretch lg:items-start">
         
         {/* Left stack (Stage Manager dock) */}
-        <div className="flex lg:flex-col gap-3 lg:gap-4 overflow-x-auto lg:overflow-visible pb-3 lg:pb-0 shrink-0 lg:w-[230px] scrollbar-none -mx-6 px-6 lg:mx-0 lg:px-0">
+        <div ref={dockRef} className="flex lg:flex-col gap-3 lg:gap-4 overflow-x-auto lg:overflow-visible pb-3 lg:pb-0 shrink-0 lg:w-[230px] scrollbar-none -mx-6 px-6 lg:mx-0 lg:px-0">
           {([
             {
               id: 'water',
@@ -1099,15 +1121,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               metric: cardPrayer.name,
               subText: cardPrayer.info,
             },
-            {
-              id: 'fitness',
-              title: 'Training',
-              Vector: FitnessVector,
-              route: 'fitness',
-              isRunning: workoutMinsToday > 0,
-              metric: `${workoutMinsToday}m`,
-              subText: 'LOGGED TODAY',
-            },
+            // Training/Fitness card temporarily hidden system-wide (see below too)
             {
               id: 'finance',
               title: 'Finance',
@@ -1136,7 +1150,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                   isActive
                     ? 'border-ink text-ink opacity-100'
                     : 'border-dashed border-ink/30 bg-paper/60 text-ink opacity-65 hover:opacity-100 hover:border-ink/60'
-                } w-[160px] lg:w-[230px] h-[100px] lg:h-[110px] shrink-0`}
+                } w-[160px] lg:w-[230px] h-[112px] lg:h-[124px] shrink-0`}
                 style={{
                   ...(isActive ? { backgroundColor: 'var(--paper-dark)' } : {}),
                   transform: isReceded ? 'scale(0.97)' : 'scale(1)',
@@ -1192,7 +1206,10 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         </div>
 
         {/* Active Stage (Center/Right) */}
-        <div className="flex-1 flex flex-col items-stretch min-h-[280px] lg:min-h-0 lg:h-[740px]">
+        <div
+          className="flex-1 flex flex-col items-stretch min-h-[280px] lg:min-h-0"
+          style={isLgUp ? { height: dockHeight ?? 740 } : undefined}
+        >
           <div
             onClick={() => {
               const found = [

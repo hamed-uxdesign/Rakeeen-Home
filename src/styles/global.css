@@ -162,7 +162,7 @@
   /* === HIDE SCROLLBAR UTILITY === */
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
-  /* === CUSTOM SCROLLBAR (branded) === */
+  /* === CUSTOM SCROLLBAR (branded, auto-hides when idle) === */
   ::-webkit-scrollbar {
     width: 4px;
     height: 4px;
@@ -170,12 +170,18 @@
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+  /* Hidden by default — only shown while actively scrolling (.is-scrolling on <html>,
+     toggled from JS) or while hovering the scrollable element itself. */
   ::-webkit-scrollbar-thumb {
-    background: var(--ink);
-    opacity: 0.3;
+    background: transparent;
+    transition: background-color 0.4s ease;
+  }
+  html.is-scrolling ::-webkit-scrollbar-thumb,
+  *:hover::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--ink) 30%, transparent);
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--sepia);
+    background: var(--sepia) !important;
   }
 
   /* === REMOVE NATIVE CHECKBOX / RADIO === */

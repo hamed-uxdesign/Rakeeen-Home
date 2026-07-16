@@ -35,18 +35,25 @@ export const WavyRing: React.FC<{
 }> = ({ pct, phase, mode, isOvertime, size = 300, waves, isFloating = false }) => {
   const half = size / 2;
   const baseR = half * 0.82;
-  const gapOffset = 0.08; // Small gap at top/bottom
+  const gapAngle = 0.04; // Tiny visual seam where progress meets remaining
 
-  // Right path (wavy): -Math.PI/2 + gapOffset to Math.PI/2 - gapOffset
-  const generateWavyRightPath = (offset: number, limitPct: number = 100) => {
-    const amplitude = size * (waves > 40 ? 0.015 : 0.02), points = 250;
+  // Sweeps `sweep` radians starting at `startAngle` (clockwise, 12 o'clock = -PI/2).
+  // Wavy traces progress (elapsed) — its arc length IS the pct, so it grows as time
+  // passes; the smooth arc is what's left of the circle and shrinks to match.
+  const generateArcPath = (startAngle: number, sweep: number, wavy: boolean) => {
+    const amplitude = size * (waves > 40 ? 0.015 : 0.02);
     const pathPoints: string[] = [];
-    const startAngle = -Math.PI / 2 + gapOffset;
-    const endAngle = Math.PI / 2 - gapOffset;
-    const diff = (endAngle - startAngle) * (limitPct / 100);
-    for (let i = 0; i <= points; i++) {
-      const angle = startAngle + (i / points) * diff;
-      const wave = Math.sin(angle * waves + offset) * amplitude;
+    // Resolution scales with how many wave CYCLES actually appear in this sweep, not
+    // with the sweep angle itself — a flat minimum point count meant short arcs with
+    // many cycles (early progress, before it grows past a certain size) got squeezed
+    // into too few points and rendered as jagged, faceted kinks instead of a smooth curve.
+    const cyclesInSweep = (sweep / (Math.PI * 2)) * waves;
+    const steps = wavy
+      ? Math.max(8, Math.ceil(cyclesInSweep * 24))
+      : Math.max(2, Math.round(300 * (sweep / (Math.PI * 2))));
+    for (let i = 0; i <= steps; i++) {
+      const angle = startAngle + (i / steps) * sweep;
+      const wave = wavy ? Math.sin(angle * waves + phase) * amplitude : 0;
       const r = baseR + wave;
       const x = half + r * Math.cos(angle);
       const y = half + r * Math.sin(angle);
@@ -55,33 +62,17 @@ export const WavyRing: React.FC<{
     return pathPoints.join(' ');
   };
 
-  // Left path (smooth): sweeps from bottom to top
-  const generateSmoothLeftPath = (limitPct: number = 100) => {
-    const points = 250;
-    const pathPoints: string[] = [];
-    const startLeftAngle = Math.PI / 2 + gapOffset;
-    const endLeftAngle = Math.PI * 1.5 - gapOffset;
-    const diff = (endLeftAngle - startLeftAngle) * (limitPct / 100);
-    for (let i = 0; i <= points; i++) {
-      const angle = startLeftAngle + (i / points) * diff;
-      const x = half + baseR * Math.cos(angle);
-      const y = half + baseR * Math.sin(angle);
-      pathPoints.push(`${i === 0 ? 'M' : 'L'} ${x.toFixed(3)} ${y.toFixed(3)}`);
-    }
-    return pathPoints.join(' ');
-  };
+  const clampedPct = Math.max(0, Math.min(100, pct));
+  const fullSweep = Math.PI * 2 - gapAngle * 2;
+  const progressSweep = fullSweep * (clampedPct / 100);
+  const remainingSweep = fullSweep - progressSweep;
+  const startAngle = -Math.PI / 2 + gapAngle;
 
-  // Right represents 0-50% progress, left represents 50-100% progress
-  const rightPct = Math.min(100, (pct / 50) * 100);
-  const leftPct = Math.max(0, ((pct - 50) / 50) * 100);
+  const wavyProgressPath = generateArcPath(startAngle, progressSweep, true);
+  const smoothRemainingPath = generateArcPath(startAngle + progressSweep + gapAngle * 2, Math.max(0, remainingSweep - gapAngle * 2), false);
 
-  const rightTrackPath = generateWavyRightPath(phase, 100);
-  const leftTrackPath = generateSmoothLeftPath(100);
-  const rightProgressPath = generateWavyRightPath(phase, rightPct);
-  const leftProgressPath = generateSmoothLeftPath(leftPct);
-
-  const strokeColor = isOvertime 
-    ? 'var(--pomo-overtime)' 
+  const strokeColor = isOvertime
+    ? 'var(--pomo-overtime)'
     : (mode === 'break' ? 'var(--pomo-break)' : 'var(--pomo-focus)');
 
   return (
@@ -90,14 +81,10 @@ export const WavyRing: React.FC<{
       style={{ maxWidth: '100%', maxHeight: '100%' }}
       shapeRendering="geometricPrecision"
     >
-      {/* Background Tracks */}
-      <path d={rightTrackPath} fill="none" stroke="var(--ink)" strokeWidth={size * 0.015} className="opacity-[0.04]" vectorEffect="non-scaling-stroke" />
-      <path d={leftTrackPath} fill="none" stroke="var(--ink)" strokeWidth={size * 0.015} className="opacity-[0.04]" vectorEffect="non-scaling-stroke" />
-
-      {/* Right Progress Ring (Wavy, Dark Green) */}
-      {rightPct > 0 && (
+      {/* Wavy Progress (elapsed) — grows as time passes */}
+      {progressSweep > 0 && (
         <path
-          d={rightProgressPath}
+          d={wavyProgressPath}
           fill="none"
           stroke={strokeColor}
           strokeWidth={size * 0.024}
@@ -106,14 +93,15 @@ export const WavyRing: React.FC<{
         />
       )}
 
-      {/* Left Progress Ring (Smooth, Light Green) */}
-      {leftPct > 0 && (
+      {/* Smooth Remaining (time left) — shrinks as the wavy progress grows */}
+      {remainingSweep > gapAngle * 2 && (
         <path
-          d={leftProgressPath}
+          d={smoothRemainingPath}
           fill="none"
-          stroke={strokeColor}
-          strokeWidth={size * 0.024}
+          stroke="var(--ink)"
+          strokeWidth={size * 0.015}
           strokeLinecap="round"
+          className="opacity-[0.12]"
           vectorEffect="non-scaling-stroke"
         />
       )}
