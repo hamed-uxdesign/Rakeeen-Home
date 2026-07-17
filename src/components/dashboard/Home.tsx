@@ -9,6 +9,7 @@ import { usePomodoro } from '../../hooks/usePomodoro';
 import { AppModal } from '../ui/AppModal';
 import { getLogicalDate } from '../../utils/timeHelpers';
 import { usePrayer } from '../../hooks/usePrayer';
+import { useSleepLock } from '../../hooks/useSleepLock';
 import { DotMatrixText } from '../ui/DotMatrixText';
 import { DMTimer, WavyProgressBar } from '../ui/TimerComponents';
 import { useFinance } from '../../hooks/useFinance';
@@ -756,6 +757,16 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
   const [greetingName, setGreetingName] = useState(() => _persistedGreetingName);
 
+  // No more hard lock — the system just calls it out when you're clearly up past Isha.
+  const isSleepTime = useSleepLock();
+  const SLEEP_TEASE_LINES = [
+    'IT\'S PAST ISHA ... WHAT ARE YOU STILL DOING HERE ',
+    'THE OWLS ARE JUDGING YOU RIGHT NOW ',
+    'THIS ISN\'T FAJR, GO TO SLEEP ',
+    'SLEEP IS FREE, TRY IT SOMETIME ',
+  ];
+  const isFriday = now.getDay() === 5;
+
   // Schedule: Fajr wake (~4:30am), workout 9am (daily except Fri/Sat), Isha sleep (~21:30)
   const getGreeting = (h: number): { before: string; name: string; after: string } => {
     const n = greetingName.toUpperCase();
@@ -769,7 +780,8 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     const hasPending = false;
 
     let before = '';
-    if (weekPattern === 'momentum')     before = 'THREE DAYS LOCKED IN ... KEEP THE RIVER MOVING ';
+    if (isSleepTime)         before = SLEEP_TEASE_LINES[Math.floor(now.getMinutes() / 15) % SLEEP_TEASE_LINES.length];
+    else if (weekPattern === 'momentum')     before = 'THREE DAYS LOCKED IN ... KEEP THE RIVER MOVING ';
     else if (weekPattern === 'slump')   before = 'THE RIVER HAS BEEN LOW ALL WEEK ... ';
     else if (weekPattern === 'rising')  before = 'SOMETHING IS SHIFTING ... DON\'T STOP NOW ';
     else if (weekPattern === 'fading')  before = 'HAWK HAS BEEN DRIFTING ... COME BACK ';
@@ -777,6 +789,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
     else if (noFocus)        before = 'HAWK HASN\'T MOVED YET ... ';
     else if (hasPending)     before = 'SOMETHING IS WAITING ... ';
     else if (noWorkout)      before = 'LION DIDN\'T HUNT TODAY ... ';
+    else if (isFriday)       before = 'JUMU\'AH MUBARAK ... READ YOUR KAHF ';
     else if (h >= 0  && h < 4)  before = 'DEEP NIGHT ... REST WELL ';
     else if (h >= 4  && h < 5)  before = 'FAJR HOUR ... THE BEST START ';
     else if (h >= 5  && h < 9)  before = 'MORNING LOCKED IN ... BUILD IT ';

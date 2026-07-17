@@ -18,7 +18,6 @@ import { PomodoroProvider } from './hooks/usePomodoro';
 import { FastingManager } from './components/logic/FastingManager';
 import { CalendarResetManager } from './components/logic/CalendarResetManager';
 import { DeviceCodeBanner } from './components/ui/DeviceCodeBanner';
-import { useSleepLock } from './hooks/useSleepLock';
 import { motion, AnimatePresence } from 'framer-motion';
 import './styles/global.css';
 
@@ -37,7 +36,6 @@ const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, biometricCleared, setBiometricCleared } = useAuth();
-  const isSleepLocked = useSleepLock();
 
   const nav = (to: string) => {
     const path = to === 'home' ? '/' : `/${to}`;
@@ -47,9 +45,6 @@ const AppRoutes: React.FC = () => {
 
   // Derive current page from location
   const currentPage = location.pathname.replace('/Rakeeen-Home', '').replace('/', '') || 'home';
-  // The Devotion page (Prayer Times / Radio / Quran tabs) stays fully interactive during
-  // Sleep Mode — everything else in the system is locked.
-  const isLockExempt = currentPage === 'devotion';
 
   if (loading) {
     return (
@@ -83,41 +78,23 @@ const AppRoutes: React.FC = () => {
       <FastingManager />
       <CalendarResetManager />
 
-      {/* Sleep Mode (9pm-Fajr): every button in the system is disabled except on the
-          Devotion page, so the actual Radio tab there stays reachable and usable. */}
-      <div
-        style={isSleepLocked && !isLockExempt ? { pointerEvents: 'none', userSelect: 'none', opacity: 0.55, filter: 'grayscale(0.3)' } : undefined}
-        aria-hidden={isSleepLocked && !isLockExempt}
-      >
-        <AnimatePresence mode="wait">
-          <Routes>
-            <Route path="/" element={<AnimatedPage><Home navigate={nav} /></AnimatedPage>} />
-            <Route path="/water" element={<AnimatedPage><Water navigate={nav} /></AnimatedPage>} />
-            <Route path="/calendar" element={<AnimatedPage><Calendar navigate={nav} /></AnimatedPage>} />
-            <Route path="/pomodoro" element={<AnimatedPage><Pomodoro navigate={nav} /></AnimatedPage>} />
-            <Route path="/devotion" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
-            <Route path="/quran" element={<AnimatedPage><QuranReader navigate={nav} /></AnimatedPage>} />
-            <Route path="/fitness" element={<AnimatedPage><Fitness navigate={nav} /></AnimatedPage>} />
-            <Route path="/finance" element={<AnimatedPage><Finance navigate={nav} /></AnimatedPage>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AnimatePresence>
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/" element={<AnimatedPage><Home navigate={nav} /></AnimatedPage>} />
+          <Route path="/water" element={<AnimatedPage><Water navigate={nav} /></AnimatedPage>} />
+          <Route path="/calendar" element={<AnimatedPage><Calendar navigate={nav} /></AnimatedPage>} />
+          <Route path="/pomodoro" element={<AnimatedPage><Pomodoro navigate={nav} /></AnimatedPage>} />
+          <Route path="/devotion" element={<AnimatedPage><Prayer navigate={nav} /></AnimatedPage>} />
+          <Route path="/quran" element={<AnimatedPage><QuranReader navigate={nav} /></AnimatedPage>} />
+          <Route path="/fitness" element={<AnimatedPage><Fitness navigate={nav} /></AnimatedPage>} />
+          <Route path="/finance" element={<AnimatedPage><Finance navigate={nav} /></AnimatedPage>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AnimatePresence>
 
-        <FloatingTimer currentPage={currentPage} onNavigate={() => nav('pomodoro')} />
-        <DeviceCodeBanner user={user} />
-      </div>
+      <FloatingTimer currentPage={currentPage} onNavigate={() => nav('pomodoro')} />
+      <DeviceCodeBanner user={user} />
 
-      {isSleepLocked && !isLockExempt && (
-        <div
-          className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] font-mono-main text-[10px] uppercase tracking-[0.25em] font-bold px-4 py-2 border border-ink bg-[var(--paper-dark)] text-ink/50"
-          style={{ pointerEvents: 'none' }}
-        >
-          Sleep Mode — Devotion Only
-        </div>
-      )}
-
-      {/* Stays clickable even during Sleep Mode — the way back to Devotion while the
-          radio plays elsewhere in the system. */}
       <FloatingRadioButton onNavigate={() => nav('devotion?tab=radio')} />
     </div>
   );
