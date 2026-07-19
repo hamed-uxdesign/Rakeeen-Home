@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, ReferenceLine } from 'recharts';
 import { formatTime } from '../../utils/timeHelpers';
+import { niceTicks } from '../../utils/charts';
 import { ChartTooltip } from '../ui/UIComponents';
 import { Play, Pause, RotateCcw, Maximize2, X, ArrowLeft, ChevronRight } from 'lucide-react';
 import { usePomodoro } from '../../hooks/usePomodoro';
@@ -277,7 +278,9 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   };
 
   const dynamicReports = getDynamicReports();
-  const [reportType, setReportType] = useState<'sessions' | 'minutes'>('sessions');
+  // Chart always shows hours now — the sessions/hours toggle was removed, but the
+  // sessions count still shows in the subtitle above the chart.
+  const reportType = 'minutes' as const;
   const DAILY_TARGET_HOURS = 12;
 
   const controls = (
@@ -538,30 +541,6 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                     </button>
                   ))}
                 </div>
-
-                {/* Metric switch tab with sliding animation */}
-                <div className="flex border border-ink/20 overflow-hidden relative bg-[var(--paper-dark)]">
-                  {(['sessions', 'minutes'] as const).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => setReportType(type)}
-                      className="relative font-mono-main text-[10px] uppercase tracking-widest font-bold px-4 py-2 cursor-pointer transition-colors duration-200"
-                      style={{
-                        color: reportType === type ? 'var(--paper)' : 'var(--ink)',
-                      }}
-                    >
-                      {reportType === type && (
-                        <motion.div
-                          layoutId="pomodoroMetricTabBg"
-                          className="absolute inset-0 bg-[var(--ink)]"
-                          transition={{ type: 'spring', stiffness: 450, damping: 36 }}
-                          style={{ zIndex: 0 }}
-                        />
-                      )}
-                      <span className="relative z-10">{type === 'sessions' ? 'Sessions' : 'Hrs Focus'}</span>
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -595,8 +574,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                       let base = reportType === 'sessions' ? 25 : 12;
                       if (view === 'month') base *= 7;
                       if (view === 'year') base *= 30;
-                      const step = base / 5;
-                      return [0, step, step*2, step*3, step*4, base, base + step];
+                      return niceTicks(base);
                     })()}
                   />
                   <Tooltip

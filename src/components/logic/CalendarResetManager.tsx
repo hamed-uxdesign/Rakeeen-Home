@@ -8,7 +8,8 @@ const ICAL_URL = 'https://calendar.google.com/calendar/ical/hamed.rakeeen%40gmai
 export const CalendarResetManager: React.FC = () => {
   // Guards against double-firing when Firebase hasn't confirmed lastResetDate yet
   const firedResetMarkerRef = useRef<string>('');
-  const firedPomoMarkerRef  = useRef<string>('');
+  const firedPomoIshaMarkerRef = useRef<string>('');
+  const firedPomoMidnightMarkerRef = useRef<string>('');
 
   // Real Isha adhan time, refreshed daily from the prayer API — both the water and the
   // focus/pomodoro reset now close out "today" at this exact moment.
@@ -27,7 +28,8 @@ export const CalendarResetManager: React.FC = () => {
   const [pomoHistory, setPomoHistory, pomoHistoryReady] = useFirebaseSync<Record<string, { sessions: number, minutes: number }>>('pomodoro_history', {});
 
   const [lastResetDate, setLastResetDate, lastResetDateReady] = useFirebaseSync<string>('system_last_reset_date', '');
-  const [lastPomoResetDate, setLastPomoResetDate, lastPomoResetDateReady] = useFirebaseSync<string>('system_last_pomo_reset_date', '');
+  const [lastPomoIshaResetDate, setLastPomoIshaResetDate, lastPomoIshaResetDateReady] = useFirebaseSync<string>('system_last_pomo_reset_date', '');
+  const [lastPomoMidnightResetDate, setLastPomoMidnightResetDate, lastPomoMidnightResetDateReady] = useFirebaseSync<string>('system_last_pomo_midnight_reset_date', '');
 
   useEffect(() => {
     // Wait until ALL Firebase sync hooks are ready before we check the calendar and potentially run reset
@@ -41,7 +43,8 @@ export const CalendarResetManager: React.FC = () => {
       !pomoWeekReady ||
       !pomoHistoryReady ||
       !lastResetDateReady ||
-      !lastPomoResetDateReady
+      !lastPomoIshaResetDateReady ||
+      !lastPomoMidnightResetDateReady
     ) {
       console.log('[CalendarResetManager] Waiting for Firebase sync to be ready...');
       return;
@@ -83,53 +86,89 @@ export const CalendarResetManager: React.FC = () => {
       setMeals({ Breakfast: [], Lunch: [], Dinner: [], Snacks: [] });
     };
 
+    // Which day a session belongs to always follows the real calendar date (midnight
+    // boundary) — matches getPomoTodayIdx(). Isha is ONLY when the "save + zero the
+    // counter" action fires, not when the day label changes. That means two separate
+    // triggers are needed:
+    //   1. At Isha: snapshot today's progress-so-far into history, then zero the
+    //      counter so the rest of the evening (still the same calendar day) starts fresh.
+    //   2. At midnight: whatever accumulated between Isha and midnight (today's leftover)
+    //      gets merged into that same day's history entry, then the new day starts clean.
+    const dayIdxOf = (d: Date) => (d.getDay() + 6) % 7; // Mon-Sun
+
+    const readFreshPomoWeek = (): any[] => {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem('pomodoro_week') || 'null');
+        return Array.isArray(parsed) && parsed.length === 7 ? parsed : pomoWeek;
+      } catch { return pomoWeek; }
+    };
+
     const checkPomoReset = () => {
       const now = new Date();
-      // Focus/Pomodoro closes out "today" at the real Isha adhan time — same mechanism
-      // as the water reset: before Isha we're still finishing yesterday's logical day,
-      // at/after it we've crossed into today's. Falls back to 9:00 PM if prayer times
-      // haven't loaded yet.
+      const todayDateStr = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toDateString();
+
+      // --- Isha trigger: snapshot today's progress so far, then let today keep
+      // accumulating from zero (falls back to 9:00 PM if prayer times haven't loaded) ---
       const [ishaH, ishaM] = (prayerTimes?.Isha || '21:00').split(':').map(Number);
-      const resetDateBase = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const todayIsha = new Date(resetDateBase);
-      todayIsha.setHours(ishaH, ishaM, 0, 0);
-      if (now < todayIsha) {
-        resetDateBase.setDate(resetDateBase.getDate() - 1);
-      }
-      const resetMarker = resetDateBase.toDateString(); // The day we need to reset/save to history
+      const todayIsha = new Date(now.getFullYear(), now.getMonth(), now.getDate(), ishaH, ishaM, 0, 0);
 
-      if (lastPomoResetDate !== resetMarker && firedPomoMarkerRef.current !== resetMarker) {
-        firedPomoMarkerRef.current = resetMarker;
-        window.localStorage.setItem('system_last_pomo_reset_date', JSON.stringify(resetMarker));
+      if (now >= todayIsha && lastPomoIshaResetDate !== todayDateStr && firedPomoIshaMarkerRef.current !== todayDateStr) {
+        firedPomoIshaMarkerRef.current = todayDateStr;
+        window.localStorage.setItem('system_last_pomo_reset_date', JSON.stringify(todayDateStr));
         window.localStorage.setItem('system_last_pomo_reset_date_updatedAt', new Date().toISOString());
-        console.log(`[CalendarResetManager] Triggering Pomodoro reset for logical day: ${resetMarker}`);
+        console.log(`[CalendarResetManager] Isha snapshot for: ${todayDateStr}`);
 
-        // Save to history — dayIdx is the day that just closed out; newDayIdx is the one
-        // we're now starting (its slot may hold stale data from last week and needs clearing).
-        const dayIdx = (resetDateBase.getDay() + 6) % 7; // Mon-Sun
-        const newDayIdx = (dayIdx + 1) % 7;
-        const currentPomoWeek = Array.isArray(pomoWeek) && pomoWeek.length === 7 ? pomoWeek : POMODORO_WEEKLY_MOCK;
-        const dayPomo = currentPomoWeek[dayIdx] || { sessions: 0, minutes: 0 };
+        const todayIdx = dayIdxOf(now);
+        const freshWeek = readFreshPomoWeek();
+        const todayPomo = freshWeek[todayIdx] || { sessions: 0, minutes: 0 };
 
-        if (dayPomo.sessions > 0) {
-          const newPomoHistory = { ...pomoHistory, [resetMarker]: { sessions: dayPomo.sessions, minutes: dayPomo.minutes } };
-          setPomoHistory(newPomoHistory);
+        if (todayPomo.sessions > 0) {
+          setPomoHistory({ ...pomoHistory, [todayDateStr]: { sessions: todayPomo.sessions, minutes: todayPomo.minutes } });
         }
+        setPomoSessions(0);
+        setPomoWeek(freshWeek.map((d: any, i: number) => i === todayIdx ? { sessions: 0, minutes: 0 } : d));
+        setLastPomoIshaResetDate(todayDateStr);
+      }
 
+      // --- Midnight trigger: merge yesterday's post-Isha leftover into its history
+      // entry (once per calendar day — doesn't need to run exactly at midnight, just
+      // before today's own Isha trigger would otherwise mix the two days together) ---
+      if (lastPomoMidnightResetDate !== todayDateStr && firedPomoMidnightMarkerRef.current !== todayDateStr) {
+        firedPomoMidnightMarkerRef.current = todayDateStr;
+        window.localStorage.setItem('system_last_pomo_midnight_reset_date', JSON.stringify(todayDateStr));
+        window.localStorage.setItem('system_last_pomo_midnight_reset_date_updatedAt', new Date().toISOString());
+
+        const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        const yesterdayDateStr = yesterday.toDateString();
+        const yesterdayIdx = dayIdxOf(yesterday);
+        const todayIdx = dayIdxOf(now);
+
+        const freshWeek = readFreshPomoWeek();
+        const leftoverPomo = freshWeek[yesterdayIdx] || { sessions: 0, minutes: 0 };
+
+        if (leftoverPomo.sessions > 0) {
+          console.log(`[CalendarResetManager] Merging post-Isha leftover into: ${yesterdayDateStr}`);
+          const existing = pomoHistory[yesterdayDateStr] || { sessions: 0, minutes: 0 };
+          setPomoHistory({
+            ...pomoHistory,
+            [yesterdayDateStr]: {
+              sessions: existing.sessions + leftoverPomo.sessions,
+              minutes: existing.minutes + leftoverPomo.minutes,
+            },
+          });
+        }
         setPomoSessions(0);
 
-        // Reset the week stats if the day that just ended was Friday (idx 4) and now we are starting Saturday (idx 5)
-        if (newDayIdx === 5) {
-          setPomoWeek(POMODORO_WEEKLY_MOCK); // Reset all Mon-Sun to 0
+        // New week starts fresh once today is Saturday (idx 5)
+        if (todayIdx === 5) {
+          setPomoWeek(POMODORO_WEEKLY_MOCK);
         } else {
-          // Just clear the new logical day's stats in case they had leftover data from the previous week:
-          const updatedWeek = currentPomoWeek.map((d: any, i: number) =>
-            i === newDayIdx ? { ...d, sessions: 0, minutes: 0 } : d
-          );
-          setPomoWeek(updatedWeek);
+          setPomoWeek(freshWeek.map((d: any, i: number) =>
+            (i === yesterdayIdx || i === todayIdx) ? { sessions: 0, minutes: 0 } : d
+          ));
         }
 
-        setLastPomoResetDate(resetMarker);
+        setLastPomoMidnightResetDate(todayDateStr);
       }
     };
 
@@ -255,8 +294,8 @@ export const CalendarResetManager: React.FC = () => {
     runChecks();
     return () => clearInterval(interval);
   }, [
-    lastResetDate, lastPomoResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setLastPomoResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory,
-    glassesReady, logReady, historyReady, mealsReady, fitHistoryReady, pomoReady, pomoWeekReady, pomoHistoryReady, lastResetDateReady, lastPomoResetDateReady,
+    lastResetDate, lastPomoIshaResetDate, lastPomoMidnightResetDate, glasses, history, meals, fitHistory, setGlasses, setLog, setHistory, setMeals, setFitHistory, setLastResetDate, setLastPomoIshaResetDate, setLastPomoMidnightResetDate, setPomoSessions, setPomoWeek, setPomoHistory, pomoWeek, pomoHistory,
+    glassesReady, logReady, historyReady, mealsReady, fitHistoryReady, pomoReady, pomoWeekReady, pomoHistoryReady, lastResetDateReady, lastPomoIshaResetDateReady, lastPomoMidnightResetDateReady,
     prayerTimes
   ]);
 

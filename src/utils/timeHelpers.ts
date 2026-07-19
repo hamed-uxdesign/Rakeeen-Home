@@ -25,13 +25,11 @@ export function getTodayIdx(): number {
   return day === 0 ? 6 : day - 1;
 }
 
+// Which day a focus session counts toward flips at real midnight — no rollback window.
+// (Archiving to history separately happens at Isha, via CalendarResetManager — a
+// different concern from which day's slot new sessions are written into.)
 export function getPomoLogicalDate(): Date {
-  const now = new Date();
-  if (now.getHours() < 4) {
-    const logical = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    return logical;
-  }
-  return now;
+  return new Date();
 }
 
 export function getPomoTodayIdx(): number {

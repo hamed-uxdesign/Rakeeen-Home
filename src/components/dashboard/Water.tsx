@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useFirebaseSync } from '../../hooks/useFirebaseSync';
 import { usePrayer } from '../../hooks/usePrayer';
+import { niceTicks } from '../../utils/charts';
 import { ChartTooltip } from '../ui/UIComponents';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, Cell } from 'recharts';
 import { RotateCcw, Undo2, Plus, ArrowLeft, ChevronRight } from 'lucide-react';
@@ -246,13 +247,16 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
                   width={32}
                   domain={[0, (dataMax: number) => {
                     const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
-                    return Math.max(dataMax, target + (reportView === 'year' ? 40 : 4));
+                    return Math.max(dataMax, target);
                   }]}
-                  ticks={
-                    reportView === 'week' ? [0, 4, 8, 12, 14] :
-                    reportView === 'month' ? [0, 25, 50, 75, 98] :
-                    [0, 100, 200, 300, 420]
-                  }
+                  ticks={(() => {
+                    const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
+                    // Nice round intermediate steps, but the final tick always lands
+                    // exactly on the real goal (14/98/420) instead of overshooting it.
+                    const ticks = niceTicks(target).filter(t => t <= target);
+                    if (ticks[ticks.length - 1] !== target) ticks.push(target);
+                    return ticks;
+                  })()}
                 />
                 <Tooltip
                   cursor={{ fill: 'var(--ink)', fillOpacity: 0.04 }}
