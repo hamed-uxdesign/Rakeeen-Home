@@ -434,14 +434,12 @@ export const Calendar: React.FC<CalendarProps> = ({ navigate }) => {
 
                 return (
                   <div key={task.id} className="flex items-center gap-4 w-full relative">
-                    {/* Dot Matrix Vector shape (inline on mobile, absolute on desktop) */}
-                    <div 
-                      className={`flex-shrink-0 flex items-center justify-center w-8 h-8 transition-all duration-500 lg:absolute lg:-left-12 lg:top-1/2 lg:-translate-y-1/2 ${
-                        isActive ? 'animate-spin' : ''
-                      }`}
-                      style={isActive ? { animationDuration: '6s' } : undefined}
+                    {/* Dot Matrix Vector shape — only visible next to the active event */}
+                    <div
+                      className="flex-shrink-0 flex items-center justify-center w-8 h-8 lg:absolute lg:-left-12 lg:top-1/2 lg:-translate-y-1/2 animate-spin"
+                      style={{ animationDuration: '6s', visibility: isActive ? 'visible' : 'hidden' }}
                     >
-                      <DotMatrixVector shapeIndex={shapeIndex} isActive={isActive} />
+                      <DotMatrixVector shapeIndex={shapeIndex} isActive={true} />
                     </div>
 
                     {/* Event Card */}

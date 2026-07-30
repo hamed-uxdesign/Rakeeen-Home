@@ -321,7 +321,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
   const [newDepositAmount, setNewDepositAmount] = useState('');
   const [newDepositBank, setNewDepositBank] = useState<keyof FinanceBanks | null>(null);
   const [newDepositCategory, setNewDepositCategory] = useState<'Salary' | 'Freelance'>('Salary');
-  const [depositMode, setDepositMode] = useState<'split' | 'manual'>('split');
+  const [depositMode] = useState<'split' | 'manual'>('manual');
   const [manualBucketKey, setManualBucketKey] = useState<keyof FinanceBuckets | null>(null);
   const [manualBankKey, setManualBankKey] = useState<keyof FinanceBanks | null>(null);
 
@@ -564,7 +564,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
       setNewDepositAmount('');
       setNewDepositBank(null);
       setNewDepositCategory('Salary');
-      setDepositMode('split');
+
       setManualBucketKey(null);
       setManualBankKey(null);
       setShowAddDepositModal(false);
@@ -689,7 +689,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowWithdrawModal(true)}
-              className="flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer border border-ink/30 text-ink/60 hover:text-ink hover:border-ink transition-colors bg-transparent"
+              className="btn-brutalist flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer opacity-60 hover:opacity-100"
             >
               <Minus size={11} /> Withdraw
             </button>
@@ -851,17 +851,17 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   return (
                     <div
                       key={key}
-                      className="brutalist-card no-lift relative overflow-hidden p-6 aspect-[1.85/1] flex flex-col justify-between group bg-paper-dark"
+                      className="brutalist-card no-lift relative overflow-hidden p-4 aspect-[2.2/1] flex flex-col justify-between group bg-paper-dark"
                     >
                       <div className="flex justify-between items-start">
                         {/* Vector on top left */}
-                        <div className="w-12 h-12 flex items-center justify-center shrink-0 text-ink/75 group-hover:text-ink transition-colors">
-                          <div className="animate-spin" style={{ animationDuration: '8s' }}>
+                        <div className="w-8 h-8 flex items-center justify-center shrink-0 text-ink/75 group-hover:text-ink transition-colors">
+                          <div className="animate-spin" style={{ animationDuration: '8s', transform: 'scale(0.67)' }}>
                             <Vector />
                           </div>
                         </div>
-                        
-                        <p className="font-sans-main text-[12px] font-black uppercase tracking-widest text-ink/60 mt-1">
+
+                        <p className="font-sans-main text-[11px] font-black uppercase tracking-widest text-ink/60">
                           {BANK_LABELS[key]}
                         </p>
                       </div>
@@ -871,7 +871,7 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                         <span className="font-mono-main text-[9px] font-bold uppercase tracking-[0.2em] text-ink/40 block mb-1">
                           Available Balance
                         </span>
-                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">
+                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-lg sm:text-xl font-black text-ink tracking-tight">
                           {formatEGP(banks[key] || 0)}
                         </MaskedValue>
                       </div>
@@ -1656,16 +1656,6 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
           return (
             <form onSubmit={handleAddDeposit}>
                   <div className="px-8 pt-7 pb-7" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-
-                    {/* Mode toggle: Split / Manual */}
-                    <div className="flex" style={{ border: '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' }}>
-                      {(['split', 'manual'] as const).map((m, i) => (
-                        <button key={m} type="button" onClick={() => setDepositMode(m)}
-                          className="cursor-pointer flex-1 font-sans-main font-bold uppercase tracking-wide transition-colors"
-                          style={{ fontSize: 11, padding: '12px 0', borderRight: i === 0 ? '1px solid color-mix(in srgb, var(--ink) 15%, transparent)' : 'none', background: depositMode === m ? '#7A9E1A' : 'transparent', color: depositMode === m ? '#000' : 'color-mix(in srgb, var(--ink) 35%, transparent)' }}
-                        >{m === 'split' ? 'Auto Split' : 'Manual'}</button>
-                      ))}
-                    </div>
 
                     {/* Amount */}
                     <div>

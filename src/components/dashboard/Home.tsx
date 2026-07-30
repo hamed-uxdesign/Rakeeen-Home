@@ -959,7 +959,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
 
   // Quick action function to increment water glasses
   // Vector emotional states
-  const waterFillLevel = Math.min(1, (glasses || 0) / 14);
+  const waterFillLevel = Math.min(1, (glasses || 0) / 12);
   const focusPaused = false;
   const fitnessPaused = workoutMinsToday > 0;
   const prayerPaused = false;
@@ -977,7 +977,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const addWaterCup = (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering card navigation
     if (waterLocked) return;
-    if (glasses < 14) {
+    if (glasses < 12) {
       setGlasses(glasses + 1);
     }
   };
@@ -1102,7 +1102,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
               Vector: WaterVector,
               route: 'water',
               isRunning: false,
-              metric: `${glasses} / 14`,
+              metric: `${glasses} / 12`,
               subText: 'GLASSES TODAY',
             },
             {
@@ -1258,7 +1258,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
                         gapClassName="gap-[4px] sm:gap-[5px]" 
                       />
                       <span className="font-mono-main text-3xl sm:text-4xl font-bold text-ink/40 leading-none">
-                        / 14
+                        / 12
                       </span>
                       <span className="font-sans-main text-sm font-bold uppercase tracking-wider text-ink/60 ml-2 leading-none">glasses today</span>
                     </div>

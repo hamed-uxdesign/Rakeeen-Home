@@ -16,7 +16,7 @@ interface PomodoroProps {
 
 
 const getTip = (value: number, type: string, reportType: 'sessions' | 'minutes') => {
-  let target = reportType === 'sessions' ? 25 : 12;
+  let target = reportType === 'sessions' ? 25 : 10;
   if (type === 'month') target *= 7;
   if (type === 'year') target *= 30;
   if (value >= target) return "Elite Focus!";
@@ -281,7 +281,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
   // Chart always shows hours now — the sessions/hours toggle was removed, but the
   // sessions count still shows in the subtitle above the chart.
   const reportType = 'minutes' as const;
-  const DAILY_TARGET_HOURS = 12;
+  const DAILY_TARGET_HOURS = 10;
 
   const controls = (
     <div className="flex flex-col items-center gap-4">
@@ -571,7 +571,7 @@ export const Pomodoro: React.FC<PomodoroProps> = ({ navigate }) => {
                       return Math.max(dataMax, target);
                     }]}
                     ticks={(() => {
-                      let base = reportType === 'sessions' ? 25 : 12;
+                      let base = reportType === 'sessions' ? 25 : 10;
                       if (view === 'month') base *= 7;
                       if (view === 'year') base *= 30;
                       return niceTicks(base);

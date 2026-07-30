@@ -18,7 +18,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
   const [log, setLog] = useFirebaseSync<string[]>('hydration_log', []);
   const [history] = useFirebaseSync<Record<string, number>>('hydration_history', {});
   const [reportView, setReportView] = useState<'week' | 'month' | 'year'>('week');
-  const goal = 14;
+  const goal = 12;
 
   React.useEffect(() => {
     document.title = 'Rakeeen - Water';
@@ -246,13 +246,13 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
                   tickLine={false}
                   width={32}
                   domain={[0, (dataMax: number) => {
-                    const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
+                    const target = reportView === 'week' ? 12 : reportView === 'month' ? 84 : 360;
                     return Math.max(dataMax, target);
                   }]}
                   ticks={(() => {
-                    const target = reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420;
+                    const target = reportView === 'week' ? 12 : reportView === 'month' ? 84 : 360;
                     // Nice round intermediate steps, but the final tick always lands
-                    // exactly on the real goal (14/98/420) instead of overshooting it.
+                    // exactly on the real goal (12/84/360) instead of overshooting it.
                     const ticks = niceTicks(target).filter(t => t <= target);
                     if (ticks[ticks.length - 1] !== target) ticks.push(target);
                     return ticks;
@@ -264,7 +264,7 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
                     <ChartTooltip
                       unit="Glasses"
                       getTipMessage={(val) =>
-                        val >= (reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420)
+                        val >= (reportView === 'week' ? 12 : reportView === 'month' ? 84 : 360)
                           ? 'Goal Achieved'
                           : 'Hydration Pending'
                       }
@@ -272,13 +272,13 @@ export const Water: React.FC<WaterProps> = ({ navigate }) => {
                   }
                 />
                 <ReferenceLine
-                  y={reportView === 'week' ? 14 : reportView === 'month' ? 98 : 420}
+                  y={reportView === 'week' ? 12 : reportView === 'month' ? 84 : 360}
                   stroke="var(--ink)"
                   strokeOpacity={0.15}
                   strokeDasharray="4 4"
                   strokeWidth={1}
                   label={{
-                    value: reportView === 'week' ? '14' : reportView === 'month' ? '98' : '420',
+                    value: reportView === 'week' ? '12' : reportView === 'month' ? '84' : '360',
                     position: 'insideTopRight',
                     fill: 'var(--ink)',
                     fontSize: 10,
