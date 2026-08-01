@@ -19,76 +19,110 @@ interface FinanceProps {
   navigate: (to: string) => void;
 }
 
-// 4 custom spinning SVG vectors for bank cards
-const CIBVector: React.FC = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
-    <circle cx="12" cy="4" r="1.3" />
-    <circle cx="12" cy="8" r="1.5" />
-    <circle cx="12" cy="12" r="1.8" />
-    <circle cx="12" cy="16" r="1.5" />
-    <circle cx="12" cy="20" r="1.3" />
-    <circle cx="4" cy="12" r="1.3" />
-    <circle cx="8" cy="12" r="1.5" />
-    <circle cx="16" cy="12" r="1.5" />
-    <circle cx="20" cy="12" r="1.3" />
-    <circle cx="8" cy="8" r="1" />
-    <circle cx="16" cy="8" r="1" />
-    <circle cx="8" cy="16" r="1" />
-    <circle cx="16" cy="16" r="1" />
-  </svg>
-);
+// Balance → animation duration: slow at 0 EGP (12s), fast at 100k+ EGP (2s)
+function balanceToDuration(balance: number): number {
+  const norm = Math.min(1, (balance || 0) / 100_000);
+  return Math.max(2, 12 - norm * 10);
+}
 
-const AhlyMainVector: React.FC = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
-    <circle cx="12" cy="16" r="1.8" />
-    <circle cx="12" cy="12" r="1.5" />
-    <circle cx="12" cy="8" r="1.3" />
-    <circle cx="9" cy="10" r="1.2" />
-    <circle cx="6" cy="9" r="1" />
-    <circle cx="3" cy="9" r="0.8" />
-    <circle cx="8" cy="13" r="1.2" />
-    <circle cx="5" cy="13" r="1" />
-    <circle cx="15" cy="10" r="1.2" />
-    <circle cx="18" cy="9" r="1" />
-    <circle cx="21" cy="9" r="0.8" />
-    <circle cx="16" cy="13" r="1.2" />
-    <circle cx="19" cy="13" r="1" />
-  </svg>
-);
+// CIB — diamond star network; dots radiate center→out, wave reflects balance speed
+const CIBVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    [12, 12, 0],
+    [12, 7, 0.08], [17, 12, 0.16], [12, 17, 0.24], [7, 12, 0.32],
+    [7, 7, 0.42], [17, 7, 0.50], [17, 17, 0.58], [7, 17, 0.66],
+    [12, 2, 0.74], [22, 12, 0.82], [12, 22, 0.90], [2, 12, 0.98],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r={i === 0 ? 1.5 : 1.1}
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
 
-const AhlyMeezaVector: React.FC = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
-    <circle cx="12" cy="12" r="1.8" />
-    <circle cx="12" cy="6" r="1.2" />
-    <circle cx="18" cy="12" r="1.2" />
-    <circle cx="12" cy="18" r="1.2" />
-    <circle cx="6" cy="12" r="1.2" />
-    <circle cx="12" cy="2" r="0.9" />
-    <circle cx="19.07" cy="4.93" r="0.9" />
-    <circle cx="22" cy="12" r="0.9" />
-    <circle cx="19.07" cy="19.07" r="0.9" />
-    <circle cx="12" cy="22" r="0.9" />
-    <circle cx="4.93" cy="19.07" r="0.9" />
-    <circle cx="2" cy="12" r="0.9" />
-    <circle cx="4.93" cy="4.93" r="0.9" />
-  </svg>
-);
+// Ahly Main — ankh ☥ (Egyptian cross); loop → crossbar → stem, wave = balance
+const AhlyMainVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    // oval loop top→right→bottom→left
+    [12, 2,    0   ],
+    [16, 4,    0.07],
+    [18, 8,    0.14],
+    [16, 11.5, 0.21],
+    [8,  11.5, 0.28],
+    [6,  8,    0.35],
+    [8,  4,    0.42],
+    // crossbar L→R
+    [5,  13.5, 0.50],
+    [8,  13.5, 0.55],
+    [16, 13.5, 0.60],
+    [19, 13.5, 0.65],
+    // stem downward
+    [12, 16,   0.72],
+    [12, 19,   0.79],
+    [12, 22,   0.86],
+    // loop center
+    [12, 8,    0.93],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r={i === 14 ? 1.5 : 1.1}
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
 
-const BanqueMisrVector: React.FC = () => (
-  <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
-    <circle cx="12" cy="6" r="1.8" />
-    <circle cx="8" cy="11" r="1.5" />
-    <circle cx="16" cy="11" r="1.5" />
-    <circle cx="4" cy="16" r="1.2" />
-    <circle cx="12" cy="16" r="1.5" />
-    <circle cx="20" cy="16" r="1.2" />
-    <circle cx="12" cy="21" r="1.2" />
-    <circle cx="6" cy="6" r="1" />
-    <circle cx="18" cy="6" r="1" />
-    <circle cx="3" cy="11" r="1" />
-    <circle cx="21" cy="11" r="1" />
-  </svg>
-);
+// Ahly Meeza — card outline + stripe; sweep clockwise, speed = balance
+const AhlyMeezaVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    // top edge L→R
+    [3, 4, 0], [7, 4, 0.07], [12, 4, 0.14], [17, 4, 0.21], [21, 4, 0.28],
+    // right edge T→B
+    [21, 9, 0.35], [21, 14, 0.42], [21, 20, 0.49],
+    // bottom edge R→L
+    [17, 20, 0.56], [12, 20, 0.63], [7, 20, 0.70], [3, 20, 0.77],
+    // left edge B→T
+    [3, 14, 0.84], [3, 9, 0.91],
+    // magnetic stripe
+    [6, 10, 0.3], [10, 10, 0.35], [14, 10, 0.4], [18, 10, 0.45],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r={i >= 14 ? 1.0 : 1.1}
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Banque Misr — pyramid; wave from apex→base, speed = balance
+const BanqueMisrVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const rows: [number, number, number][][] = [
+    [[12, 3, 0]],
+    [[9, 9, 0.18], [12, 9, 0.18], [15, 9, 0.18]],
+    [[6, 15, 0.40], [9, 15, 0.40], [12, 15, 0.40], [15, 15, 0.40], [18, 15, 0.40]],
+    [[3, 21, 0.65], [6, 21, 0.65], [9, 21, 0.65], [12, 21, 0.65], [15, 21, 0.65], [18, 21, 0.65], [21, 21, 0.65]],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {rows.map((row, ri) =>
+        row.map(([cx, cy, frac], i) => (
+          <circle key={`${ri}-${i}`} cx={cx} cy={cy} r={ri === 0 ? 1.6 : 1.1}
+            style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+        ))
+      )}
+    </svg>
+  );
+};
 
 // Animated price number — flashes green/red on change
 // Spinning vector that hides the value until hover
@@ -165,11 +199,133 @@ const BANK_LABELS: Record<keyof FinanceBanks, string> = {
   bm: 'Banque Misr',
 };
 
-const BANK_VECTORS: Record<keyof FinanceBanks, React.ComponentType> = {
+const BANK_VECTORS: Record<keyof FinanceBanks, React.ComponentType<{ balance: number }>> = {
   cib: CIBVector,
   ahly_main: AhlyMainVector,
   ahly_meeza: AhlyMeezaVector,
   bm: BanqueMisrVector,
+};
+
+// Mustaqbal — shield outline (safe / vault)
+const MustaqbalVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    [12, 2,  0   ], [17, 4,  0.08], [20, 8,  0.16], [20, 13, 0.24],
+    [17, 18, 0.32], [12, 21, 0.40], [7,  18, 0.48], [4,  13, 0.56],
+    [4,  8,  0.64], [7,  4,  0.72],
+    [12, 12, 0.85],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r={i === 10 ? 1.5 : 1.1}
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Tawarr2 — lightning bolt (urgent, emergency)
+const Tawarr2Vector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    [16, 2,  0   ], [14, 5,  0.10], [12, 8,  0.20],
+    [14, 8,  0.25], [11, 12, 0.35], [9,  16, 0.45],
+    [11, 16, 0.50], [8,  22, 0.65],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r="1.2"
+          style={{ animation: `vectorFade ${d * 0.7}s ease-in-out infinite`, animationDelay: `${frac * d * 0.7}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Basmala — crescent moon (spiritual, personal)
+const BasmalaVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    [12, 2,  0   ], [17, 4,  0.09], [20, 8,  0.18],
+    [21, 12, 0.27], [20, 16, 0.36], [17, 20, 0.45], [12, 22, 0.54],
+    [4,  6,  0.70], [4,  18, 0.80],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r="1.1"
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Sadaqa — ascending sprout / rising (charity = growth)
+const SadaqaVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    [12, 2,  0   ],
+    [9,  6,  0.10], [12, 6,  0.15], [15, 6,  0.10],
+    [7,  10, 0.22], [12, 10, 0.28], [17, 10, 0.22],
+    [12, 14, 0.40],
+    [12, 18, 0.55],
+    [12, 22, 0.70],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r={i === 0 ? 1.5 : 1.1}
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Total Physical — stacked cash notes (horizontal bars)
+const TotalPhysicalVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const dots: [number, number, number][] = [
+    [3,5,0],[7,5,0.05],[12,5,0.10],[17,5,0.05],[21,5,0],
+    [3,9,0.20],[7,9,0.25],[12,9,0.30],[17,9,0.25],[21,9,0.20],
+    [3,13,0.40],[7,13,0.45],[12,13,0.50],[17,13,0.45],[21,13,0.40],
+    [3,17,0.60],[7,17,0.65],[12,17,0.70],[17,17,0.65],[21,17,0.60],
+    [3,21,0.80],[7,21,0.85],[12,21,0.90],[17,21,0.85],[21,21,0.80],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {dots.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r="0.9"
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+// Total Virtual — ordered 4×4 lattice (digital / virtual)
+const TotalVirtualVector: React.FC<{ balance: number }> = ({ balance }) => {
+  const d = balanceToDuration(balance);
+  const pts: [number, number, number][] = [
+    [4,4,0],[10,4,0.10],[14,4,0.10],[20,4,0],
+    [4,10,0.20],[10,10,0.30],[14,10,0.30],[20,10,0.20],
+    [4,14,0.40],[10,14,0.50],[14,14,0.50],[20,14,0.40],
+    [4,20,0.60],[10,20,0.70],[14,20,0.70],[20,20,0.60],
+  ];
+  return (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+      {pts.map(([cx, cy, frac], i) => (
+        <circle key={i} cx={cx} cy={cy} r={[0,3,12,15].includes(i) ? 1.4 : 1.0}
+          style={{ animation: `vectorFade ${d}s ease-in-out infinite`, animationDelay: `${frac * d}s` }} />
+      ))}
+    </svg>
+  );
+};
+
+const BUCKET_VECTORS: Record<keyof FinanceBuckets, React.ComponentType<{ balance: number }>> = {
+  mustaqbal: MustaqbalVector,
+  tawarr2:   Tawarr2Vector,
+  basmala:   BasmalaVector,
+  sadaqa:    SadaqaVector,
 };
 
 const BUCKET_META: Record<keyof FinanceBuckets, { en: string; pct: string; accent: string }> = {
@@ -689,7 +845,10 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowWithdrawModal(true)}
-              className="btn-brutalist flex items-center gap-1.5 font-mono-main text-[10px] uppercase tracking-widest font-bold py-2 px-4 cursor-pointer opacity-60 hover:opacity-100"
+              className="btn-brutalist flex items-center gap-1.5 cursor-pointer"
+              style={{ background: 'transparent', color: 'var(--ink)', opacity: 0.55, border: '1px solid color-mix(in srgb, var(--ink) 35%, transparent)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '1'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--ink)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.opacity = '0.55'; (e.currentTarget as HTMLButtonElement).style.borderColor = 'color-mix(in srgb, var(--ink) 35%, transparent)'; }}
             >
               <Minus size={11} /> Withdraw
             </button>
@@ -851,27 +1010,21 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
                   return (
                     <div
                       key={key}
-                      className="brutalist-card no-lift relative overflow-hidden p-4 aspect-[2.2/1] flex flex-col justify-between group bg-paper-dark"
+                      className="brutalist-card no-lift relative overflow-hidden p-4 aspect-[3.2/1] flex flex-col justify-between group bg-paper-dark"
                     >
                       <div className="flex justify-between items-start">
-                        {/* Vector on top left */}
-                        <div className="w-8 h-8 flex items-center justify-center shrink-0 text-ink/75 group-hover:text-ink transition-colors">
-                          <div className="animate-spin" style={{ animationDuration: '8s', transform: 'scale(0.67)' }}>
-                            <Vector />
-                          </div>
+                        <div className="flex items-center justify-center shrink-0 text-ink/70 group-hover:text-ink transition-colors duration-500">
+                          <Vector balance={banks[key] || 0} />
                         </div>
-
                         <p className="font-sans-main text-[11px] font-black uppercase tracking-widest text-ink/60">
                           {BANK_LABELS[key]}
                         </p>
                       </div>
-
-                      {/* Card Balance at the bottom */}
                       <div className="relative z-10 mt-auto">
                         <span className="font-mono-main text-[9px] font-bold uppercase tracking-[0.2em] text-ink/40 block mb-1">
                           Available Balance
                         </span>
-                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-lg sm:text-xl font-black text-ink tracking-tight">
+                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">
                           {formatEGP(banks[key] || 0)}
                         </MaskedValue>
                       </div>
@@ -883,130 +1036,81 @@ export const Finance: React.FC<FinanceProps> = ({ navigate }) => {
 
             {/* BALANCE TOTALS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="brutalist-card no-lift">
-                <div className="flex items-center gap-2 mb-3">
-                  <Banknote className="text-ink/40" />
-                  <p className="font-mono-main text-[10px] font-bold tracking-[0.2em] uppercase text-ink/40">
-                    TOTAL PHYSICAL BALANCE
-                  </p>
+              <div className="brutalist-card no-lift relative overflow-hidden p-4 aspect-[3.2/1] flex flex-col justify-between group bg-paper-dark">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center justify-center shrink-0 text-ink/70 group-hover:text-ink transition-colors duration-500">
+                    <TotalPhysicalVector balance={totalPhysical} />
+                  </div>
+                  <p className="font-sans-main text-[11px] font-black uppercase tracking-widest text-ink/60">Total Physical</p>
                 </div>
-                <MaskedValue disabled={!privacyMode} className="font-mono-main text-3xl md:text-4xl font-black text-ink">{formatEGP(totalPhysical)}</MaskedValue>
+                <div className="relative z-10 mt-auto">
+                  <span className="font-mono-main text-[9px] font-bold uppercase tracking-[0.2em] text-ink/40 block mb-1">Available Balance</span>
+                  <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">{formatEGP(totalPhysical)}</MaskedValue>
+                </div>
               </div>
-              <div className="brutalist-card no-lift">
-                <div className="flex items-center gap-2 mb-3">
-                  <Wallet className="text-ink/40" />
-                  <p className="font-mono-main text-[10px] font-bold tracking-[0.2em] uppercase text-ink/40">
-                    TOTAL VIRTUAL BALANCE
-                  </p>
+              <div className="brutalist-card no-lift relative overflow-hidden p-4 aspect-[3.2/1] flex flex-col justify-between group bg-paper-dark">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center justify-center shrink-0 text-ink/70 group-hover:text-ink transition-colors duration-500">
+                    <TotalVirtualVector balance={totalVirtual} />
+                  </div>
+                  <p className="font-sans-main text-[11px] font-black uppercase tracking-widest text-ink/60">Total Virtual</p>
                 </div>
-                <MaskedValue disabled={!privacyMode} className="font-mono-main text-3xl md:text-4xl font-black text-ink">{formatEGP(totalVirtual)}</MaskedValue>
+                <div className="relative z-10 mt-auto">
+                  <span className="font-mono-main text-[9px] font-bold uppercase tracking-[0.2em] text-ink/40 block mb-1">Available Balance</span>
+                  <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">{formatEGP(totalVirtual)}</MaskedValue>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* BUCKETS TAB - DYNAMIC GRID WITH DOT-MATRIX LOADER */}
+        {/* BUCKETS TAB */}
         {activeTab === 'buckets' && (
           <section className="space-y-6">
             <p className="font-mono-main text-[11px] font-bold tracking-[0.25em] uppercase text-ink/40 mb-4">VIRTUAL BUCKETS</p>
-            
-            <div className="flex flex-col gap-6">
-              {/* 1. MUSTAQBAL (Vault) - FULL WIDTH */}
-              {(() => {
-                const key = 'mustaqbal';
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {(['mustaqbal', 'tawarr2', 'basmala', 'sadaqa'] as Array<keyof FinanceBuckets>).map(key => {
                 const meta = BUCKET_META[key];
-                const value = (buckets[key] || 0) + totalGoldValuation;
-                const percentOfTotal = totalVirtual > 0 ? (value / totalVirtual) * 100 : 0;
-                const activeDots = Math.max(0, Math.min(10, Math.round(percentOfTotal / 10)));
+                const Vector = BUCKET_VECTORS[key];
+                const value = key === 'mustaqbal'
+                  ? (buckets[key] || 0) + totalGoldValuation
+                  : (buckets[key] || 0);
                 return (
-                  <div className="brutalist-card no-lift group flex flex-col justify-between p-6 bg-paper-dark min-h-[140px] relative w-full">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 shrink-0 rounded-full" style={{ backgroundColor: meta.accent }} />
-                        <p className="font-sans-main text-base font-black uppercase tracking-wider text-ink/80">
-                          {meta.en}
-                        </p>
+                  <div
+                    key={key}
+                    className="brutalist-card no-lift relative overflow-hidden p-4 aspect-[3.2/1] flex flex-col justify-between group bg-paper-dark"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center justify-center shrink-0 text-ink/70 group-hover:text-ink transition-colors duration-500">
+                        <Vector balance={value} />
                       </div>
+                      <p className="font-sans-main text-[11px] font-black uppercase tracking-widest text-ink/60">
+                        {meta.en}
+                      </p>
                     </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mt-6">
+                    <div className="relative z-10 mt-auto flex justify-between items-end">
                       <div>
-                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink">
+                        <span className="font-mono-main text-[9px] font-bold uppercase tracking-[0.2em] text-ink/40 block mb-1">
+                          Available Balance
+                        </span>
+                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-2xl sm:text-3xl font-black text-ink tracking-tight">
                           {formatEGP(value)}
                         </MaskedValue>
-                        {totalGoldValuation > 0 && (
-                          <div className="flex gap-4 mt-2">
-                            <span className="font-mono-main text-[10px] text-ink/35">
-                              Cash <span className="text-ink/55">{formatEGP(buckets['mustaqbal'] || 0)}</span>
-                            </span>
-                            <span className="font-mono-main text-[10px] text-ink/35">
-                              Gold <span style={{ color: '#B89228' }}>{formatEGP(totalGoldValuation)}</span>
-                            </span>
-                          </div>
-                        )}
                       </div>
-                      
-                      {/* 10-Dot Matrix Loader */}
-                      <div className="flex flex-col items-start sm:items-end gap-1.5">
-                        <div className="flex gap-1.5">
-                          {Array.from({ length: 10 }).map((_, idx) => (
-                            <div
-                              key={idx}
-                              className="w-2.5 h-2.5 rounded-full transition-all duration-300 shrink-0"
-                              style={{
-                                backgroundColor: idx < activeDots ? meta.accent : 'var(--ink)',
-                                opacity: idx < activeDots ? 1 : 0.15
-                              }}
-                            />
-                          ))}
+                      {key === 'mustaqbal' && totalGoldValuation > 0 && (
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="font-mono-main text-[8px] font-bold text-ink/35 uppercase tracking-widest">
+                            Cash <span className="text-ink/55">{formatEGP(buckets['mustaqbal'] || 0)}</span>
+                          </span>
+                          <span className="font-mono-main text-[8px] font-bold uppercase tracking-widest" style={{ color: 'var(--pomo-overtime)' }}>
+                            Gold {formatEGP(totalGoldValuation)}
+                          </span>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 );
-              })()}
-
-              {/* 2. THE OTHER 3 BUCKETS - GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {(['tawarr2', 'basmala', 'sadaqa'] as Array<keyof FinanceBuckets>).map(key => {
-                  const meta = BUCKET_META[key];
-                  const value = buckets[key] || 0;
-                  const percentOfTotal = totalVirtual > 0 ? (value / totalVirtual) * 100 : 0;
-                  const activeDots = Math.max(0, Math.min(10, Math.round(percentOfTotal / 10)));
-                  return (
-                    <div key={key} className="brutalist-card no-lift group flex flex-col justify-between p-5 bg-paper-dark min-h-[140px] relative">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 shrink-0 rounded-full" style={{ backgroundColor: meta.accent }} />
-                          <p className="font-sans-main text-sm font-black uppercase tracking-wider text-ink/75">
-                            {meta.en}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-end justify-between mt-6">
-                        <MaskedValue disabled={!privacyMode} className="font-mono-main text-xl font-black text-ink">
-                          {formatEGP(value)}
-                        </MaskedValue>
-                        
-                        {/* 10-Dot Matrix Loader */}
-                        <div className="flex gap-1">
-                          {Array.from({ length: 10 }).map((_, idx) => (
-                            <div
-                              key={idx}
-                              className="w-1.5 h-1.5 rounded-full transition-all duration-300 shrink-0"
-                              style={{
-                                backgroundColor: idx < activeDots ? meta.accent : 'var(--ink)',
-                                opacity: idx < activeDots ? 1 : 0.15
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+              })}
             </div>
           </section>
         )}
