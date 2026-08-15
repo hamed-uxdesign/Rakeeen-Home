@@ -425,8 +425,35 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const [glasses, setGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
   const [workouts] = useFirebaseSync<any[]>('fitness_workouts', []);
   const [financeBanks] = useFirebaseSync<Record<string, number>>('finance_banks', {});
-  const [dailyHistory, setDailyHistory] = useFirebaseSync<Record<string, { water: number; focus: number; workout: number }>>('daily_history', {});
+  const [dailyHistory, setDailyHistory, dailyHistoryReady] = useFirebaseSync<Record<string, { water: number; focus: number; workout: number }>>('daily_history', {});
   const [dailyJournal, setDailyJournal] = useFirebaseSync<Record<string, string>>('daily_journal', {});
+  const [hydrationHistory] = useFirebaseSync<Record<string, number>>('hydration_history', {});
+  const [pomoHistory] = useFirebaseSync<Record<string, { sessions: number; minutes: number }>>('pomodoro_history', {});
+
+  // ONE-TIME patch: reconstruct Aug 1-3 2026 entries from hydration_history + pomodoro_history
+  // Remove this block after the data is recovered (check localStorage flag 'boomy_aug_patch_v1')
+  useEffect(() => {
+    if (!dailyHistoryReady) return;
+    if (localStorage.getItem('boomy_aug_patch_v1')) return;
+    const DAYS: Array<{ dateStr: string; iso: string }> = [
+      { dateStr: 'Sat Aug 01 2026', iso: '2026-08-01' },
+      { dateStr: 'Sun Aug 02 2026', iso: '2026-08-02' },
+      { dateStr: 'Mon Aug 03 2026', iso: '2026-08-03' },
+    ];
+    const patches: Record<string, { water: number; focus: number; workout: number }> = {};
+    for (const { dateStr, iso } of DAYS) {
+      const water = hydrationHistory[dateStr] ?? 0;
+      const focus = pomoHistory[dateStr]?.minutes ?? 0;
+      if (water > 0 || focus > 0) {
+        patches[iso] = { water, focus, workout: dailyHistory[iso]?.workout ?? 0 };
+      }
+    }
+    if (Object.keys(patches).length > 0) {
+      setDailyHistory(prev => ({ ...prev, ...patches }));
+      console.log('[Boomy patch] Restored Aug 1-3 data:', patches);
+    }
+    localStorage.setItem('boomy_aug_patch_v1', '1');
+  }, [dailyHistoryReady, hydrationHistory, pomoHistory]);
   const { pendingItems } = useFinance();
   const totalPhysical = Object.values(financeBanks).reduce((a, b) => a + (Number(b) || 0), 0);
   
@@ -450,8 +477,11 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
   const focusHours = (focusMinutes / 60).toFixed(1).replace('.0', '');
 
   // Save today's snapshot whenever key data changes
+  // IMPORTANT: wait for dailyHistoryReady — if we write before Firestore loads,
+  // prev={} and we overwrite all past days with only today's data.
   const todayKey = getLogicalDate().toISOString().slice(0, 10);
   useEffect(() => {
+    if (!dailyHistoryReady) return;
     if (glasses === 0 && focusMinutes === 0 && workoutMinsToday === 0) return;
     setDailyHistory(prev => {
       const existing = prev[todayKey] ?? { water: 0, focus: 0, workout: 0 };
@@ -464,7 +494,7 @@ export const Home: React.FC<HomeProps> = ({ navigate }) => {
         },
       };
     });
-  }, [glasses, focusMinutes, workoutMinsToday]);
+  }, [glasses, focusMinutes, workoutMinsToday, dailyHistoryReady]);
 
   // Compute 7-day pattern for emotional greeting awareness
   const weekPattern = (() => {

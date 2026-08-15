@@ -22,6 +22,42 @@ const TOTAL_PAGES = 604;
 const STORAGE_KEY = 'quran_last_page';
 const TRIGGER_ZONE = 80;
 
+const DAILY_GOAL = 10;
+const PROGRESS_KEY = 'quran_daily_progress';
+
+interface QuranProgress {
+  fajrDayKey: string;
+  startPage: number;
+  maxPageReached: number;
+  pagesRead: number;
+}
+
+function getFajrDayKey(): string {
+  try {
+    const times = JSON.parse(localStorage.getItem('prayer_times') || '{}');
+    const fajr: string = times['Fajr'] || '05:00';
+    const [fh, fm] = fajr.split(':').map(Number);
+    const now = new Date();
+    if (now.getHours() * 60 + now.getMinutes() < fh * 60 + fm) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().slice(0, 10);
+    }
+    return now.toISOString().slice(0, 10);
+  } catch {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+
+function loadProgress(): QuranProgress | null {
+  try { const s = localStorage.getItem(PROGRESS_KEY); return s ? JSON.parse(s) : null; }
+  catch { return null; }
+}
+
+function saveProgress(p: QuranProgress) {
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify(p));
+}
+
 function audioUrl(reciter: Reciter, n: number) {
   return `https://cdn.islamic.network/quran/audio/128/${reciter}/${n}.mp3`;
 }
@@ -48,14 +84,48 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
   const [isDark, setIsDark] = useState(() => document.body.classList.contains('dark-theme'));
   const [showHeader, setShowHeader] = useState(false);
   const [showFooter, setShowFooter] = useState(false);
+  const [pagesRead, setPagesRead] = useState(0);
 
   // Refs to avoid stale closures in audio callbacks
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const progressRef = useRef<QuranProgress | null>(null);
   const ayahsRef = useRef<Ayah[]>([]);
   const reciterRef = useRef<Reciter>(reciter);
   const mutedRef = useRef(muted);
   const pageRef = useRef(page);
   const pendingAutoPlay = useRef(false);
+
+  // Init daily progress — reset if new Fajr day
+  useEffect(() => {
+    const dayKey = getFajrDayKey();
+    const saved = loadProgress();
+    if (!saved || saved.fajrDayKey !== dayKey) {
+      const fresh: QuranProgress = { fajrDayKey: dayKey, startPage: page, maxPageReached: page, pagesRead: 0 };
+      saveProgress(fresh);
+      progressRef.current = fresh;
+      setPagesRead(0);
+    } else {
+      progressRef.current = saved;
+      setPagesRead(saved.pagesRead);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track forward page navigation
+  useEffect(() => {
+    const prog = progressRef.current;
+    if (!prog) return;
+    if (page > prog.maxPageReached) {
+      const updated: QuranProgress = {
+        ...prog,
+        maxPageReached: page,
+        pagesRead: prog.pagesRead + (page - prog.maxPageReached),
+      };
+      progressRef.current = updated;
+      saveProgress(updated);
+      setPagesRead(updated.pagesRead);
+    }
+  }, [page]);
 
   useEffect(() => { ayahsRef.current = ayahs; }, [ayahs]);
   useEffect(() => { reciterRef.current = reciter; }, [reciter]);
@@ -333,6 +403,10 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
           <ChevronLeft size={16} />
         </button>
 
+        <div className="flex flex-col items-center gap-1.5">
+          <span className="font-mono-main uppercase tracking-[0.2em] text-ink/40" style={{ fontSize: 9 }}>
+            {pagesRead}/{DAILY_GOAL} today
+          </span>
         <form onSubmit={e => { e.preventDefault(); const n = parseInt(goInput); if (n) goTo(n); setGoInput(''); }} className="flex items-center gap-2">
           <input
             type="number" min={1} max={TOTAL_PAGES} value={goInput}
@@ -342,6 +416,7 @@ export const QuranReader: React.FC<Props> = ({ navigate }) => {
           />
           <button type="submit" className="btn-brutalist px-3 py-1.5 text-xs font-mono-main cursor-pointer">Go</button>
         </form>
+        </div>
 
         <button onClick={() => goTo(page - 1)} disabled={page <= 1} className="btn-brutalist px-3 py-2 flex items-center cursor-pointer disabled:opacity-20">
           <ChevronRight size={16} />

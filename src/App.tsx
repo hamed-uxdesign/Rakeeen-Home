@@ -13,8 +13,11 @@ import { TouchIDGate } from './components/dashboard/TouchIDGate';
 import { CustomCursor } from './components/ui/CustomCursor';
 import { FloatingTimer } from './components/ui/FloatingTimer';
 import { FloatingRadioButton } from './components/ui/FloatingRadioButton';
+import { Bommy } from './components/dashboard/Bommy';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { PomodoroProvider } from './hooks/usePomodoro';
+import { PomodoroProvider, usePomodoro } from './hooks/usePomodoro';
+import { usePrayer } from './hooks/usePrayer';
+import { useFirebaseSync } from './hooks/useFirebaseSync';
 import { FastingManager } from './components/logic/FastingManager';
 import { CalendarResetManager } from './components/logic/CalendarResetManager';
 import { DeviceCodeBanner } from './components/ui/DeviceCodeBanner';
@@ -36,6 +39,21 @@ const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, loading, biometricCleared, setBiometricCleared } = useAuth();
+
+  const [waterGlasses] = useFirebaseSync<number>('hydration_glasses', 0);
+  const { weekStats, todayIdx } = usePomodoro();
+  const focusMinutesToday = Math.round(weekStats?.[todayIdx]?.minutes ?? 0);
+
+  // Bommy system awareness
+  const [calendarData] = useFirebaseSync<Record<string, { date?: string }>>('calendar_entries', {});
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const calendarTaskCount = Object.values(calendarData ?? {}).filter(e => e?.date === todayStr).length;
+
+  const [financeBuckets] = useFirebaseSync<Record<string, number>>('finance_buckets', {});
+  const totalBalance = Object.values(financeBuckets ?? {}).reduce((a, b) => a + b, 0);
+
+  const quranPage = Number(localStorage.getItem('quran_last_page') ?? 0);
+  const { nextPrayer } = usePrayer();
 
   const nav = (to: string) => {
     const path = to === 'home' ? '/' : `/${to}`;
@@ -96,6 +114,16 @@ const AppRoutes: React.FC = () => {
       <DeviceCodeBanner user={user} />
 
       <FloatingRadioButton onNavigate={() => nav('devotion?tab=radio')} />
+      <Bommy
+        page={currentPage}
+        waterCount={waterGlasses}
+        waterGoal={12}
+        focusMinutes={focusMinutesToday}
+        calendarTaskCount={calendarTaskCount}
+        totalBalance={totalBalance}
+        quranSurah={quranPage > 0 ? `P${quranPage}` : undefined}
+        nextPrayer={nextPrayer?.name}
+      />
     </div>
   );
 };
